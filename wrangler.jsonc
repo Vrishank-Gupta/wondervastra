@@ -7,7 +7,13 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "wondervastra" }],
   // Non-secret settings. Secrets (database token, Razorpay, Cloudinary…) are set with `wrangler secret put`.
-  "vars": { "CF_BUILD": "1" },
+  // The shop's own domain (DNS on Cloudflare). www redirects are handled by the same worker.
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "wondervastra.in", "custom_domain": true },
+    { "pattern": "www.wondervastra.in", "custom_domain": true }
+  ],
+  "vars": { "CF_BUILD": "1", "NEXT_PUBLIC_SITE_URL": "https://wondervastra.in" },
   // Expires unpaid orders and releases their stock (see src/app/api/cron/route.ts).
   "triggers": { "crons": ["*/15 * * * *"] },
   "observability": { "enabled": true }

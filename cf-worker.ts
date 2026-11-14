@@ -8,10 +8,18 @@ import handler from "./.open-next/worker.js";
 type Env = { CRON_SECRET?: string; NEXT_PUBLIC_SITE_URL?: string };
 
 export default {
-  fetch: handler.fetch,
+  // One address for the shop: www.wondervastra.in → wondervastra.in, keeping the path.
+  fetch(req: Request, env: Env, ctx: unknown) {
+    const url = new URL(req.url);
+    if (url.hostname.startsWith("www.")) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.toString(), 301);
+    }
+    return handler.fetch(req, env, ctx);
+  },
   async scheduled(_event: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) {
     if (!env.CRON_SECRET) return;
-    const url = new URL("/api/cron", env.NEXT_PUBLIC_SITE_URL || "https://wondervastra.workers.dev");
+    const url = new URL("/api/cron", env.NEXT_PUBLIC_SITE_URL || "https://wondervastra.in");
     ctx.waitUntil(handler.fetch(new Request(url, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }), env, ctx));
   },
 };
