@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: { default: "WonderVastra | 100% original brands, lowest prices", template: "%s | WonderVastra" },
-  description: "100% original branded thermals for men, kids and babies (0+) at the lowest prices, with more innerwear and our own hoodies coming soon. Secure payment, order tracking on WhatsApp and delivery across India.",
+  description: "100% original branded thermals for kids, babies (0+) and men at the lowest prices. Secure payment, order tracking on WhatsApp and delivery across India.",
   openGraph: { siteName: "WonderVastra", type: "website", locale: "en_IN", images: ["/seed/px-15072827-wide.jpg"] },
   ...(previewMode() ? { robots: { index: false, follow: false } } : {}),
 };

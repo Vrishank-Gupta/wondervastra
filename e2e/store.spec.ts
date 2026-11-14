@@ -33,7 +33,7 @@ async function adminLogin(page: Page) {
 test("browse, search, cart nudges, coupon, simulated payment, confirmation", async ({ page }) => {
   await page.goto("/?utm_source=instagram&utm_campaign=reel1");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("WonderVastra");
-  await expect(page.getByRole("heading", { name: "Shop by category" })).toBeVisible();
+  await expect(page.getByText(/Our hero range/)).toBeVisible();
 
   await page.getByRole("searchbox", { name: /search/i }).or(page.getByLabel("Search products").first()).first().fill("boys thermal top");
   await expect(page.getByRole("link", { name: /Boys' Thermal Top/ }).first()).toBeVisible();
@@ -419,7 +419,10 @@ test("timed sale and cart offer created in admin take effect, and expire", async
 });
 
 test("coming soon: listed but not buyable, buyers sign up, launching notifies them once", async ({ page, request }) => {
+  // Every coming-soon range is switched off on the site for now, so bring one listing back for this test.
   const slug = "wondervastra-originals-essential-pullover-hoodie";
+  await db.execute("update categories set active=1 where slug='hoodies'");
+  await db.execute({ sql: "update products set status='active' where slug=?", args: [slug] });
   const p = await one("select id, coming_soon from products where slug=?", [slug]);
   expect(Number(p.coming_soon)).toBe(1);
 
@@ -456,12 +459,14 @@ test("coming soon: listed but not buyable, buyers sign up, launching notifies th
 
   await page.goto(`/p/${slug}`);
   await expect(page.getByRole("button", { name: "Add to cart" }).first()).toBeVisible();
+  await db.execute("update categories set active=0 where slug='hoodies'");
+  await db.execute({ sql: "update products set status='archived', coming_soon=1 where slug=?", args: [slug] });
 });
 
-test("brands: brand pages, brand filter, own label section, and a brand-wide sale", async ({ page }) => {
+test("brands: brand pages, brand filter, own label hidden until it has stock, and a brand-wide sale", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Shop by brand" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "WonderVastra Originals" }).last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "WonderVastra Originals" })).toHaveCount(0);
 
   await page.goto("/brands");
   await page.getByRole("link", { name: /^Lux/ }).first().click();
@@ -501,20 +506,23 @@ test("brands: brand pages, brand filter, own label section, and a brand-wide sal
   await db.execute("update sales set ends_at=1000 where name='Amul Week'");
 });
 
-test("what's live vs coming soon: kids' shortcuts, launching categories can't be bought", async ({ page, request }) => {
+test("only thermals are on the site: kids' lead, other ranges are hidden and can't be bought", async ({ page, request }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Kids' thermals" }).last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kids' thermals" }).first()).toBeVisible();
+  await expect(page.getByText("Coming soon")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Categories" }).getByRole("link").nth(2)).toHaveText("Kids' Thermals");
   await page.locator('a[href="/c/kids-thermals?collection=baby"]').first().click();
   await page.waitForURL("**/c/kids-thermals?collection=baby");
   const babies = Number((await one("select count(*) n from products where status='active' and tags like '%\"baby\"%'")).n);
   await expect(page.getByText(`${babies} items`)).toBeVisible();
 
-  await page.goto("/c/mens-vests");
-  await expect(page.getByText("This range isn't on sale yet")).toBeVisible();
+  // Hidden ranges are gone from the site and refused at checkout.
+  expect((await page.goto("/c/mens-vests"))?.status()).toBe(404);
+  expect((await page.goto("/p/lux-classic-cotton-vest"))?.status()).toBe(404);
   const vest = await variantOf("lux-classic-cotton-vest", 20);
   const res = await createOrder(request, { ...buyer(60), items: [{ variantId: vest, qty: 1 }] });
   expect(res.status()).toBe(409);
-  // A live category shows no launch notice.
-  await page.goto("/c/mens-thermals");
-  await expect(page.getByText("This range isn't on sale yet")).toHaveCount(0);
+  await page.goto("/shop");
+  const live = Number((await one("select count(*) n from products where status='active'")).n);
+  await expect(page.getByText(`${live} items`)).toBeVisible();
 });

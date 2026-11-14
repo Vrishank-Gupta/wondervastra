@@ -3,7 +3,7 @@ import { db, schema } from "@/db";
 
 export const DEFAULT_SETTINGS = {
   storeName: "WonderVastra",
-  tagline: "100% original brands at the lowest prices. Innerwear, thermals and our own label, delivered across India.",
+  tagline: "100% original brands at the lowest prices. Thermals for kids, babies and men, delivered across India.",
   announcement: "",
   supportEmail: "",
   whatsappNumber: "",

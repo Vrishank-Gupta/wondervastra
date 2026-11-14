@@ -3,7 +3,7 @@ import Link from "next/link";
 import { filtersFromParams, Listing } from "@/components/store/listing";
 import { getActiveCategories, getAllCards } from "@/lib/catalog";
 
-export const metadata: Metadata = { title: "Shop all", description: "Men's and kids' thermals from top brands, with vests, briefs, women's wear, socks and our own hoodies coming soon." };
+export const metadata: Metadata = { title: "Shop all", description: "Kids' and men's thermals from top brands: 100% original, at the lowest prices." };
 const TITLES: Record<string, string> = { kids: "Kids' thermals", baby: "Baby thermals (0–24 months)", boys: "Boys' thermals", girls: "Girls' thermals", winter: "Winter warmers", everyday: "Everyday essentials", new: "New in", value: "Value packs", sport: "Sport & active", bestseller: "Bestsellers" };
 
 export default async function Shop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

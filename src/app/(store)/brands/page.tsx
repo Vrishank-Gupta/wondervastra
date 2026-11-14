@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BrandTile } from "@/components/store/brand-tile";
 import { getActiveBrands } from "@/lib/catalog";
 
-export const metadata: Metadata = { title: "Shop by brand", description: "Innerwear and thermals from the brands you already trust, plus our own label." };
+export const metadata: Metadata = { title: "Shop by brand", description: "Thermals from the brands you already trust, 100% original at the lowest prices." };
 
 export default async function Brands() {
   const brands = await getActiveBrands();

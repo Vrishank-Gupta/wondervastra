@@ -30,15 +30,18 @@ type ColorKey = keyof typeof C;
 /** Partner brands are placeholders standing in for the real ones the store will stock. */
 const BRANDS = [
   { slug: "wondervastra-originals", name: "WonderVastra Originals", tagline: "Our own label. Hoodies first, more soon.", house: true },
-  { slug: "lux", name: "Lux", tagline: "Vests, briefs and thermals" },
-  { slug: "amul", name: "Amul", tagline: "Everyday innerwear and thermals" },
-  { slug: "rupa", name: "Rupa", tagline: "Innerwear and winter wear" },
-  { slug: "dollar", name: "Dollar", tagline: "Innerwear, socks and thermals" },
+  { slug: "lux", name: "Lux", tagline: "Thermals for kids and men" },
+  { slug: "amul", name: "Amul", tagline: "Everyday thermals" },
+  { slug: "rupa", name: "Rupa", tagline: "Winter wear for the family" },
+  { slug: "dollar", name: "Dollar", tagline: "Warm, everyday thermals" },
 ] as const;
 
+// Only these ranges are on the site for now (kids' first, as the hero range). The rest are seeded switched off
+// (category inactive, listings archived) so the owner can bring each back from the admin when stock arrives.
+const SHOWN = new Set(["kids-thermals", "mens-thermals"]);
 const CATEGORIES = [
-  { slug: "mens-thermals", name: "Men's Thermals", tagline: "Warm base layers for winter", hsn: "6107" },
   { slug: "kids-thermals", name: "Kids' Thermals", tagline: "Baby (0–24 months), boys and girls", hsn: "6111" },
+  { slug: "mens-thermals", name: "Men's Thermals", tagline: "Warm base layers for winter", hsn: "6107" },
   { slug: "womens-thermals", name: "Women's Thermals", tagline: "Slim, warm layers under anything", hsn: "6108" },
   { slug: "mens-vests", name: "Men's Vests", tagline: "Cotton vests for daily wear", hsn: "6109" },
   { slug: "briefs-trunks", name: "Briefs & Trunks", tagline: "Everyday comfort, packs that last", hsn: "6107" },
@@ -125,7 +128,7 @@ for (const [i, c] of CATEGORIES.entries()) {
   const id = newId();
   catIds.set(c.slug, id);
   const image = await categoryPhoto(c.slug);
-  await db.insert(schema.categories).values({ id, name: c.name, slug: c.slug, tagline: c.tagline, image, sortOrder: i });
+  await db.insert(schema.categories).values({ id, name: c.name, slug: c.slug, tagline: c.tagline, image, sortOrder: i, active: SHOWN.has(c.slug) });
 }
 const brandIds = new Map<string, string>();
 for (const [i, b] of BRANDS.entries()) {
@@ -150,7 +153,7 @@ for (const p of PRODUCTS) {
   const sizes = p.sizes ?? SOCK;
   t += 3_600_000;
   await db.insert(schema.products).values({
-    id, name: p.name, slug, categoryId: catIds.get(p.cat)!, brandId: brandIds.get(p.brand)!, status: "active",
+    id, name: p.name, slug, categoryId: catIds.get(p.cat)!, brandId: brandIds.get(p.brand)!, status: SHOWN.has(p.cat) && !p.soon ? "active" : "archived",
     price: p.price * 100, compareAtPrice: p.mrp ? p.mrp * 100 : null,
     shortDescription: p.short,
     description: `${p.short}\n\nSample listing text. Replace it with the real details of this product from the seller admin.`,

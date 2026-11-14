@@ -8,7 +8,7 @@ const contactLine = (s: StoreSettings) => s.supportEmail || s.whatsappNumber ? `
 
 const PAGES: Record<string, Page> = {
   about: { title: "Our story", body: (s) => <>
-    <p>{s.storeName} started with a simple idea: the everyday things you wear should be made well. We bring the innerwear and thermal brands you already trust into one easy store: 100% original products, at the lowest prices we can offer, and we're building our own label, starting with hoodies.</p>
+    <p>{s.storeName} started with a simple idea: the everyday things you wear should be made well. We bring the thermal brands you already trust into one easy store, starting with warm layers for kids, babies and men: 100% original products, at the lowest prices we can offer.</p>
     <h2>What we care about</h2>
     <ul><li>Comfort you can wear all day</li><li>Colours that go with what you already own</li><li>Honest pricing and clear delivery charges</li><li>Keeping you updated at every step of your order</li></ul>
   </> },

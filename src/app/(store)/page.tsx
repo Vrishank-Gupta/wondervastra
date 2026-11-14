@@ -44,14 +44,14 @@ export default async function Home() {
 
   const saleScope = sale ? (sale.scope === "all" ? "everything" : sale.scope === "category" ? categories.filter((c) => sale.targetIds.includes(c.id)).map((c) => c.name.toLowerCase()).join(" and ") || "selected styles" : sale.scope === "brand" ? brands.filter((b) => sale.targetIds.includes(b.id)).map((b) => b.name).join(" and ") || "selected brands" : "selected styles") : "";
   const slides: Slide[] = [
+    ...(categories.some((c) => c.slug === "kids-thermals" && !c.comingSoon) ? [{ key: "kids", eyebrow: "Baby (0+), boys & girls", title: "Kids' thermals",
+      text: "Soft, warm layers for little ones. 100% original brands at the lowest prices.", cta: "Shop kids'", href: "/c/kids-thermals",
+      ...bannerSrc("kids"), alt: "Baby in a white long-sleeve top and red beanie" }] : []),
     ...(sale ? [{
       key: "sale", eyebrow: `Ends in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`, title: sale.name,
       text: `${sale.type === "percent" ? `${sale.value}% off` : `${money(sale.value)} off`} ${saleScope}.`, cta: "Shop the sale", href: "/sale",
       ...bannerSrc("sale"), alt: "Man in warm winter wear outdoors in the snow",
     }] : []),
-    ...(categories.some((c) => c.slug === "kids-thermals" && !c.comingSoon) ? [{ key: "kids", eyebrow: "Baby (0+), boys & girls", title: "Kids' thermals",
-      text: "Soft, warm layers for little ones, from top brands.", cta: "Shop kids'", href: "/c/kids-thermals",
-      ...bannerSrc("kids"), alt: "Baby in a white long-sleeve top and red beanie" }] : []),
     ...(partners.length > 0 ? [{ key: "brands", eyebrow: `${partners.length} trusted ${partners.length === 1 ? "brand" : "brands"}`, title: "Brands you know",
       text: `${partners.slice(0, 4).map((b) => b.name).join(", ")}${partners.length > 4 ? " and more" : ""}. Genuine stock, one cart.`, cta: "Shop by brand", href: "/brands",
       ...bannerSrc("brands"), alt: "Man in a white cotton vest" }] : []),
@@ -61,19 +61,42 @@ export default async function Home() {
   ];
 
   const promos = [
-    { slug: "mens-thermals", title: "Men's thermals", text: "Warm base layers for winter" },
     { slug: "kids-thermals", title: "Kids' thermals", text: "Baby (0+), boys and girls" },
+    { slug: "mens-thermals", title: "Men's thermals", text: "Warm base layers for winter" },
   ].filter((p) => catImage(p.slug) && categories.some((c) => c.slug === p.slug && !c.comingSoon));
   const kidsCat = categories.find((c) => c.slug === "kids-thermals" && !c.comingSoon);
+  const kidsItems = kidsCat ? buyable.filter((c) => c.categoryId === kidsCat.id).slice(0, 10) : [];
   const audiences = AUDIENCES.filter((a) => cards.some((c) => c.categoryId === kidsCat?.id && c.tags.includes(a.tag)));
   const launching = categories.filter((c) => c.comingSoon && !houseItems.some((h) => h.categoryId === c.id));
 
   return (
     <>
-      <h1 className="sr-only">WonderVastra: 100% original branded innerwear and thermals at the lowest prices</h1>
+      <h1 className="sr-only">WonderVastra: 100% original branded kids' and men's thermals at the lowest prices</h1>
       <HeroCarousel slides={slides} />
 
-      <section aria-label="Our promise" className="bg-ink text-white">
+      {kidsCat && audiences.length > 0 && (
+        <section aria-label="Kids' thermals" className="container-x pt-8 sm:pt-12">
+          <p className="eyebrow text-madder">Our hero range · Baby (0+), boys &amp; girls</p>
+          <SectionTitle title="Kids' thermals" href="/c/kids-thermals" cta="Shop all kids'" />
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {audiences.map((a) => (
+              <Link key={a.tag} href={`/c/kids-thermals?collection=${a.tag}`} className="group relative block aspect-[4/5] overflow-hidden bg-sand-soft sm:aspect-[5/4]">
+                <Image src={a.img} alt="" fill sizes="33vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
+                <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
+                <span className="absolute inset-x-0 bottom-0 p-3 text-white sm:p-5">
+                  <span className="font-display block text-3xl leading-none sm:text-5xl">{a.label}</span>
+                  <span className="mt-1 block text-xs text-white/85 sm:text-sm">{a.sub}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+      {kidsItems.length > 0 && <ProductRail title="Kids' favourites" href="/c/kids-thermals" products={kidsItems} wished={wished} />}
+
+
+
+      <section aria-label="Our promise" className="mt-12 bg-ink text-white sm:mt-16">
         <div className="container-x grid gap-6 py-8 sm:py-10 lg:grid-cols-[1.1fr_2fr] lg:items-center lg:gap-10">
           <p className="font-display text-[2.6rem] leading-[0.92] uppercase sm:text-6xl">
             100% original.<br /><span className="text-madder">Lowest prices.</span>
@@ -112,47 +135,26 @@ export default async function Home() {
         </section>
       )}
 
-      <section className="container-x pt-10 sm:pt-14">
-        <SectionTitle title="Shop by category" href="/shop" cta="Shop all" />
-        <div className="rail lg:grid lg:grid-cols-8 lg:gap-3">
-          {categories.map((c) => {
-            const tile = catImage(c.slug);
-            return (
-              <Link key={c.id} href={`/c/${c.slug}`} className="group w-[30%] shrink-0 sm:w-[22%] lg:w-auto">
-                <span className="relative block aspect-square overflow-hidden bg-sand-soft">
-                  {tile && <Image src={tile} alt="" fill sizes="(max-width:1024px) 30vw, 12vw" className={`object-cover transition-transform duration-500 group-hover:scale-105 ${c.comingSoon ? "opacity-60 grayscale-[40%]" : ""}`} />}
-                  {c.comingSoon ? <span className="absolute inset-x-0 bottom-0 bg-ink/80 py-1 text-center text-[10px] font-bold tracking-[0.08em] text-white uppercase">Coming soon</span>
-                    : <span className="absolute top-1.5 left-1.5 bg-madder px-1.5 py-0.5 text-[9px] font-bold tracking-[0.08em] text-white uppercase">Shop now</span>}
-                </span>
-                <span className="mt-2 block text-center text-[11px] font-bold tracking-[0.06em] uppercase sm:text-xs">{c.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {kidsCat && audiences.length > 0 && (
-        <section className="container-x pt-12 sm:pt-16">
-          <SectionTitle title="Kids' thermals" href="/c/kids-thermals" cta="Shop all kids'" />
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {audiences.map((a) => (
-              <Link key={a.tag} href={`/c/kids-thermals?collection=${a.tag}`} className="group relative block aspect-[4/5] overflow-hidden bg-sand-soft sm:aspect-[5/4]">
-                <Image src={a.img} alt="" fill sizes="33vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
-                <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
-                <span className="absolute inset-x-0 bottom-0 p-3 text-white sm:p-5">
-                  <span className="font-display block text-3xl leading-none sm:text-5xl">{a.label}</span>
-                  <span className="mt-1 block text-xs text-white/85 sm:text-sm">{a.sub}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
+      {promos.length > 0 && (
+        <section className="container-x grid gap-3 pt-12 sm:grid-cols-2 sm:pt-16">
+          {promos.map((p) => (
+            <Link key={p.slug} href={`/c/${p.slug}`} className="group relative block aspect-[4/3] overflow-hidden bg-sand-soft sm:aspect-[5/4] lg:aspect-[16/11]">
+              <Image src={catImage(p.slug)!} alt="" fill sizes="(max-width:640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <span className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7">
+                <span className="font-display block text-4xl sm:text-5xl">{p.title}</span>
+                <span className="mt-1 block text-sm text-white/85">{p.text}</span>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold tracking-[0.1em] uppercase underline underline-offset-4">Shop now <ArrowRight size={14} aria-hidden /></span>
+              </span>
+            </Link>
+          ))}
         </section>
       )}
 
       {partners.length > 0 && (
         <section className="container-x pt-12 sm:pt-16">
           <SectionTitle title="Shop by brand" href="/brands" cta="All brands" />
-          <div className="rail lg:grid lg:grid-cols-5 lg:gap-3">
+          <div className="rail lg:grid lg:grid-cols-[repeat(var(--n),minmax(0,1fr))] lg:gap-3" style={{ "--n": Math.min(5, partners.length + (house ? 1 : 0)) } as React.CSSProperties}>
             {[...(house ? [house] : []), ...partners].slice(0, 10).map((b) => (
               <div key={b.id} className="w-[40%] shrink-0 sm:w-[28%] lg:w-auto"><BrandTile brand={b} /></div>
             ))}
@@ -185,22 +187,6 @@ export default async function Home() {
               ))}
             </div>
           </div>
-        </section>
-      )}
-
-      {promos.length > 0 && (
-        <section className="container-x grid gap-3 pt-12 sm:grid-cols-2 sm:pt-16">
-          {promos.map((p) => (
-            <Link key={p.slug} href={`/c/${p.slug}`} className="group relative block aspect-[4/3] overflow-hidden bg-sand-soft sm:aspect-[5/4] lg:aspect-[16/11]">
-              <Image src={catImage(p.slug)!} alt="" fill sizes="(max-width:640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-              <span className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7">
-                <span className="font-display block text-4xl sm:text-5xl">{p.title}</span>
-                <span className="mt-1 block text-sm text-white/85">{p.text}</span>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold tracking-[0.1em] uppercase underline underline-offset-4">Shop now <ArrowRight size={14} aria-hidden /></span>
-              </span>
-            </Link>
-          ))}
         </section>
       )}
 

@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const b = (await getActiveBrands()).find((x) => x.slug === slug);
   if (!b) return {};
-  return { title: `${b.name} innerwear & more`, description: b.tagline ?? `Shop ${b.name} at WonderVastra.`, openGraph: { images: b.image ? [b.image] : undefined } };
+  return { title: `${b.name} thermals`, description: b.tagline ?? `Shop ${b.name} at WonderVastra.`, openGraph: { images: b.image ? [b.image] : undefined } };
 }
 
 export default async function BrandPage({ params, searchParams }: Props) {
