@@ -129,6 +129,18 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
     );
   }
   const hasIssue = quote?.views.some((v) => v.issue);
+  const pieces = quote?.views.reduce((a, v) => a + v.qty, 0) ?? 0;
+  const itemList = (
+    <ul className="space-y-2.5">
+              {quote?.views.map((l) => (
+                <li key={l.variantId} className="flex gap-2.5">
+                  <span className="relative h-16 w-13 shrink-0 overflow-hidden rounded-sm border border-line">{l.image && <Image src={l.image} alt="" fill sizes="52px" className="object-cover" />}</span>
+                  <span className="min-w-0 flex-1 text-sm"><b className="line-clamp-1">{l.name}</b><span className="block text-xs text-ink-soft">{l.variantLabel} × {l.qty}</span>{l.issue && <span className="block text-xs font-medium text-clay">{l.issue}</span>}</span>
+                  <b className="text-sm">{money(l.lineTotal)}</b>
+                </li>
+              ))}
+            </ul>
+  );
   const nothing = quote && !quote.views.some((v) => v.qty > 0);
 
   return (
@@ -141,6 +153,20 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
       )}
       <form onSubmit={placeOrder} className="grid gap-6 pb-24 lg:grid-cols-[1fr_24rem] lg:pb-0">
         <div className="space-y-5">
+          {/* On phones the full summary sits below the form, so what's being bought is one tap away at the top. */}
+          {quote && (
+            <details className="group card lg:hidden" data-testid="mobile-summary">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2 text-sm font-semibold"><ShoppingBag size={18} aria-hidden /> Order summary · {pieces} {pieces === 1 ? "item" : "items"}<span className="font-normal text-ink-soft underline group-open:hidden">Show</span><span className="hidden font-normal text-ink-soft underline group-open:inline">Hide</span></span>
+                <b className="text-lg">{money(quote.total)}</b>
+              </summary>
+              <div className="space-y-3 border-t border-line p-4">
+                {itemList}
+                {quote.totalSavings > 0 && <p className="text-sm font-semibold text-pine">You save {money(quote.totalSavings)} on this order</p>}
+                <p className="text-xs text-ink-soft">Coupon code and full price breakdown are at the bottom, above the Pay button.</p>
+              </div>
+            </details>
+          )}
           <section className="card p-4 sm:p-5">
             <h2 className="mb-3 text-xl">Contact</h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -206,15 +232,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
           <div className="card-pop space-y-4 p-4">
             <h2 className="text-xl">Order summary</h2>
             {quote && <OfferProgress quote={quote} />}
-            <ul className="space-y-2.5">
-              {quote?.views.map((l) => (
-                <li key={l.variantId} className="flex gap-2.5">
-                  <span className="relative h-16 w-13 shrink-0 overflow-hidden rounded-sm border border-line">{l.image && <Image src={l.image} alt="" fill sizes="52px" className="object-cover" />}</span>
-                  <span className="min-w-0 flex-1 text-sm"><b className="line-clamp-1">{l.name}</b><span className="block text-xs text-ink-soft">{l.variantLabel} × {l.qty}</span>{l.issue && <span className="block text-xs font-medium text-clay">{l.issue}</span>}</span>
-                  <b className="text-sm">{money(l.lineTotal)}</b>
-                </li>
-              ))}
-            </ul>
+            {itemList}
             <CouponBox quote={quote} />
             {quote && <PriceSummary quote={quote} />}
             {error && <p className="rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">{error}</p>}

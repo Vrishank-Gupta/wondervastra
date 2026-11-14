@@ -47,7 +47,7 @@ export function ProductCard({ p, priority = false, wished = false }: { p: Card; 
         {p.comingSoon && p.launchNote && p.launchNote.trim().toLowerCase() !== "coming soon" && <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-center text-[11px] font-bold tracking-[0.06em] text-white uppercase">{p.launchNote}</span>}
       </div>
       <div className="flex flex-1 flex-col pt-2.5">
-        {p.brandName && <p className="mb-0.5 truncate text-[11px] font-extrabold tracking-[0.08em] uppercase">{p.brandSlug ? <Link href={`/brands/${p.brandSlug}`} className="hover:text-madder">{p.brandName}</Link> : p.brandName}</p>}
+        {p.brandName && <p className="mb-0.5 truncate text-[11px] font-extrabold tracking-[0.08em] uppercase">{p.brandSlug ? <Link href={`/brands/${p.brandSlug}`} className="relative -my-1.5 inline-block py-1.5 pr-2 hover:text-madder">{p.brandName}</Link> : p.brandName}</p>}
         <h3 className={`line-clamp-2 text-[13px] leading-snug sm:text-sm ${p.brandName ? "text-ink-soft" : "font-semibold"}`}><Link href={`/p/${p.slug}`} className="hover:underline">{p.name}</Link></h3>
         {p.ratingCount > 0 && <p className="mt-0.5 flex items-center gap-1 text-xs"><Star size={12} className="fill-ink" aria-hidden /><b>{p.rating.toFixed(1)}</b><span className="text-ink-soft">({p.ratingCount})</span></p>}
         <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-sm">

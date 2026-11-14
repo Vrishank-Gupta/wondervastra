@@ -84,7 +84,7 @@ export default async function ProductPage({ params }: Props) {
     <div className="container-x py-4 sm:py-6">
       <JsonLd data={jsonLd} />
       <nav aria-label="Breadcrumb" className="mb-3 truncate text-xs font-medium text-ink-soft">
-        <Link href="/shop" className="hover:underline">Shop</Link>{brand && <> / <Link href={`/brands/${brand.slug}`} className="hover:underline">{brand.name}</Link></>}{category && <> / <Link href={`/c/${category.slug}`} className="hover:underline">{category.name}</Link></>} / <span>{p.name}</span>
+        <Link href="/shop" className="-my-2 inline-block py-2 hover:underline">Shop</Link>{brand && <> / <Link href={`/brands/${brand.slug}`} className="hover:underline">{brand.name}</Link></>}{category && <> / <Link href={`/c/${category.slug}`} className="hover:underline">{category.name}</Link></>} / <span>{p.name}</span>
       </nav>
       <ProductDetail
         brand={brand ? { name: brand.name, slug: brand.slug, isHouse: brand.isHouse } : null}
