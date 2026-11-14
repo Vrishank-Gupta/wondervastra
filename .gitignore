@@ -19,3 +19,5 @@ preview/
 .dev.vars
 .env.cloudflare
 *.cfbuild-hidden
+
+.claude/settings.local.json
