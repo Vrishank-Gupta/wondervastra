@@ -1,13 +1,20 @@
 import { cache } from "react";
 import { db, schema } from "@/db";
+import { NCR_PINCODES } from "./delivery-area";
 import { clearMemo, memo } from "./memo";
 
 export const DEFAULT_SETTINGS = {
   storeName: "WonderVastra",
-  tagline: "100% original brands at the lowest prices. Thermals for kids, babies and men, delivered across India.",
+  tagline: "100% original brands at the lowest prices. Thermals for kids, babies and men.",
   announcement: "",
   supportEmail: "",
   whatsappNumber: "",
+  /** Invite link to the store's WhatsApp group or channel (chat.whatsapp.com/… or whatsapp.com/channel/…). */
+  whatsappGroupUrl: "",
+  supportHours: "Mon–Sat, 10am–7pm",
+  /** Delivery area. Blank pincode list = all of India. */
+  deliveryAreaName: "Delhi NCR",
+  deliveryPincodes: NCR_PINCODES,
   instagramUrl: "",
   facebookUrl: "",
   legalName: "",

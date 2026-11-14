@@ -10,16 +10,17 @@ import { useCart } from "./cart-context";
 import { OfferProgress } from "./offer-progress";
 import { CouponBox, PriceSummary } from "./price-summary";
 import { useQuote } from "./use-quote";
+import { AreaWaitlist, lookupPin, rememberPin, savedPin, type PinResult } from "./delivery-check";
 
 type Addr = { id: string; name: string; phone: string; line1: string; line2: string | null; city: string; state: string; pincode: string };
 type Props = {
   customer: { name: string | null; email: string | null; phone: string | null } | null;
-  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number;
+  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; deliveryArea: string;
 };
 declare global { interface Window { Razorpay?: new (o: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void } } }
 
 
-export function CheckoutClient({ customer, addresses, online, simulated, codFee }: Props) {
+export function CheckoutClient({ customer, addresses, online, simulated, codFee, deliveryArea }: Props) {
   const { items, ready, coupon, clear, setCoupon, attribution } = useCart();
   const [email, setEmail] = useState(customer?.email ?? "");
   const [name, setName] = useState(customer?.name ?? addresses[0]?.name ?? "");
@@ -36,6 +37,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pinNote, setPinNote] = useState("");
+  const [area, setArea] = useState<PinResult | null>(null);
 
   const { quote } = useQuote(items, { coupon, paymentMethod: method, email, phone, enabled: ready });
 
@@ -43,22 +45,31 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee 
     if (quote && !quote.codAvailable && method === "cod" && online) setMethod("razorpay");
   }, [quote, method, online]);
 
-  // Pincode autofill saves typing on phones. Purely a convenience: failure is silent.
+  // A buyer who already checked their pincode on a product page doesn't type it twice.
+  useEffect(() => { if (!addresses.length) setPincode((p) => p || savedPin()); }, [addresses.length]);
+
+  // Pincode: tells the buyer straight away whether we deliver there, and fills city and state.
   useEffect(() => {
-    if (!/^\d{6}$/.test(pincode)) { setPinNote(""); return; }
+    if (!/^[1-9]\d{5}$/.test(pincode)) { setPinNote(""); setArea(null); return; }
     let live = true;
-    fetch(`/api/pincode/${pincode}`).then((r) => r.ok ? r.json() : null).then((d) => {
-      if (!live || !d?.city) return;
-      setCity((c) => c || d.city);
-      if (STATES.includes(d.state)) setState((s) => s || d.state);
-      setPinNote(`${d.city}, ${d.state}`);
-    }).catch(() => {});
+    lookupPin(pincode).then((d) => {
+      if (!live || !d) return;
+      setArea(d);
+      if (d.serviceable) rememberPin(pincode);
+      const town = d.place ?? d.city;
+      if (!town) { setPinNote(""); return; }
+      setCity((c) => c || town);
+      if (d.state && STATES.includes(d.state)) setState((s) => s || d.state!);
+      setPinNote(d.state ? `${town}, ${d.state}` : town);
+    });
     return () => { live = false; };
   }, [pincode]);
+  const outside = Boolean(area && area.pincode === pincode && !area.serviceable);
 
   async function placeOrder(e: React.FormEvent) {
     e.preventDefault();
     if (!quote) return;
+    if (outside) { setError(`We don't deliver to ${pincode} yet. Please use an address in ${deliveryArea}.`); document.getElementById("pincode")?.focus(); return; }
     setBusy(true); setError("");
     try {
       const res = await fetch("/api/checkout/create", {
@@ -140,7 +151,8 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee 
           </section>
 
           <section className="card p-4 sm:p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-xl"><MapPin size={20} aria-hidden />Delivery address</h2>
+            <h2 className="mb-1 flex items-center gap-2 text-xl"><MapPin size={20} aria-hidden />Delivery address</h2>
+            {deliveryArea !== "India" && <p className="mb-3 text-sm text-ink-soft">We deliver across {deliveryArea} for now.</p>}
             {addresses.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
                 {addresses.map((a) => (
@@ -154,8 +166,14 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee 
               <div className="sm:col-span-2"><label className="label" htmlFor="name">Full name</label><input id="name" className="input" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} /></div>
               <div className="sm:col-span-2"><label className="label" htmlFor="line1">House no, building, street</label><input id="line1" className="input" autoComplete="address-line1" required value={line1} onChange={(e) => setLine1(e.target.value)} /></div>
               <div className="sm:col-span-2"><label className="label" htmlFor="line2">Area, landmark <span className="font-normal text-ink-soft">(optional)</span></label><input id="line2" className="input" autoComplete="address-line2" value={line2} onChange={(e) => setLine2(e.target.value)} /></div>
-              <div><label className="label" htmlFor="pincode">Pincode</label><input id="pincode" className="input" inputMode="numeric" autoComplete="postal-code" maxLength={6} required pattern="[1-9][0-9]{5}" title="6-digit pincode" value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ""))} />{pinNote && <p className="mt-1 text-xs font-medium text-pine">{pinNote}</p>}</div>
+              <div><label className="label" htmlFor="pincode">Pincode</label><input id="pincode" className="input" inputMode="numeric" autoComplete="postal-code" maxLength={6} required pattern="[1-9][0-9]{5}" title="6-digit pincode" value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ""))} aria-invalid={outside || undefined} aria-describedby={outside ? "pin-outside" : undefined} />{pinNote && !outside && <p className="mt-1 text-xs font-medium text-pine">{pinNote} · we deliver here</p>}</div>
               <div><label className="label" htmlFor="city">City</label><input id="city" className="input" autoComplete="address-level2" required value={city} onChange={(e) => setCity(e.target.value)} /></div>
+              {outside && area && (
+                <div id="pin-outside" className="space-y-2 rounded-sm border border-clay bg-clay-soft p-3 sm:col-span-2" role="alert">
+                  <p className="text-sm"><b>Sorry, we don&apos;t deliver to {area.place ? `${area.place} ` : ""}{area.pincode} yet.</b> We deliver only in {area.area} for now. Use a {area.area} address, or leave your number and we&apos;ll tell you when we reach you.</p>
+                  <AreaWaitlist pincode={area.pincode} place={area.place} defaultContact={phone || email} compact />
+                </div>
+              )}
               <div className="sm:col-span-2"><label className="label" htmlFor="state">State</label>
                 <select id="state" className="input" autoComplete="address-level1" required value={state} onChange={(e) => setState(e.target.value)}>
                   <option value="">Select state</option>{STATES.map((s) => <option key={s}>{s}</option>)}

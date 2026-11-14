@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { BadgeCheck, CreditCard, MessageCircle, RotateCcw, Truck } from "lucide-react";
+import { BadgeCheck, Clock, CreditCard, Mail, MessageCircle, RotateCcw, Truck, Users } from "lucide-react";
 import type { StoreSettings } from "@/lib/settings";
 import { capabilities, paymentLine } from "@/lib/capabilities";
+import { areaLabel } from "@/lib/delivery-area";
+import { waLink } from "@/lib/utils";
 import { Logo } from "../brand-logo";
 
 export function WhatsAppFab({ number }: { number: string }) {
   if (!number) return null;
   return (
     <a
-      href={`https://wa.me/${number.replace(/\D/g, "").replace(/^(?=[6-9]\d{9}$)/, "91")}?text=${encodeURIComponent("Hi WonderVastra, I have a question.")}`}
+      href={waLink(number, "Hi WonderVastra, I have a question.")}
       target="_blank" rel="noreferrer" aria-label="Chat with us on WhatsApp"
       className="fixed right-4 bottom-20 z-20 grid size-12 place-items-center rounded-full bg-[#25D366] text-white shadow-lg shadow-black/20 md:bottom-6 no-print"
     >
@@ -21,7 +23,9 @@ export function TrustStrip({ settings }: { settings: StoreSettings }) {
   const online = capabilities().onlinePayments;
   const items = [
     { icon: CreditCard, title: online ? "Secure payment" : "Easy payment", text: paymentLine(online, settings.codEnabled).replace(/ available$/, "") },
-    { icon: Truck, title: `Ships in ${settings.dispatchDays} days`, text: `Delivered in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` },
+    areaLabel(settings) === "India"
+      ? { icon: Truck, title: `Ships in ${settings.dispatchDays} days`, text: `Delivered in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` }
+      : { icon: Truck, title: `Delivering in ${areaLabel(settings)}`, text: `Arrives in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` },
     { icon: BadgeCheck, title: "100% original brands", text: "At the lowest prices" },
     { icon: RotateCcw, title: `${settings.returnWindowDays}-day returns`, text: "On eligible items" },
   ];
@@ -48,7 +52,15 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         <div className="col-span-2 md:col-span-1">
           <p aria-label="WonderVastra"><Logo onDark size="lg" /></p>
           <p className="mt-3 max-w-xs text-sm text-white/70">{settings.tagline}</p>
+          {(settings.whatsappNumber || settings.supportEmail) && (
+            <ul className="mt-5 space-y-2 text-sm" aria-label="Customer support">
+              {settings.whatsappNumber && <li><a className={`${a} inline-flex items-center gap-2`} href={waLink(settings.whatsappNumber, "Hi WonderVastra, I have a question.")} target="_blank" rel="noreferrer"><MessageCircle size={16} aria-hidden /> WhatsApp {settings.whatsappNumber}</a></li>}
+              {settings.supportEmail && <li><a className={`${a} inline-flex items-center gap-2`} href={`mailto:${settings.supportEmail}`}><Mail size={16} aria-hidden /> {settings.supportEmail}</a></li>}
+              {settings.supportHours && <li className="inline-flex items-center gap-2 text-white/55"><Clock size={16} aria-hidden /> {settings.supportHours}</li>}
+            </ul>
+          )}
           <div className="mt-5 flex flex-wrap gap-2">
+            {settings.whatsappGroupUrl && <a className="btn btn-sm border-[#25D366] bg-[#25D366] text-ink hover:bg-white" href={settings.whatsappGroupUrl} target="_blank" rel="noreferrer"><Users size={15} aria-hidden /> Join our WhatsApp group</a>}
             {settings.instagramUrl && <a className="btn btn-sm border-white/40 text-white hover:bg-white hover:text-ink" href={settings.instagramUrl} target="_blank" rel="noreferrer">Instagram</a>}
             {settings.facebookUrl && <a className="btn btn-sm border-white/40 text-white hover:bg-white hover:text-ink" href={settings.facebookUrl} target="_blank" rel="noreferrer">Facebook</a>}
           </div>

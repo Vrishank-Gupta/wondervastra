@@ -144,7 +144,8 @@ export const stockAlerts = sqliteTable(
     variantId: text("variant_id"),
     email: text("email"),
     phone: text("phone"),
-    status: text("status", { enum: ["waiting", "notified", "cancelled"] }).notNull().default("waiting"),
+    /** to_message = back in stock, but only a phone number was left and WhatsApp isn't connected: the owner messages them. */
+    status: text("status", { enum: ["waiting", "to_message", "notified", "cancelled"] }).notNull().default("waiting"),
     notifiedAt: ts("notified_at"),
     createdAt: created(),
   },
@@ -381,6 +382,20 @@ export const notifications = sqliteTable(
     updatedAt: updated(),
   },
   (t) => [index("notif_order").on(t.orderId), index("notif_status").on(t.status)],
+);
+
+/** "Tell me when you deliver to my pincode": buyers outside the delivery area. */
+export const areaRequests = sqliteTable(
+  "area_requests",
+  {
+    id: text("id").primaryKey(),
+    pincode: text("pincode").notNull(),
+    place: text("place"),
+    email: text("email"),
+    phone: text("phone"),
+    createdAt: created(),
+  },
+  (t) => [index("area_requests_pin").on(t.pincode), uniqueIndex("area_requests_contact").on(t.pincode, t.email, t.phone)],
 );
 
 export const coupons = sqliteTable("coupons", {

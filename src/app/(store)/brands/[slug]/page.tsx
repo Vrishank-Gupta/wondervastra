@@ -1,4 +1,6 @@
 import { breadcrumbs, itemList, JsonLd } from "@/lib/seo";
+import { areaLabel } from "@/lib/delivery-area";
+import { getSettings } from "@/lib/settings";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,11 +13,11 @@ type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<s
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const [b, sp] = await Promise.all([getActiveBrands().then((all) => all.find((x) => x.slug === slug)), searchParams]);
+  const [b, sp, s] = await Promise.all([getActiveBrands().then((all) => all.find((x) => x.slug === slug)), searchParams, getSettings()]);
   if (!b) return {};
   return {
     title: `${b.name} thermals online`,
-    description: `Buy 100% original ${b.name} thermals online in India at the lowest prices${b.tagline ? `: ${b.tagline.toLowerCase()}` : ""}. Delivered across India by WonderVastra.`,
+    description: `Buy 100% original ${b.name} thermals online at the lowest prices${b.tagline ? `: ${b.tagline.toLowerCase()}` : ""}. Delivered across ${areaLabel(s)} by WonderVastra.`,
     alternates: { canonical: `/brands/${b.slug}` },
     ...(Object.keys(sp).length ? { robots: { index: false, follow: true } } : {}),
     openGraph: { images: b.image ? [b.image] : undefined },

@@ -6,6 +6,7 @@ import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { money } from "@/lib/format";
 import { useCart } from "./cart-context";
 import { OfferProgress } from "./offer-progress";
+import { CartDeliveryNote } from "./delivery-check";
 import { useQuote } from "./use-quote";
 
 export function QtyStepper({ qty, max, onChange, label }: { qty: number; max: number; onChange: (n: number) => void; label: string }) {
@@ -49,6 +50,7 @@ export function CartDrawer() {
           <>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {quote && <OfferProgress quote={quote} />}
+              <CartDeliveryNote />
               {quote?.views.map((l) => (
                 <div key={l.variantId} className="flex gap-3 border-b border-line pb-3">
                   <Link href={`/p/${l.slug}`} onClick={() => setDrawerOpen(false)} className="relative h-24 w-20 shrink-0 overflow-hidden bg-sand-soft">

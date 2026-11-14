@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RestockMessages } from "@/components/admin/restock-messages";
+import { restocksToMessage } from "@/lib/inventory";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -22,6 +24,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
     db.select().from(schema.stockMovements).where(eq(schema.stockMovements.productId, id)).orderBy(desc(schema.stockMovements.createdAt)).limit(20),
     db.select().from(schema.stockAlerts).where(and(eq(schema.stockAlerts.productId, id), eq(schema.stockAlerts.status, "waiting"))),
   ]);
+  const toMessage = await restocksToMessage(id);
   return (
     <>
       <PageHead title={p.name} sub={`Last updated ${formatDateTime(p.updatedAt)}`} actions={<Link className="btn btn-white btn-sm" href={`/p/${p.slug}`} target="_blank">View on store</Link>} />
@@ -36,7 +39,8 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
       }} />
       <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 [&>*]:min-w-0">
         <Panel title={`Waiting for restock (${alerts.length})`}>
-          {alerts.length ? <ul className="space-y-1 text-sm">{alerts.map((a) => <li key={a.id} className="flex justify-between gap-2"><span>{a.email ?? a.phone}</span><span className="text-xs text-ink-soft">{formatDateTime(a.createdAt)}</span></li>)}</ul> : <p className="text-sm text-ink-soft">Nobody yet. They&apos;re messaged automatically when stock returns.</p>}
+          {alerts.length ? <ul className="space-y-1 text-sm">{alerts.map((a) => { const v = vars.find((x) => x.id === a.variantId); return <li key={a.id} className="flex justify-between gap-2"><span className="min-w-0 truncate">{a.email ?? a.phone}{v ? <span className="text-ink-soft"> · {[v.option1, v.option2].filter((x) => x && x !== "Default" && x !== "Free size").join(", ")}</span> : null}</span><span className="shrink-0 text-xs text-ink-soft">{formatDateTime(a.createdAt)}</span></li>; })}</ul> : <p className="text-sm text-ink-soft">Nobody yet. They&apos;re messaged automatically when stock returns.</p>}
+          {toMessage.length > 0 && <div className="mt-3 border-t border-line pt-2"><p className="text-sm font-semibold">Back in stock, message by hand:</p><RestockMessages rows={toMessage} /></div>}
         </Panel>
         <Panel title="Stock history">
           {moves.length ? (

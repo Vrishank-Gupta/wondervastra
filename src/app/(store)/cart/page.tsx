@@ -5,6 +5,7 @@ import { ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "@/components/store/cart-context";
 import { QtyStepper } from "@/components/store/cart-drawer";
 import { OfferProgress } from "@/components/store/offer-progress";
+import { CartDeliveryNote } from "@/components/store/delivery-check";
 import { CouponBox, PriceSummary } from "@/components/store/price-summary";
 import { useQuote } from "@/components/store/use-quote";
 import { money } from "@/lib/format";
@@ -27,6 +28,7 @@ export default function CartPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="space-y-3">
           {quote && <OfferProgress quote={quote} />}
+          <CartDeliveryNote />
           {quote?.views.map((l) => (
             <div key={l.variantId} className="flex gap-3 rounded-sm border border-line bg-white p-3">
               <Link href={`/p/${l.slug}`} className="relative h-28 w-24 shrink-0 overflow-hidden rounded-sm border border-line">{l.image && <Image src={l.image} alt="" fill sizes="96px" className="object-cover" />}</Link>

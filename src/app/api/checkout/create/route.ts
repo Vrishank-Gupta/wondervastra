@@ -8,6 +8,8 @@ import { CheckoutError, createOrder, expireUnpaidOrders } from "@/lib/orders";
 import { createRazorpayOrder, onlinePaymentsAvailable, razorpayConfigured, razorpayKeyId, simulationAllowed } from "@/lib/razorpay";
 import { newId, normalizeEmail, normalizePhone } from "@/lib/utils";
 import { PREVIEW_MESSAGE, previewMode } from "@/lib/preview";
+import { areaLabel, deliversTo } from "@/lib/delivery-area";
+import { getSettings } from "@/lib/settings";
 
 const Body = z.object({
   items: z.array(z.object({ variantId: z.string().max(40), qty: z.number().int().min(1).max(999) })).min(1).max(50),
@@ -42,6 +44,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: what[field] ? `Please check ${what[field]}.` : "Please check your details and try again." }, { status: 400 });
   }
   const b = parsed.data;
+  const settings = await getSettings();
+  if (!deliversTo(b.pincode, settings.deliveryPincodes)) {
+    return NextResponse.json({ error: `Sorry, we don't deliver to ${b.pincode} yet. We deliver only in ${areaLabel(settings)} for now.` }, { status: 400 });
+  }
   const email = normalizeEmail(b.email);
   const phone = normalizePhone(b.phone);
   if (!email) return NextResponse.json({ error: "Please enter a valid email." }, { status: 400 });

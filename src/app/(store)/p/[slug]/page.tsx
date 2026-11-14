@@ -8,7 +8,9 @@ import { ProductDetail } from "@/components/store/product-detail";
 import { ProductGrid } from "@/components/store/product-grid";
 import { RecentlyViewed } from "@/components/store/recently-viewed";
 import { wishedIds } from "@/components/store/listing";
-import { getAllCards, getProductBySlug } from "@/lib/catalog";
+import { getAllCards, getLiveOffers, getProductBySlug } from "@/lib/catalog";
+import { areaLabel } from "@/lib/delivery-area";
+import { offerTiers } from "@/lib/pricing";
 import { formatDate, money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { siteUrl } from "@/lib/utils";
@@ -37,7 +39,7 @@ export default async function ProductPage({ params }: Props) {
   const d = await getProductBySlug(slug);
   if (!d) notFound();
   const { product: p, images, variants, category, brand, reviews } = d;
-  const [settings, cards, wished] = await Promise.all([getSettings(), getAllCards(), wishedIds()]);
+  const [settings, cards, wished, offers] = await Promise.all([getSettings(), getAllCards(), wishedIds(), getLiveOffers()]);
   const related = cards.filter((c) => c.categoryId === p.categoryId && c.id !== p.id && c.inStock).slice(0, 4);
   const sameBrand = brand ? cards.filter((c) => c.brandId === brand.id && c.id !== p.id && c.categoryId !== p.categoryId && c.inStock).slice(0, 4) : [];
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
@@ -95,7 +97,8 @@ export default async function ProductPage({ params }: Props) {
         variants={variants}
         rating={{ avg, count: reviews.length }}
         wished={wished.includes(p.id)}
-        settings={{ codEnabled: settings.codEnabled, onlinePayments: capabilities().onlinePayments, dispatchDays: settings.dispatchDays, deliveryDaysMin: settings.deliveryDaysMin, deliveryDaysMax: settings.deliveryDaysMax, returnWindowDays: settings.returnWindowDays }}
+        settings={{ codEnabled: settings.codEnabled, onlinePayments: capabilities().onlinePayments, dispatchDays: settings.dispatchDays, deliveryDaysMin: settings.deliveryDaysMin, deliveryDaysMax: settings.deliveryDaysMax, returnWindowDays: settings.returnWindowDays, deliveryArea: areaLabel(settings), areaRestricted: Boolean(settings.deliveryPincodes.trim()) }}
+        tiers={offerTiers(offers)}
       />
 
       {reviews.length > 0 && (

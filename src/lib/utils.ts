@@ -48,3 +48,9 @@ export function normalizeEmail(input: string | null | undefined): string | null 
   const e = input.trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e) ? e : null;
 }
+
+/** wa.me chat link for the store's own number (10-digit Indian numbers get +91). */
+export function waLink(number: string, text?: string) {
+  const n = number.replace(/\D/g, "").replace(/^0(?=[6-9]\d{9}$)/, "").replace(/^(?=[6-9]\d{9}$)/, "91");
+  return `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+}

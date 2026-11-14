@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RestockMessages } from "@/components/admin/restock-messages";
+import { restocksToMessage } from "@/lib/inventory";
 import { desc, eq, sql } from "drizzle-orm";
 import { AlertTriangle, CheckCircle2, Circle, CreditCard, PackageOpen, RotateCcw, Truck } from "lucide-react";
 import { db, schema } from "@/db";
@@ -24,11 +26,12 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 export default async function Dashboard() {
-  const [s, settings, recent, sample] = await Promise.all([
+  const [s, settings, recent, sample, toMessage] = await Promise.all([
     dashboardStats(), getSettings(),
     db.select().from(schema.orders).where(sql`${schema.orders.status} != 'pending_payment'`).orderBy(desc(schema.orders.createdAt)).limit(8),
     // Only listings you can still sell count; archived ones don't need new photos.
     db.select({ n: sql<number>`count(*)` }).from(schema.productImages).innerJoin(schema.products, eq(schema.products.id, schema.productImages.productId)).where(sql`${schema.productImages.url} LIKE '/seed/%' AND ${schema.products.status} != 'archived'`),
+    restocksToMessage(),
   ]);
   const [{ n: productCount }] = await db.select({ n: sql<number>`count(*)` }).from(schema.products).where(eq(schema.products.status, "active"));
 
@@ -38,6 +41,7 @@ export default async function Dashboard() {
     { done: whatsappConfigured(), label: "Connect WhatsApp Cloud API (or use one-tap send on each order)", href: "/admin/settings" },
     { done: Boolean(settings.legalName && settings.businessAddress), label: "Add your legal business name and address", href: "/admin/settings" },
     { done: Boolean(settings.supportEmail && settings.whatsappNumber), label: "Add support email and WhatsApp number", href: "/admin/settings" },
+    { done: Boolean(settings.whatsappGroupUrl), label: "Add your WhatsApp group link so buyers can join", href: "/admin/settings" },
     { done: Number(sample[0].n) === 0, label: `Replace stand-in stock photos with your own product photos (${sample[0].n} left)`, href: "/admin/products" },
   ];
   const pending = checklist.filter((c) => !c.done);
@@ -62,6 +66,12 @@ export default async function Dashboard() {
               </li>
             ))}
           </ul>
+        </Panel>
+      )}
+      {toMessage.length > 0 && (
+        <Panel title={`Back in stock: message ${toMessage.length} ${toMessage.length === 1 ? "buyer" : "buyers"}`} className="mb-5 border border-ink">
+          <p className="mb-2 text-sm text-ink-soft">These buyers left a phone number for a restock alert. WhatsApp isn&apos;t connected yet, so send each one by hand.</p>
+          <RestockMessages rows={toMessage} />
         </Panel>
       )}
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

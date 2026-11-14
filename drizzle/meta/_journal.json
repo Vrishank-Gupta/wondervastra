@@ -29,6 +29,13 @@
       "when": 1794646715653,
       "tag": "0003_invoice_numbers",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794661317511,
+      "tag": "0004_area_requests",
+      "breakpoints": true
     }
   ]
 }

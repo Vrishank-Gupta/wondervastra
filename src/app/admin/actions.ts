@@ -7,7 +7,7 @@ import { db, schema } from "@/db";
 import { audit } from "@/lib/audit";
 import { clientIp, createSession, destroySession, peekLimit, rateLimit, requireAdmin, requireOwner } from "@/lib/auth";
 import { courierLink } from "@/lib/couriers";
-import { processStockAlerts } from "@/lib/inventory";
+import { alertNote, processStockAlerts } from "@/lib/inventory";
 import { pingIndexNow } from "@/lib/indexnow";
 import { previewMode } from "@/lib/preview";
 import { retryNotification, notifyOrder } from "@/lib/notifications";
@@ -16,6 +16,7 @@ import type { OrderStatus } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/passwords";
 import { refundPayment, razorpayConfigured } from "@/lib/razorpay";
 import { getSettings, saveSettings, type StoreSettings } from "@/lib/settings";
+import { parsePincodes } from "@/lib/delivery-area";
 import { newId, slugify } from "@/lib/utils";
 
 export type Result = { error?: string; ok?: boolean; id?: string; message?: string };
@@ -231,10 +232,10 @@ export async function saveProduct(input: unknown): Promise<Result> {
     await audit(a, before ? "update" : "create", "product", id, `${before ? "Updated" : "Created"} listing ${d.name}`, before ? { ...before, variants: beforeVariants } : null, d);
     // Switching off "Coming soon" is a launch: everyone who signed up hears about it once.
     const launched = Boolean(before?.comingSoon && !d.comingSoon);
-    const notified = await processStockAlerts(id, launched);
+    const notified = alertNote(await processStockAlerts(id, launched), launched);
     if (d.status === "active") await pingIndexNow([`/p/${slug}`, "/sitemap.xml"]);
     revalidatePath("/admin/products");
-    return { ok: true, id, message: notified ? `Saved. ${notified} waiting customer(s) notified it's ${launched ? "now available" : "back in stock"}.` : "Saved." };
+    return { ok: true, id, message: notified ? `Saved. ${notified}` : "Saved." };
   } catch (e) { return fail(e); }
 }
 export async function duplicateProduct(id: string): Promise<Result> {
@@ -284,10 +285,10 @@ export async function setProductStatus(id: string, status: "draft" | "active" | 
   }
   await db.update(schema.products).set({ status, updatedAt: Date.now() }).where(eq(schema.products.id, id));
   await audit(a, "status", "product", id, `${p.name}: ${p.status} → ${status}`, { status: p.status }, { status });
-  const notified = status === "active" ? await processStockAlerts(id) : 0;
+  const notified = status === "active" ? alertNote(await processStockAlerts(id)) : "";
   if (status === "active") await pingIndexNow([`/p/${p.slug}`]);
   revalidatePath("/admin/products");
-  return { ok: true, message: notified ? `Published. ${notified} waiting customer(s) notified.` : undefined };
+  return { ok: true, message: notified ? `Published. ${notified}` : undefined };
 }
 export async function setForceOutOfStock(id: string, value: boolean): Promise<Result> {
   const a = await requireAdmin();
@@ -295,10 +296,10 @@ export async function setForceOutOfStock(id: string, value: boolean): Promise<Re
   if (!p) return { error: "Not found" };
   await db.update(schema.products).set({ forceOutOfStock: value, updatedAt: Date.now() }).where(eq(schema.products.id, id));
   await audit(a, "update", "product", id, `${p.name}: marked ${value ? "out of stock" : "back on sale"}`);
-  const notified = value ? 0 : await processStockAlerts(id);
+  const notified = value ? "" : alertNote(await processStockAlerts(id));
   revalidatePath("/admin/products");
   revalidatePath("/admin/inventory");
-  return { ok: true, message: notified ? `${notified} waiting customer(s) notified.` : undefined };
+  return { ok: true, message: notified || undefined };
 }
 export async function bulkUpdateStock(changes: { variantId: string; stock: number }[]): Promise<Result> {
   const a = await requireAdmin();
@@ -315,10 +316,10 @@ export async function bulkUpdateStock(changes: { variantId: string; stock: numbe
     touched.add(prev.productId);
   }
   await audit(a, "update", "inventory", null, `Bulk stock edit: ${changes.length} variant(s)`, null, changes);
-  let notified = 0;
-  for (const pid of touched) notified += await processStockAlerts(pid);
+  const notified = { sent: 0, manual: 0 };
+  for (const pid of touched) { const x = await processStockAlerts(pid); notified.sent += x.sent; notified.manual += x.manual; }
   revalidatePath("/admin/inventory");
-  return { ok: true, message: `Stock saved.${notified ? ` ${notified} waiting customer(s) notified.` : ""}` };
+  return { ok: true, message: `Stock saved. ${alertNote(notified)}`.trim() };
 }
 
 /* ---------- orders ---------- */
@@ -495,6 +496,42 @@ export async function saveOffer(input: unknown): Promise<Result> {
     return { ok: true };
   } catch (e) { return fail(e); }
 }
+const LadderInput = z.object({
+  steps: z.array(z.object({ minSubtotal: z.number().int().positive(), percent: z.number().int().min(1).max(90) })).max(10),
+  freeDeliveryMin: z.number().int().min(0).nullable(),
+  combinesWithCoupons: z.boolean(),
+});
+/** One screen for the whole "buy more, save more" ladder: replaces every cart offer with these steps. */
+export async function saveOfferLadder(input: unknown): Promise<Result> {
+  const a = await requireAdmin();
+  const parsed = LadderInput.safeParse(input);
+  if (!parsed.success) return { error: "Each step needs a cart amount above ₹0 and a discount from 1% to 90%." };
+  const d = parsed.data;
+  const steps = [...d.steps].sort((x, y) => x.minSubtotal - y.minSubtotal);
+  for (let i = 1; i < steps.length; i++) {
+    if (steps[i].minSubtotal === steps[i - 1].minSubtotal) return { error: `Two steps start at ₹${steps[i].minSubtotal / 100}. Give each step its own amount.` };
+    if (steps[i].percent <= steps[i - 1].percent) return { error: `The ₹${(steps[i].minSubtotal / 100).toLocaleString("en-IN")} step should give more than ${steps[i - 1].percent}%, or buyers gain nothing by adding more.` };
+  }
+  const inr = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
+  const rows = [
+    ...steps.map((st) => ({ id: newId(), name: `${st.percent}% off above ${inr(st.minSubtotal)}`, type: "percent" as const, value: st.percent, minSubtotal: st.minSubtotal, maxDiscount: null, combinesWithCoupons: d.combinesWithCoupons, startsAt: null, endsAt: null, active: true })),
+    ...(d.freeDeliveryMin != null ? [{ id: newId(), name: d.freeDeliveryMin ? `Free delivery above ${inr(d.freeDeliveryMin)}` : "Free delivery on every order", type: "free_shipping" as const, value: 0, minSubtotal: d.freeDeliveryMin, maxDiscount: null, combinesWithCoupons: true, startsAt: null, endsAt: null, active: true }] : []),
+  ];
+  const before = await db.select().from(schema.cartOffers);
+  // One batch, so the store never sees a moment with no offers.
+  if (rows.length) await db.batch([db.delete(schema.cartOffers), db.insert(schema.cartOffers).values(rows)]);
+  else await db.delete(schema.cartOffers);
+  await audit(a, "update", "cart_offer", null, `Saved discount ladder (${rows.length} offers)`, before, rows);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+export async function markAlertMessaged(id: string): Promise<Result> {
+  const a = await requireAdmin();
+  await db.update(schema.stockAlerts).set({ status: "notified", notifiedAt: Date.now() }).where(and(eq(schema.stockAlerts.id, id), eq(schema.stockAlerts.status, "to_message")));
+  await audit(a, "update", "stock_alert", id, "Messaged buyer about restock");
+  revalidatePath("/admin");
+  return { ok: true };
+}
 export async function deleteDiscount(kind: "sale" | "coupon" | "offer", id: string): Promise<Result> {
   const a = await requireAdmin();
   const table = kind === "sale" ? schema.sales : kind === "coupon" ? schema.coupons : schema.cartOffers;
@@ -535,13 +572,20 @@ const SettingsInput = z.object({
   shippingCombine: z.enum(["highest", "sum"]), defaultDeliveryCharge: money, codEnabled: z.boolean(), codFee: money, codMaxOrder: money,
   dispatchDays: days, deliveryDaysMin: days, deliveryDaysMax: days, returnWindowDays: days,
   orderFeedbackEnabled: z.boolean(), deliveryFeedbackEnabled: z.boolean(), adminAlertEmail: email,
+  whatsappGroupUrl: z.union([z.literal(""), z.string().trim().max(200).regex(/^https:\/\/(chat\.whatsapp\.com\/[A-Za-z0-9]+|(www\.)?whatsapp\.com\/channel\/[A-Za-z0-9]+)\/?$/, "Paste the invite link from WhatsApp (it starts with https://chat.whatsapp.com/ or https://whatsapp.com/channel/)")]),
+  supportHours: text(60), deliveryAreaName: text(40),
+  deliveryPincodes: text(4000).superRefine((t, ctx) => {
+    const { bad } = parsePincodes(t);
+    if (bad.length) ctx.addIssue({ code: "custom", message: `these aren't pincodes, ranges or prefixes: ${bad.slice(0, 5).join(", ")}` });
+  }),
 }).partial(); // Unknown keys are dropped.
 
+const SETTING_NAMES: Record<string, string> = { whatsappGroupUrl: "WhatsApp group link", deliveryPincodes: "Delivery pincodes", whatsappNumber: "WhatsApp number", supportEmail: "Support email", gstin: "GSTIN", adminAlertEmail: "Order alert email" };
 export async function updateSettings(input: Partial<StoreSettings>): Promise<Result> {
   const a = await requireOwner().catch(() => null);
   if (!a) return { error: "Only the store owner can change settings." };
   const parsed = SettingsInput.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues.map((i) => `${String(i.path[0] ?? "Setting")}: ${i.message}`).join("; ") };
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => `${SETTING_NAMES[String(i.path[0])] ?? String(i.path[0] ?? "Setting")}: ${i.message}`).join("; ") };
   const values = parsed.data as Partial<StoreSettings>;
   const before = await getSettings();
   const min = values.deliveryDaysMin ?? before.deliveryDaysMin, max = values.deliveryDaysMax ?? before.deliveryDaysMax;

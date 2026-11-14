@@ -1,4 +1,6 @@
 import { brandPhrase, breadcrumbs, itemList, JsonLd } from "@/lib/seo";
+import { areaLabel } from "@/lib/delivery-area";
+import { getSettings } from "@/lib/settings";
 import { money } from "@/lib/format";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -12,13 +14,14 @@ type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<s
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const [cats, cards, sp] = await Promise.all([getActiveCategories(), getAllCards(), searchParams]);
+  const [cats, cards, sp, s] = await Promise.all([getActiveCategories(), getAllCards(), searchParams, getSettings()]);
   const cat = cats.find((c) => c.slug === slug);
   if (!cat) return {};
+  const area = areaLabel(s);
   const items = cards.filter((c) => c.categoryId === cat.id && c.inStock);
   const brands = [...new Set(items.map((c) => c.brandName).filter(Boolean))] as string[];
   const from = items.length ? Math.min(...items.map((c) => c.price)) : 0;
-  const description = `Buy ${cat.name.toLowerCase()} online in India${brands.length ? ` from ${brandPhrase(brands)}` : ""}. 100% original${from ? `, from ${money(from)}` : ""}, at the lowest prices with delivery across India.${cat.tagline ? ` ${cat.tagline}.` : ""}`;
+  const description = `Buy ${cat.name.toLowerCase()} online in ${area}${brands.length ? ` from ${brandPhrase(brands)}` : ""}. 100% original${from ? `, from ${money(from)}` : ""}, at the lowest prices with delivery across ${area}.${cat.tagline ? ` ${cat.tagline}.` : ""}`;
   // Baby/Boys/Girls shortcuts are real landing pages; other filter combinations aren't indexed.
   const indexable = Object.keys(sp).every((k) => k === "collection");
   return {

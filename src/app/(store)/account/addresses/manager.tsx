@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { STATES } from "@/lib/states";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteAddressAction, saveAddressAction } from "../../order-actions";
+import { lookupPin } from "@/components/store/delivery-check";
 
 type Addr = { id?: string; name: string; phone: string; line1: string; line2: string; city: string; state: string; pincode: string; isDefault: boolean };
 const EMPTY: Addr = { name: "", phone: "", line1: "", line2: "", city: "", state: "", pincode: "", isDefault: false };
@@ -10,15 +11,20 @@ const EMPTY: Addr = { name: "", phone: "", line1: "", line2: "", city: "", state
 export function AddressManager({ addresses }: { addresses: Addr[] }) {
   const [edit, setEdit] = useState<Addr | null>(null);
   const [error, setError] = useState("");
+  const [outside, setOutside] = useState<string | null>(null);
   // Pincode fills in city and state, like at checkout (only when they're still empty).
   const pin = edit?.pincode ?? "";
   useEffect(() => {
+    setOutside(null);
     if (!/^[1-9]\d{5}$/.test(pin)) return;
     let live = true;
-    fetch(`/api/pincode/${pin}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
-      if (!live || !d?.city) return;
-      setEdit((x) => (x ? { ...x, city: x.city || d.city, state: x.state || (STATES.includes(d.state) ? d.state : "") } : x));
-    }).catch(() => {});
+    lookupPin(pin).then((d) => {
+      if (!live || !d) return;
+      setOutside(d.serviceable ? null : `We don't deliver to ${pin} yet (only ${d.area} for now). You can still save it for later.`);
+      const town = d.place ?? d.city;
+      if (!town) return;
+      setEdit((x) => (x ? { ...x, city: x.city || town, state: x.state || (d.state && STATES.includes(d.state) ? d.state : "") } : x));
+    });
     return () => { live = false; };
   }, [pin]);
   const f = (k: keyof Addr, label: string, opts: { required?: boolean; full?: boolean } = { required: true }) => (
@@ -53,6 +59,7 @@ export function AddressManager({ addresses }: { addresses: Addr[] }) {
               <option value="">Select state</option>{STATES.map((s) => <option key={s}>{s}</option>)}
             </select></div>
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" className="size-4 accent-ink" checked={edit.isDefault} onChange={(e) => setEdit({ ...edit, isDefault: e.target.checked })} /> Make this my default</label>
+          {outside && <p className="text-sm font-medium text-clay sm:col-span-2" role="status">{outside}</p>}
           {error && <p className="text-sm font-medium text-clay sm:col-span-2" role="alert">{error}</p>}
           <div className="flex gap-2 sm:col-span-2"><button className="btn btn-primary">Save</button><button type="button" className="btn btn-white" onClick={() => setEdit(null)}>Cancel</button></div>
         </form>

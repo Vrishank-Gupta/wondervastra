@@ -68,7 +68,24 @@ export type Quote = {
   total: number;
   totalSavings: number;
   nextOffer: { name: string; type: OfferRule["type"]; value: number; remaining: number; minSubtotal: number } | null;
+  /** Every live cart reward in order, for the stepped "buy more, save more" bar. */
+  tiers: { minSubtotal: number; reward: string; reached: boolean }[];
 };
+
+/** Sales saved without an end date run until this time and show no countdown. */
+export const NO_END = Date.UTC(2100, 0, 1);
+export const isOpenEnded = (endsAt: number | null | undefined) => endsAt != null && endsAt >= NO_END;
+
+export function rewardLabel(o: Pick<OfferRule, "type" | "value" | "maxDiscount">) {
+  if (o.type === "free_shipping") return "Free delivery";
+  if (o.type === "percent") return `${o.value}% off${o.maxDiscount ? ` (up to ${rupees(o.maxDiscount)})` : ""}`;
+  return `${rupees(o.value)} off`;
+}
+/** Cart rewards a buyer can work towards, cheapest threshold first. */
+export function offerTiers(offers: OfferRule[]) {
+  return [...offers].filter((o) => o.minSubtotal > 0).sort((a, b) => a.minSubtotal - b.minSubtotal || (a.type === "free_shipping" ? -1 : 1))
+    .map((o) => ({ minSubtotal: o.minSubtotal, reward: rewardLabel(o) }));
+}
 
 export function isLive(r: { active: boolean; startsAt?: number | null; endsAt?: number | null }, now: number) {
   return r.active && (r.startsAt == null || r.startsAt <= now) && (r.endsAt == null || r.endsAt > now);
@@ -207,9 +224,11 @@ export function priceCart(input: {
   const total = lines.length ? subtotal - offerDiscount - finalCoupon + shipping + codFee : 0;
 
   // Nudge: closest offer not yet unlocked, skipping free delivery when delivery is already free.
+  // A higher tier is only a nudge if it beats what the buyer already gets.
   const nextRule = liveOffers
     .filter((o) => o.minSubtotal > subtotal)
-    .filter((o) => !(o.type === "free_shipping" && shipping === 0))
+    .filter((o) => !(o.type === "free_shipping" && (shipping === 0 || baseShipping === 0)))
+    .filter((o) => o.type === "free_shipping" || ruleDiscount(o.type, o.value, o.minSubtotal, o.maxDiscount) > offerDiscount)
     .sort((a, b) => a.minSubtotal - b.minSubtotal)[0];
 
   return {
@@ -228,10 +247,11 @@ export function priceCart(input: {
     nextOffer: nextRule
       ? { name: nextRule.name, type: nextRule.type, value: nextRule.value, remaining: nextRule.minSubtotal - subtotal, minSubtotal: nextRule.minSubtotal }
       : null,
+    tiers: lines.length ? offerTiers(liveOffers).map((t) => ({ ...t, reached: subtotal >= t.minSubtotal })) : [],
   };
 }
 function rupees(p: number) {
-  return `₹${Math.ceil(p / 100)}`;
+  return `₹${Math.ceil(p / 100).toLocaleString("en-IN")}`;
 }
 /** Effective purchase cap: stock, per-order cap, and what the buyer has left of a lifetime cap. */
 export function maxPurchasable(opts: { stock: number; maxPerOrder?: number | null; maxPerCustomer?: number | null; alreadyBought?: number }) {

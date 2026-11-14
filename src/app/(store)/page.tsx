@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { WhatsAppGroupBand } from "@/components/store/whatsapp-group";
 import { JsonLd, organization, website } from "@/lib/seo";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,7 +15,7 @@ import { ProductRail, SectionTitle } from "@/components/store/product-rail";
 import { wishedIds } from "@/components/store/listing";
 import { BrandTile } from "@/components/store/brand-tile";
 import { getActiveBrands, getActiveCategories, getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
-import { isLive } from "@/lib/pricing";
+import { isLive, isOpenEnded } from "@/lib/pricing";
 import { money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { AUDIENCES, bannerSrc } from "@/lib/home-banners";
@@ -52,7 +53,7 @@ export default async function Home() {
       text: "Soft, warm layers for little ones. 100% original brands at the lowest prices.", cta: "Shop kids'", href: "/c/kids-thermals",
       ...bannerSrc("kids"), alt: "Baby in a white long-sleeve top and red beanie" }] : []),
     ...(sale ? [{
-      key: "sale", eyebrow: `Ends in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`, title: sale.name,
+      key: "sale", eyebrow: isOpenEnded(sale.endsAt) ? "On now" : `Ends in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`, title: sale.name,
       text: `${sale.type === "percent" ? `${sale.value}% off` : `${money(sale.value)} off`} ${saleScope}.`, cta: "Shop the sale", href: "/sale",
       ...bannerSrc("sale"), alt: "Man in warm winter wear outdoors in the snow",
     }] : []),
@@ -174,11 +175,11 @@ export default async function Home() {
           <div className="bg-madder text-white">
             <div className="container-x flex flex-wrap items-center justify-between gap-x-10 gap-y-5 py-8 sm:py-10">
               <div>
-                <p className="eyebrow text-white/80">Limited time · {sale.type === "percent" ? `${sale.value}% off` : `${money(sale.value)} off`}</p>
+                <p className="eyebrow text-white/80">{isOpenEnded(sale.endsAt) ? "On now" : "Limited time"} · {sale.type === "percent" ? `${sale.value}% off` : `${money(sale.value)} off`}</p>
                 <h2 className="mt-1 text-5xl sm:text-7xl">{sale.name}</h2>
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-                <Countdown endsAt={sale.endsAt} dark />
+                {!isOpenEnded(sale.endsAt) && <Countdown endsAt={sale.endsAt} dark />}
                 <Link href="/sale" className="btn bg-white text-ink hover:bg-ink hover:text-white">Shop the sale <ArrowRight size={16} aria-hidden /></Link>
               </div>
             </div>
@@ -244,6 +245,7 @@ export default async function Home() {
         </section>
       )}
 
+      <WhatsAppGroupBand url={settings.whatsappGroupUrl} />
       <div className="pt-12 sm:pt-16"><TrustStrip settings={settings} /></div>
     </>
   );

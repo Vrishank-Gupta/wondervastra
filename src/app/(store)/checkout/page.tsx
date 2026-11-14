@@ -5,6 +5,7 @@ import { CheckoutClient } from "@/components/store/checkout-client";
 import { getCustomer } from "@/lib/auth";
 import { onlinePaymentsAvailable, razorpayConfigured, simulationAllowed } from "@/lib/razorpay";
 import { getSettings } from "@/lib/settings";
+import { areaLabel, deliversTo } from "@/lib/delivery-area";
 
 export const metadata: Metadata = { title: "Checkout", robots: { index: false } };
 
@@ -16,11 +17,13 @@ export default async function CheckoutPage() {
   return (
     <CheckoutClient
       customer={customer ? { name: customer.name, email: customer.email, phone: customer.phone } : null}
-      addresses={addresses.map((a) => ({ id: a.id, name: a.name, phone: a.phone, line1: a.line1, line2: a.line2, city: a.city, state: a.state, pincode: a.pincode }))}
+      // Addresses we can deliver to come first, so the pre-filled one works.
+      addresses={[...addresses].sort((a, b) => Number(deliversTo(b.pincode, settings.deliveryPincodes)) - Number(deliversTo(a.pincode, settings.deliveryPincodes))).map((a) => ({ id: a.id, name: a.name, phone: a.phone, line1: a.line1, line2: a.line2, city: a.city, state: a.state, pincode: a.pincode }))}
       online={onlinePaymentsAvailable()}
       simulated={simulationAllowed()}
       live={razorpayConfigured()}
       codFee={settings.codFee}
+      deliveryArea={areaLabel(settings)}
     />
   );
 }

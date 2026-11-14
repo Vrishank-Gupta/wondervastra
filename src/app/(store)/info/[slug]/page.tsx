@@ -1,4 +1,5 @@
-import { faqPage, JsonLd } from "@/lib/seo";
+import { areaPhrase, faqPage, JsonLd } from "@/lib/seo";
+import { waLink } from "@/lib/utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSettings, type StoreSettings } from "@/lib/settings";
@@ -18,7 +19,9 @@ function faqItems(s: StoreSettings): { q: string; a: string }[] {
     { q: "Are your products original?", a: "Yes. Everything we sell is 100% original branded stock, never copies, at the lowest prices we can offer." },
     { q: "Do I need an account to order?", a: "No. You can check out as a guest and track your order with the link we send you." },
     { q: "How do I pay?", a: online ? `UPI, cards, netbanking and wallets through Razorpay${s.codEnabled ? ", or cash on delivery on eligible items" : ""}.` : s.codEnabled ? "Cash on delivery on eligible items. Online payment (UPI and cards) is opening soon." : "Online payment is opening soon. Please contact us to order." },
-    { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners. Delivery charges are shown on each product page and in your cart before you pay." },
+    s.deliveryPincodes.trim()
+      ? { q: "Where do you deliver?", a: `We deliver across ${areaPhrase(s)} for now. Enter your pincode on any product page to check. If we don't reach you yet, leave your number there and we'll tell you as soon as we do.` }
+      : { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners. Delivery charges are shown on each product page and in your cart before you pay." },
     { q: "When will my order arrive?", a: `We dispatch within ${s.dispatchDays} working days, and delivery usually takes ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after that depending on your location.` },
     { q: "What sizes do kids' thermals come in?", a: "Baby thermals come in sizes from 0–6 months up to 18–24 months, and kids' thermals for boys and girls from 2–4 years up to 12–14 years. Each product page shows the sizes in stock." },
     { q: "How do I track my order?", a: `We'll send you a tracking link by ${channels()} when it ships. You can also use the Track Order page anytime.` },
@@ -36,8 +39,10 @@ const PAGES: Record<string, Page> = {
   </> },
   contact: { title: "Contact us", body: (s) => <>
     <p>Questions about an order or a product? We&apos;d love to help.</p>
-    {s.whatsappNumber && <p><b>WhatsApp:</b> {s.whatsappNumber}</p>}
-    {s.supportEmail && <p><b>Email:</b> {s.supportEmail}</p>}
+    {s.whatsappNumber && <p><b>WhatsApp:</b> <a href={waLink(s.whatsappNumber)} target="_blank" rel="noreferrer">{s.whatsappNumber}</a> (chat with us)</p>}
+    {s.supportEmail && <p><b>Email:</b> <a href={`mailto:${s.supportEmail}`}>{s.supportEmail}</a></p>}
+    {s.supportHours && (s.whatsappNumber || s.supportEmail) && <p><b>Hours:</b> {s.supportHours}</p>}
+    {s.whatsappGroupUrl && <p><b>WhatsApp group:</b> <a href={s.whatsappGroupUrl} target="_blank" rel="noreferrer">Join for new arrivals and deals</a></p>}
     {s.legalName && <p><b>Business name:</b> {s.legalName}</p>}
     {s.businessAddress && <p><b>Address:</b> {s.businessAddress}</p>}
     {s.gstin && <p><b>GSTIN:</b> {s.gstin}</p>}
@@ -45,8 +50,10 @@ const PAGES: Record<string, Page> = {
   </> },
   faq: { title: "FAQs", body: (s) => <>{faqItems(s).map((x) => <div key={x.q}><h2>{x.q}</h2><p>{x.a}</p></div>)}</> },
   "shipping-policy": { title: "Shipping policy", body: (s) => <>
-    <p>We ship across India through trusted courier partners.</p>
-    <h2>Dispatch & delivery time</h2><p>Orders are dispatched within {s.dispatchDays} working days. Delivery usually takes {s.deliveryDaysMin}–{s.deliveryDaysMax} days after dispatch, and may take longer for remote areas.</p>
+    {s.deliveryPincodes.trim()
+      ? <><h2>Where we deliver</h2><p>We deliver across {areaPhrase(s)} for now. Enter your pincode on any product page or at checkout to check. If we don&apos;t deliver to you yet, leave your number and we&apos;ll tell you when we do.</p></>
+      : <p>We ship across India through trusted courier partners.</p>}
+    <h2>Dispatch & delivery time</h2><p>Orders are dispatched within {s.dispatchDays} working days. Delivery usually takes {s.deliveryDaysMin}–{s.deliveryDaysMax} days after dispatch.</p>
     <h2>Delivery charges</h2><p>Delivery charges depend on the item and are shown on each product page, in your cart and at checkout before you pay. Many items and larger orders ship free.</p>
     <h2>Tracking</h2><p>When your order ships, you&apos;ll get the courier name, AWB number and tracking link by {channels()}.</p>
     <h2>Failed delivery</h2><p>If delivery fails because of an incorrect address or if the recipient is unavailable, please contact us {contactLine(s)}.</p>

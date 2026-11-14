@@ -1,4 +1,5 @@
 import { emailConfigured, whatsappConfigured } from "@/lib/notifications";
+import { WhatsAppGroupBand } from "@/components/store/whatsapp-group";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PartyPopper } from "lucide-react";
@@ -34,6 +35,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           </div>
         </div>
       )}
+      {placed && order.status !== "pending_payment" && <WhatsAppGroupBand url={settings.whatsappGroupUrl} compact />}
       {placed && order.status === "pending_payment" && (
         <div className="mb-5 rounded-sm border border-line bg-sand-soft p-4 font-medium">We&apos;re confirming your payment. This page will update shortly; refresh in a minute.</div>
       )}

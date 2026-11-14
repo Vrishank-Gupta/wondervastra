@@ -1,12 +1,18 @@
-import { PartyPopper, Truck } from "lucide-react";
+import { Check, PartyPopper, Truck } from "lucide-react";
 import type { Quote } from "@/lib/pricing";
 import { money } from "@/lib/format";
 
-/** "Add ₹120 more for free delivery". The nudge that lifts average order value. */
+/**
+ * "Add ₹120 more to get 10% off", over a stepped bar with every reward on it, so a buyer can see the
+ * whole ladder (₹500 → 5%, ₹1,000 → 8% …) and how close the next step is.
+ */
 export function OfferProgress({ quote }: { quote: Quote }) {
   const n = quote.nextOffer;
-  if (!n && quote.shipping > 0) return null;
-  if (!n) {
+  const tiers = quote.tiers ?? [];
+  const nextReward = n ? (n.type === "free_shipping" ? "free delivery" : n.type === "percent" ? `${n.value}% off` : `${money(n.value)} off`) : "";
+  const unlocked = quote.offer ? `${quote.offer.name}: you save ${money(quote.offer.discount)}` : null;
+
+  if (!n && !tiers.length) {
     if (!quote.offer && !quote.shippingNote) return null;
     return (
       <p className="flex items-center gap-2 bg-pine-soft px-3 py-2.5 text-sm font-semibold text-pine">
@@ -14,14 +20,33 @@ export function OfferProgress({ quote }: { quote: Quote }) {
       </p>
     );
   }
-  const pct = Math.min(100, Math.round((quote.subtotal / n.minSubtotal) * 100));
-  const reward = n.type === "free_shipping" ? "free delivery" : n.type === "percent" ? `${n.value}% off` : `${money(n.value)} off`;
   return (
-    <div className="bg-sand-soft px-3 py-2.5">
-      <p className="flex items-center gap-2 text-sm"><Truck size={16} aria-hidden /> Add <b>{money(n.remaining)}</b> more for <b>{reward}</b></p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-        <div className="h-full rounded-full bg-madder transition-all" style={{ width: `${pct}%` }} />
-      </div>
+    <div className="space-y-2.5 bg-sand-soft px-3 py-3" data-testid="offer-progress">
+      {unlocked && <p className="flex items-center gap-2 text-sm font-semibold text-pine"><PartyPopper size={16} aria-hidden className="shrink-0" /> {unlocked}</p>}
+      {n ? (
+        <p className="flex items-center gap-2 text-sm"><Truck size={16} aria-hidden className="shrink-0" /><span>Add <b>{money(n.remaining)}</b> more to get <b>{nextReward}</b></span></p>
+      ) : !unlocked && quote.shippingNote ? (
+        <p className="flex items-center gap-2 text-sm font-semibold text-pine"><PartyPopper size={16} aria-hidden /> {quote.shippingNote}</p>
+      ) : !unlocked ? null : <p className="text-xs text-ink-soft">You&apos;ve unlocked the best cart offer.</p>}
+      {tiers.length > 0 && (
+        <ol className="flex items-start" aria-label="Cart rewards">
+          {tiers.map((t, i) => {
+            const prev = i ? tiers[i - 1].minSubtotal : 0;
+            const fill = Math.max(0, Math.min(1, (quote.subtotal - prev) / Math.max(1, t.minSubtotal - prev)));
+            return (
+              <li key={`${t.minSubtotal}-${t.reward}`} className="flex min-w-0 flex-1 flex-col items-end">
+                <div className="flex w-full items-center">
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"><span className="block h-full bg-madder transition-all" style={{ width: `${fill * 100}%` }} /></span>
+                  <span className={`-ml-0.5 grid size-4 shrink-0 place-items-center rounded-full ${t.reached ? "bg-madder text-white" : "border-2 border-line bg-white"}`}>{t.reached && <Check size={10} strokeWidth={3} aria-hidden />}</span>
+                </div>
+                <span className={`mt-1 w-full text-right text-[10px] leading-tight break-words ${t.reached ? "font-bold text-madder" : "text-ink-soft"}`} title={`${t.reward} above ${money(t.minSubtotal)}`}>
+                  <span className="sr-only">{t.reached ? "Unlocked: " : ""}</span>{t.reward.replace(/ \(up to .*\)$/, "")}<span className="block font-normal">{money(t.minSubtotal)}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </div>
   );
 }

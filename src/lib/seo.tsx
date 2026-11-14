@@ -5,6 +5,7 @@
  */
 import type { StoreSettings } from "./settings";
 import { siteUrl } from "./utils";
+import { areaLabel, parsePincodes } from "./delivery-area";
 
 export function JsonLd({ data }: { data: object | object[] }) {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
@@ -17,8 +18,18 @@ export function brandPhrase(names: string[]) {
   if (!names.length) return "top brands";
   return names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
-export function seoDescription(brandNames: string[]) {
-  return `WonderVastra is an Indian online store for 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals, from ${brandPhrase(brandNames)}. Delivered across India.`;
+/** "Delhi NCR (Delhi, Gurugram, Noida, Ghaziabad and Faridabad)" for the default list, else the area name. */
+export function areaPhrase(s: Pick<StoreSettings, "deliveryAreaName" | "deliveryPincodes">) {
+  const a = areaLabel(s);
+  return /^delhi ncr$/i.test(a) ? "Delhi NCR (Delhi, Gurugram, Noida, Greater Noida, Ghaziabad and Faridabad)" : a;
+}
+export function seoDescription(brandNames: string[], s: Pick<StoreSettings, "deliveryAreaName" | "deliveryPincodes">) {
+  return `WonderVastra is an online store for 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals, from ${brandPhrase(brandNames)}. Delivering across ${areaPhrase(s)}.`;
+}
+/** Where we deliver, as schema.org understands it. */
+function served(s: StoreSettings) {
+  if (!s.deliveryPincodes.trim()) return { "@type": "Country", name: "India" };
+  return { "@type": "Place", name: areaLabel(s), address: { "@type": "PostalAddress", addressCountry: "IN" } };
 }
 
 export function organization(s: StoreSettings, brandNames: string[] = []) {
@@ -32,10 +43,10 @@ export function organization(s: StoreSettings, brandNames: string[] = []) {
     logo: abs("/brand/wondervastra-avatar-1080.png"),
     image: abs("/brand/wondervastra-logo.png"),
     slogan: "Crafted with trust",
-    description: seoDescription(brandNames),
+    description: seoDescription(brandNames, s),
     email: s.supportEmail || undefined,
     telephone: s.whatsappNumber || undefined,
-    areaServed: { "@type": "Country", name: "India" },
+    areaServed: served(s),
     currenciesAccepted: "INR",
     sameAs: [s.instagramUrl, s.facebookUrl].filter(Boolean),
     contactPoint: s.supportEmail || s.whatsappNumber ? [{ "@type": "ContactPoint", contactType: "customer support", email: s.supportEmail || undefined, telephone: s.whatsappNumber || undefined, areaServed: "IN", availableLanguage: ["English", "Hindi"] }] : undefined,
@@ -72,7 +83,9 @@ export function shippingDetails(s: StoreSettings, charge: number) {
   return {
     "@type": "OfferShippingDetails",
     shippingRate: { "@type": "MonetaryAmount", value: (charge / 100).toFixed(2), currency: "INR" },
-    shippingDestination: { "@type": "DefinedRegion", addressCountry: "IN" },
+    shippingDestination: s.deliveryPincodes.trim()
+      ? parsePincodes(s.deliveryPincodes).rules.slice(0, 20).map((r) => ({ "@type": "DefinedRegion", addressCountry: "IN", postalCodeRange: { postalCodeBegin: String(r.from), postalCodeEnd: String(r.to) } }))
+      : { "@type": "DefinedRegion", addressCountry: "IN" },
     deliveryTime: {
       "@type": "ShippingDeliveryTime",
       handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: s.dispatchDays, unitCode: "DAY" },

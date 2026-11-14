@@ -2,7 +2,7 @@ import { getActiveBrands, getActiveCategories, getAllCards, getLiveOffers } from
 import { capabilities } from "@/lib/capabilities";
 import { money } from "@/lib/format";
 import { previewMode } from "@/lib/preview";
-import { brandPhrase } from "@/lib/seo";
+import { areaPhrase, brandPhrase } from "@/lib/seo";
 import { getSettings } from "@/lib/settings";
 import { siteUrl } from "@/lib/utils";
 
@@ -26,18 +26,19 @@ export async function GET() {
   const out = [
     `# ${s.storeName}`,
     "",
-    `> ${s.storeName} (${base}) is an Indian online store selling 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals${brandNames.length ? `, from ${brandPhrase(brandNames)}` : ""}. It delivers across India.`,
+    `> ${s.storeName} (${base}) is an online store selling 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals${brandNames.length ? `, from ${brandPhrase(brandNames)}` : ""}. It delivers across ${areaPhrase(s)}${s.deliveryPincodes.trim() ? " for now; buyers can check their pincode on any product page" : ""}.`,
     "",
     "## Key facts",
     `- Products: ${cats.filter((c) => !c.comingSoon).map((c) => c.name).join(", ") || "thermal wear"}`,
     `- Brands: ${brandNames.join(", ") || "top brands"}`,
     "- Every product is 100% original branded stock, sold at the lowest prices the store can offer",
     `- Payment: ${pay}`,
-    `- Dispatch within ${s.dispatchDays} working days; delivery usually ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after dispatch, anywhere in India`,
+    `- Delivery area: ${areaPhrase(s)}`,
+    `- Dispatch within ${s.dispatchDays} working days; delivery usually ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after dispatch`,
     ...offers.map((o) => `- Offer: ${o.type === "free_shipping" ? `free delivery on orders above ${money(o.minSubtotal)}` : `${o.name} (orders above ${money(o.minSubtotal)})`}`),
     `- Returns: eligible unused items within ${s.returnWindowDays} days of delivery`,
     "- No account needed to order; every order gets a tracking link",
-    ...(s.supportEmail ? [`- Contact: ${s.supportEmail}${s.whatsappNumber ? `, WhatsApp ${s.whatsappNumber}` : ""}`] : []),
+    ...(s.supportEmail ? [`- Contact: ${s.supportEmail}${s.whatsappNumber ? `, WhatsApp ${s.whatsappNumber}` : ""}${s.supportHours ? ` (${s.supportHours})` : ""}`] : []),
     "",
     "## Shop",
     `- [All products](${base}/shop)`,

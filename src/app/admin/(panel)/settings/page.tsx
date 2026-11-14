@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { asc } from "drizzle-orm";
+import { asc, desc, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { StaffToggle } from "@/components/admin/misc-actions";
@@ -14,7 +14,14 @@ import { siteUrl } from "@/lib/utils";
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function Settings() {
-  const [me, s, team] = await Promise.all([requireAdmin(), getSettingsFresh(), db.select().from(schema.admins).orderBy(asc(schema.admins.createdAt))]);
+  const ar = schema.areaRequests;
+  const [me, s, team, top, recent, [{ total }]] = await Promise.all([
+    requireAdmin(), getSettingsFresh(), db.select().from(schema.admins).orderBy(asc(schema.admins.createdAt)),
+    db.select({ pincode: ar.pincode, place: sql<string | null>`max(${ar.place})`, n: sql<number>`count(*)` }).from(ar).groupBy(ar.pincode).orderBy(desc(sql`count(*)`)).limit(8),
+    db.select().from(ar).orderBy(desc(ar.createdAt)).limit(30),
+    db.select({ total: sql<number>`count(*)` }).from(ar),
+  ]);
+  const demand = { total: Number(total), top: top.map((t) => ({ ...t, n: Number(t.n) })), recent: recent.map((r) => ({ pincode: r.pincode, contact: r.email ?? r.phone ?? "", at: r.createdAt })) };
   const conn = [
     { name: "Razorpay payments", on: razorpayConfigured(), keys: "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" },
     { name: "Email via Resend", on: emailConfigured(), keys: "RESEND_API_KEY, EMAIL_FROM" },
@@ -24,7 +31,7 @@ export default async function Settings() {
     <>
       <PageHead title="Settings" />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3 [&>*]:min-w-0">
-        <div className="xl:col-span-2"><SettingsForm initial={s} isOwner={me.role === "owner"} /></div>
+        <div className="xl:col-span-2"><SettingsForm initial={s} isOwner={me.role === "owner"} demand={demand} /></div>
         <div className="space-y-5">
           <Panel title="Connections">
             <ul className="space-y-2.5 text-sm">

@@ -9,7 +9,7 @@ const rows = async (sql: string, args: (string | number)[] = []) => (await db.ex
 const one = async (sql: string, args: (string | number)[] = []) => (await rows(sql, args))[0];
 
 const buyer = (n: number) => ({ name: `Asha Test${n}`, email: `asha${n}@example.com`, phone: `98765432${String(n).padStart(2, "0")}` });
-const addr = { line1: "12 MG Road", line2: "Near Park", city: "Pune", state: "Maharashtra", pincode: "411001" };
+const addr = { line1: "12 Hauz Khas Village", line2: "Near Deer Park", city: "New Delhi", state: "Delhi", pincode: "110016" };
 
 async function variantOf(slug: string, stock?: number) {
   const v = await one("select v.id, v.stock from variants v join products p on p.id=v.product_id where p.slug=? and v.active=1 order by v.sort_order limit 1", [slug]);
@@ -48,7 +48,7 @@ test("browse, search, cart nudges, coupon, simulated payment, confirmation", asy
   await page.getByRole("button", { name: "Add to cart" }).first().click();
 
   const drawer = page.getByRole("dialog", { name: "Your cart" });
-  await expect(drawer.getByText(/Add .* more for/)).toBeVisible();
+  await expect(drawer.getByText(/Add .* more to get/)).toBeVisible();
   await drawer.getByRole("link", { name: "Checkout" }).click();
   await page.waitForURL("**/checkout");
 
@@ -176,12 +176,19 @@ test("out of stock: subscribe, seller restocks, buyer is notified exactly once",
   for (let i = 0; i < (await inputs.count()); i++) await inputs.nth(i).fill("7");
   await field.blur();
   await page.getByRole("button", { name: /^Save \d+ change/ }).click();
-  await expect(page.getByText(/customer\(s\) notified/)).toBeVisible();
-
-  const after = await one("select * from stock_alerts where id=?", [a.id as unknown as string]);
-  expect(after.status).toBe("notified");
-  const msgs = await rows("select * from notifications where event='back_in_stock' and recipient='9812345678'");
-  expect(msgs.length).toBe(1);
+  // WhatsApp isn't connected in tests, so a phone-only alert can't be sent automatically:
+  // it waits on the dashboard for a one-tap manual message instead of being silently marked as sent.
+  await expect(page.getByText(/left only a phone number/)).toBeVisible();
+  expect((await one("select * from stock_alerts where id=?", [a.id as unknown as string])).status).toBe("to_message");
+  expect((await rows("select * from notifications where event='back_in_stock' and recipient='9812345678'")).length).toBe(0);
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Back in stock: message 1 buyer" })).toBeVisible();
+  const panel = page;
+  await expect(panel.getByText("9812345678")).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Message" })).toHaveAttribute("href", /wa\.me\/919812345678\?text=.*back%20in%20stock/);
+  await panel.getByRole("button", { name: "Sent" }).click();
+  await expect(page.getByRole("heading", { name: /Back in stock: message/ })).toHaveCount(0);
+  expect((await one("select * from stock_alerts where id=?", [a.id as unknown as string])).status).toBe("notified");
 
   await page.goto("/p/amul-girls-thermal-leggings");
   await page.locator("#size-picker button:not(.line-through)").first().click();
@@ -403,7 +410,7 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
 test("timed sale and cart offer created in admin take effect, and expire", async ({ page }) => {
   await adminLogin(page);
   await page.goto("/admin/discounts");
-  await page.getByRole("tab", { name: /Timed sales/ }).click();
+  await page.getByRole("tab", { name: /^Sales/ }).click();
   await page.getByRole("button", { name: "New sale" }).click();
   await page.getByLabel("Sale name").fill("Flash Friday");
   await page.getByLabel("Percent off").fill("50");
@@ -507,7 +514,7 @@ test("brands: brand pages, brand filter, own label hidden until it has stock, an
   await page.goto("/admin/brands");
   await expect(page.getByRole("button", { name: "Edit WonderVastra Originals" })).toBeVisible();
   await page.goto("/admin/discounts");
-  await page.getByRole("tab", { name: /Timed sales/ }).click();
+  await page.getByRole("tab", { name: /^Sales/ }).click();
   await page.getByRole("button", { name: "New sale" }).click();
   await page.getByLabel("Sale name").fill("Amul Week");
   await page.getByLabel("Percent off").fill("20");
@@ -622,14 +629,14 @@ test("orders: whole-rupee coupons, restock alerts after a cancel, publishing nee
   await db.execute({ sql: "update products set status='active' where id=?", args: [draft.id as string] });
 
   // GST invoice: sequential number, place of supply, CGST+SGST in the seller's state.
-  await db.execute(`insert into settings (key, value, updated_at) values ('gstin', '"27ABCDE1234F1Z5"', 0), ('businessState', '"Maharashtra"', 0), ('legalName', '"WonderVastra Retail"', 0) on conflict(key) do update set value=excluded.value`);
+  await db.execute(`insert into settings (key, value, updated_at) values ('gstin', '"07ABCDE1234F1Z5"', 0), ('businessState', '"Delhi"', 0), ('legalName', '"WonderVastra Retail"', 0) on conflict(key) do update set value=excluded.value`);
   const a = await (await createOrder(request, { ...buyer(71), items: [{ variantId: await variantOf("rupa-boys-thermal-top", 20), qty: 2 }] }, "10.67.0.4")).json();
-  const b = await (await createOrder(request, { ...buyer(72), state: "Karnataka", city: "Bengaluru", pincode: "560001", items: [{ variantId: await variantOf("rupa-boys-thermal-top"), qty: 1 }] }, "10.67.0.5")).json();
+  const b = await (await createOrder(request, { ...buyer(72), state: "Haryana", city: "Gurugram", pincode: "122002", items: [{ variantId: await variantOf("rupa-boys-thermal-top"), qty: 1 }] }, "10.67.0.5")).json();
   await page.goto(`/admin/orders/${a.id}/invoice`);
   await expect(page.getByText("Tax invoice")).toBeVisible();
   const first = (await page.getByText(/^Invoice no\./).innerText()).match(/WV\/\d{4}-\d{2}\/(\d{5})/)!;
   await expect(page.getByText("CGST + SGST (intra-state)")).toBeVisible();
-  await expect(page.getByText("GSTIN: 27ABCDE1234F1Z5")).toBeVisible();
+  await expect(page.getByText("GSTIN: 07ABCDE1234F1Z5")).toBeVisible();
   await page.goto(`/admin/orders/${b.id}/invoice`);
   await expect(page.getByText("IGST (inter-state)")).toBeVisible();
   const second = (await page.getByText(/^Invoice no\./).innerText()).match(/WV\/\d{4}-\d{2}\/(\d{5})/)!;
@@ -671,7 +678,10 @@ test("search engines and AI assistants: structured data, sitemap, robots, llms.t
   expect(p.brand.name).toBe("Rupa");
   expect(p.offers.priceCurrency).toBe("INR");
   expect(p.offers.availability).toMatch(/InStock|OutOfStock/);
-  expect(p.offers.shippingDetails.shippingDestination.addressCountry).toBe("IN");
+  // Delivery area: Delhi NCR pincode ranges, so search engines don't promise delivery elsewhere.
+  const dest = p.offers.shippingDetails.shippingDestination;
+  expect(dest[0].addressCountry).toBe("IN");
+  expect(dest.some((d: { postalCodeRange: { postalCodeBegin: string; postalCodeEnd: string } }) => d.postalCodeRange.postalCodeBegin === "110001" && d.postalCodeRange.postalCodeEnd === "110099")).toBe(true);
   expect(product.find((x) => x["@type"] === "BreadcrumbList").itemListElement.length).toBe(3);
   expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe("http://localhost:3100/p/rupa-boys-thermal-top");
 
@@ -763,4 +773,115 @@ test("round 2: wishlist survives login, real states only, discount typos refused
   await box.check();
   await expect(box).toBeChecked();
   await page.waitForURL(/inStock=1/);
+});
+
+test("round 3: Delhi NCR delivery area, discount ladder, open-ended sale, WhatsApp group, sold-out sizes", async ({ page, request }) => {
+  // Product page: check a pincode before buying.
+  await page.goto("/p/rupa-boys-thermal-top");
+  const check = page.getByTestId("delivery-check");
+  await expect(check.getByText("We deliver across Delhi NCR for now.")).toBeVisible();
+  await check.getByLabel("Your pincode").fill("400001");
+  await check.getByRole("button", { name: "Check" }).click();
+  await expect(check.getByText(/We don't deliver to .*400001 yet/)).toBeVisible();
+  await expect(check.getByText("We deliver only in Delhi NCR for now.")).toBeVisible();
+  await check.getByLabel("WhatsApp number or email").fill("9876500001");
+  await check.getByRole("button", { name: "Notify me" }).click();
+  await expect(check.getByText("We'll tell you as soon as we deliver to 400001.")).toBeVisible();
+  expect((await one("select * from area_requests where pincode='400001'")).phone).toBe("9876500001");
+  await check.getByRole("button", { name: "Change" }).click();
+  await check.getByLabel("Your pincode").fill("122002");
+  await check.getByRole("button", { name: "Check" }).click();
+  await expect(check.getByText(/We deliver to .*122002/)).toBeVisible();
+
+  // The server refuses an address outside the area, whatever the page says.
+  const v = await variantOf("rupa-boys-thermal-top", 30);
+  const far = await createOrder(request, { ...buyer(90), city: "Mumbai", state: "Maharashtra", pincode: "400001", items: [{ variantId: v, qty: 1 }] }, "10.90.0.1");
+  expect(far.status()).toBe(400);
+  expect((await far.json()).error).toMatch(/only in Delhi NCR/);
+
+  // Checkout: the remembered pincode is filled in, and an outside pincode is explained on the spot.
+  await page.locator("#size-picker button:not(.line-through)").first().click();
+  await page.getByRole("button", { name: "Add to cart" }).first().click();
+  const drawer = page.getByRole("dialog", { name: "Your cart" });
+  await expect(drawer.getByText(/Delivering to .*122002/)).toBeVisible();
+  await drawer.getByRole("link", { name: "Checkout" }).click();
+  await page.waitForURL("**/checkout");
+  await expect(page.locator("#pincode")).toHaveValue("122002");
+  await page.locator("#pincode").fill("560001");
+  await expect(page.getByText(/Sorry, we don't deliver to .*560001 yet/)).toBeVisible();
+  await page.locator("#pincode").fill("110016");
+  await expect(page.getByText(/Sorry, we don't deliver/)).toHaveCount(0);
+
+  // Discount ladder: one screen, saved as cart offers, shown to buyers as steps.
+  const before = await rows("select * from cart_offers");
+  await adminLogin(page);
+  await page.goto("/admin/discounts");
+  const ladder = page;
+  for (let i = (await ladder.getByRole("button", { name: /Remove step/ }).count()); i > 0; i--) await ladder.getByRole("button", { name: /Remove step/ }).first().click();
+  for (const [min, pct] of [["500", "5"], ["1000", "8"], ["2000", "4"]]) {
+    await ladder.getByRole("button", { name: "Add a step" }).click();
+    const n = await ladder.getByLabel(/cart amount$/).count();
+    await ladder.getByLabel(`Step ${n} cart amount`).fill(min);
+    await ladder.getByLabel(`Step ${n} percent off`).fill(pct);
+  }
+  await ladder.getByLabel(/Free delivery when cart/).fill("799");
+  await ladder.getByRole("button", { name: "Save discount ladder" }).click();
+  await expect(ladder.getByText(/should give more than 8%/)).toBeVisible();
+  await ladder.getByLabel("Step 3 percent off").fill("12");
+  await expect(ladder.getByText(/Buyers will see: 5% off above ₹500 · 8% off above ₹1,000 · 12% off above ₹2,000 · free delivery above ₹799/)).toBeVisible();
+  await ladder.getByRole("button", { name: "Save discount ladder" }).click();
+  await expect(ladder.getByText("Saved. It's live on the store now.")).toBeVisible();
+  const saved = await rows("select type, value, min_subtotal from cart_offers order by min_subtotal");
+  expect(saved.map((o) => `${o.type}:${o.value}:${o.min_subtotal}`)).toEqual(["percent:5:50000", "free_shipping:0:79900", "percent:8:100000", "percent:12:200000"]);
+
+  // A sale on a single listing with no end date: no countdown.
+  await page.getByRole("tab", { name: /^Sales/ }).click();
+  await page.getByRole("button", { name: "New sale" }).click();
+  await page.getByLabel("Sale name").fill("Always On");
+  await page.getByLabel("Percent off").fill("10");
+  await page.getByLabel("No end date").check();
+  await page.getByLabel("Applies to").selectOption("products");
+  await page.getByLabel("Search listings").fill("Boys' Thermal Top");
+  await page.getByLabel(/Boys' Thermal Top/).first().check();
+  await page.getByRole("button", { name: "Save sale" }).click();
+  await expect(page.getByText(/no end date/)).toBeVisible();
+
+  // WhatsApp group: a wrong link is refused; a real one shows in the footer.
+  await page.goto("/admin/settings");
+  await page.getByLabel("WhatsApp group invite link").fill("https://example.com/group");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText(/WhatsApp group link: Paste the invite link/)).toBeVisible();
+  await page.getByLabel("WhatsApp group invite link").fill("https://chat.whatsapp.com/AbCdEf123456");
+  await page.getByLabel("Check a pincode").fill("201301");
+  await expect(page.getByText("Delivers", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
+  await expect(page.getByText(/1 buyer has asked you to deliver/)).toBeVisible();
+
+  await page.goto("/p/rupa-boys-thermal-top");
+  await expect(page.getByTestId("tiers").getByText("12% off")).toBeVisible();
+  await expect(page.getByText(/Always On ends in/i)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Join our WhatsApp group" })).toHaveAttribute("href", "https://chat.whatsapp.com/AbCdEf123456");
+
+  // A sold-out size says which size, lists sizes in stock, and takes an alert for that size.
+  const sizes = await rows("select v.id, v.option1 from variants v join products p on p.id=v.product_id where p.slug='rupa-boys-thermal-top' and v.active=1 order by v.sort_order");
+  await db.execute({ sql: "update variants set stock=0 where id=?", args: [sizes[1].id] });
+  await db.execute({ sql: "update variants set stock=5 where id=?", args: [sizes[0].id] });
+  await page.goto("/p/rupa-boys-thermal-top");
+  await page.locator("#size-picker").getByRole("button", { name: String(sizes[1].option1), exact: true }).click();
+  await expect(page.getByText(`Size ${sizes[1].option1} in Navy is sold out`)).toBeVisible();
+  await expect(page.getByText("This size is in stock in Grey Melange, Maroon.")).toBeVisible();
+  await expect(page.getByText(new RegExp(`In stock: .*${String(sizes[0].option1).replace(/[()]/g, "\\$&")}`))).toBeVisible();
+  await page.getByLabel(`Get a message the moment size ${sizes[1].option1} is back:`).fill("buyer.size@example.com");
+  await page.getByRole("button", { name: "Notify me" }).click();
+  await expect(page.getByText("You're on the list")).toBeVisible();
+  expect((await one("select variant_id from stock_alerts where email='buyer.size@example.com'")).variant_id).toBe(sizes[1].id);
+  await page.getByRole("button", { name: "Maroon", exact: true }).last().click();
+  await expect(page.getByRole("button", { name: "Add to cart" }).first()).toBeVisible();
+
+  // Clean up so other tests see the seeded store.
+  await db.execute("delete from cart_offers");
+  for (const o of before) await db.execute({ sql: `insert into cart_offers (${Object.keys(o).join(",")}) values (${Object.keys(o).map(() => "?").join(",")})`, args: Object.values(o) as never[] });
+  await db.execute("delete from sales where name='Always On'");
+  await db.execute("delete from settings where key='whatsappGroupUrl'");
 });

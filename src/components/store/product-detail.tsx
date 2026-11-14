@@ -9,6 +9,7 @@ import { money } from "@/lib/format";
 import { useCart } from "./cart-context";
 import { QtyStepper } from "./cart-drawer";
 import { Countdown } from "./countdown";
+import { DeliveryCheck } from "./delivery-check";
 
 type Variant = {
   id: string; option1: string; option2: string; colorHex: string | null; sku: string | null;
@@ -23,7 +24,9 @@ type Props = {
   brand?: { name: string; slug: string; isHouse: boolean } | null;
   product: Product; images: { url: string; alt: string | null }[]; variants: Variant[];
   rating: { avg: number; count: number }; wished: boolean;
-  settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number };
+  settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number; deliveryArea: string; areaRestricted: boolean };
+  /** Cart offers, cheapest threshold first: "₹1,000+ → 10% off". */
+  tiers?: { minSubtotal: number; reward: string }[];
 };
 
 function Accordion({ title, children, open = false }: { title: string; children: React.ReactNode; open?: boolean }) {
@@ -35,7 +38,12 @@ function Accordion({ title, children, open = false }: { title: string; children:
   );
 }
 
-function NotifyForm({ product, variant, soon = false }: { product: Product; variant: Variant | null; soon?: boolean }) {
+function soldLabel(p: Product, v: Variant | null) {
+  const parts = v ? [v.option1 !== "Free size" ? `${p.option1Label} ${v.option1}` : "", v.option2 !== "Default" ? v.option2 : ""].filter(Boolean) : [];
+  return parts.length ? `${parts.join(" in ")} is sold out` : "Sold out";
+}
+
+function NotifyForm({ product, variant, soon = false, inStock = [], otherColors = [], onColor }: { product: Product; variant: Variant | null; soon?: boolean; inStock?: string[]; otherColors?: string[]; onColor?: (c: string) => void }) {
   const [contact, setContact] = useState("");
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [error, setError] = useState("");
@@ -43,7 +51,11 @@ function NotifyForm({ product, variant, soon = false }: { product: Product; vari
     <div className={soon ? "bg-slate-soft p-4" : "bg-sand-soft p-4"}>
       {soon ? (
         <p className="flex flex-wrap items-center gap-2 font-bold uppercase"><Bell size={18} aria-hidden /> Coming soon{product.launchNote && <span className="text-sm font-semibold normal-case text-ink-soft">· {product.launchNote}</span>}</p>
-      ) : <p className="flex items-center gap-2 font-semibold"><Bell size={18} aria-hidden /> {variant ? `${variant.option2 !== "Default" ? variant.option2 + " " : ""}${variant.option1 !== "Free size" ? variant.option1 + " " : ""}is sold out` : "Sold out"}</p>}
+      ) : <p className="flex items-center gap-2 font-semibold"><Bell size={18} aria-hidden /> {soldLabel(product, variant)}</p>}
+      {!soon && otherColors.length > 0 && variant && (
+        <p className="mt-1 text-sm">This size is in stock in {otherColors.map((c, i) => <span key={c}>{i ? ", " : ""}<button type="button" className="font-semibold underline" onClick={() => onColor?.(c)}>{c}</button></span>)}.</p>
+      )}
+      {!soon && inStock.length > 0 && <p className="mt-1 text-sm text-ink-soft">In stock: {inStock.join(", ")}</p>}
       {state === "done" ? (
         <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-pine" role="status"><Check size={16} aria-hidden /> You&apos;re on the list. {soon ? "We'll message you the day it launches." : "We'll message you as soon as it's back."}</p>
       ) : (
@@ -54,7 +66,7 @@ function NotifyForm({ product, variant, soon = false }: { product: Product; vari
           const json = await res.json();
           if (!res.ok) { setError(json.error ?? "Please try again."); setState("idle"); } else setState("done");
         }}>
-          <label htmlFor="notify" className="block text-sm">{soon ? "Not on sale yet. Get a message the day it launches:" : "Get a message the moment it's restocked:"}</label>
+          <label htmlFor="notify" className="block text-sm">{soon ? "Not on sale yet. Get a message the day it launches:" : `Get a message the moment ${variant && variant.option1 !== "Free size" ? `size ${variant.option1}` : "it"} is back:`}</label>
           <div className="flex gap-2">
             <input id="notify" required value={contact} onChange={(e) => setContact(e.target.value)} className="input" placeholder="WhatsApp number or email" />
             <button disabled={state === "busy"} className="btn btn-ink shrink-0">Notify me</button>
@@ -66,7 +78,7 @@ function NotifyForm({ product, variant, soon = false }: { product: Product; vari
   );
 }
 
-export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings }: Props) {
+export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [] }: Props) {
   const router = useRouter();
   const { add } = useCart();
   const sizes = useMemo(() => [...new Set(variants.map((v) => v.option1))], [variants]);
@@ -195,7 +207,8 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
 
         <div className="mt-5" aria-live="polite">
           {sold ? (
-            <NotifyForm product={p} variant={soon ? null : variant} soon={soon} />
+            <NotifyForm key={variant?.id ?? "all"} product={p} variant={soon ? null : variant} soon={soon} inStock={nothingLeft || soon ? [] : sizes.filter((s) => variants.some((v) => v.option1 === s && v.option2 === color && v.stock > 0))}
+              otherColors={nothingLeft || soon || !variant ? [] : variants.filter((v) => v.option1 === variant.option1 && v.option2 !== color && v.stock > 0).map((v) => v.option2)} onColor={pickColor} />
           ) : (
             <>
               {choosing && <p className={`mb-3 text-sm font-medium ${sizeError ? "text-clay" : "text-ink-soft"}`} role={sizeError ? "alert" : undefined}>{sizeError ? `Please select a ${p.option1Label.toLowerCase()} first.` : `Select a ${p.option1Label.toLowerCase()} to see availability.`}</p>}
@@ -218,6 +231,18 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
             </>
           )}
         </div>
+
+        {tiers.length > 0 && !soon && (
+          <div className="mt-5 bg-sand-soft p-3" data-testid="tiers">
+            <p className="text-[13px] font-bold tracking-[0.08em] uppercase">Buy more, save more</p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {tiers.map((t) => <li key={t.minSubtotal} className="border border-dashed border-ink/40 bg-white px-2.5 py-1.5 text-xs"><b className="text-madder">{t.reward}</b> above {money(t.minSubtotal)}</li>)}
+            </ul>
+            <p className="mt-2 text-xs text-ink-soft">Applied automatically in your cart. Mix any items.</p>
+          </div>
+        )}
+
+        {!soon && <DeliveryCheck area={settings.deliveryArea} restricted={settings.areaRestricted} days={`Dispatched in ${settings.dispatchDays} working days, delivered in about ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days`} />}
 
         <ul className="mt-5 grid gap-2 text-sm">
           <li className="flex items-center gap-2"><Truck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.deliveryMode === "free" ? <span className="text-pine">Free delivery on this item</span> : <span>Delivery charge: {money(p.deliveryCharge)}</span>}</li>

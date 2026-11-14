@@ -6,7 +6,7 @@ import { Countdown } from "@/components/store/countdown";
 import { filtersFromParams, Listing } from "@/components/store/listing";
 import { CopyCode } from "@/components/store/copy-code";
 import { getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
-import { isLive } from "@/lib/pricing";
+import { isLive, isOpenEnded } from "@/lib/pricing";
 import { money } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Offers & sales", description: "Live discounts, coupons and limited-time sales on original branded thermals at WonderVastra.", alternates: { canonical: "/sale" } };
@@ -31,7 +31,7 @@ export default async function SalePage({ searchParams }: { searchParams: Promise
               <div key={s.id} className="flex bg-white text-ink flex-col gap-2 p-4">
                 <p className="font-display text-2xl">{s.name}</p>
                 <p className="text-sm text-ink-soft">{s.type === "percent" ? `${s.value}% off` : `${money(s.value)} off`} selected styles</p>
-                <Countdown endsAt={s.endsAt} />
+                {!isOpenEnded(s.endsAt) && <Countdown endsAt={s.endsAt} />}
               </div>
             ))}
             {offers.map((o) => (

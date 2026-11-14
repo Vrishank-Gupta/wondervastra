@@ -2,7 +2,7 @@ import { cache } from "react";
 import { memo } from "./memo";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { bestSalePrice, isLive, type OfferRule, type SaleRule } from "./pricing";
+import { bestSalePrice, isLive, isOpenEnded, type OfferRule, type SaleRule } from "./pricing";
 
 const { products, productImages, variants, categories, brands, reviews, sales, cartOffers } = schema;
 
@@ -90,7 +90,7 @@ export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", asy
       brandId: brand?.id ?? null, brandName: brand?.name ?? null, brandSlug: brand?.slug ?? null, isHouse: brand?.isHouse ?? false,
       images: imgs.filter((i) => i.productId === p.id).map((i) => ({ url: i.url, alt: i.alt })),
       price, mrp, discountPct: mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0,
-      saleName: sale?.name ?? null, saleBadge: sale?.badge ?? null, saleEndsAt: sale?.endsAt ?? null,
+      saleName: sale?.name ?? null, saleBadge: sale?.badge ?? null, saleEndsAt: sale && !isOpenEnded(sale.endsAt) ? sale.endsAt : null,
       inStock: totalStock > 0, totalStock, lowStock: totalStock > 0 && totalStock <= p.lowStockThreshold, showStockCount: p.showStockCount,
       comingSoon: p.comingSoon, launchNote: p.launchNote,
       freeDelivery: p.deliveryMode === "free", deliveryCharge: p.deliveryMode === "free" ? 0 : p.deliveryCharge,
@@ -169,7 +169,7 @@ export const getProductBySlug = cache(async (slug: string) => {
       id: v.id, option1: v.option1, option2: v.option2, colorHex: v.colorHex, sku: v.sku,
       stock: p.forceOutOfStock || p.comingSoon ? 0 : Math.max(0, v.stock),
       price, mrp: Math.max(p.compareAtPrice ?? 0, base),
-      saleName: sale?.name ?? null, saleEndsAt: sale?.endsAt ?? null,
+      saleName: sale?.name ?? null, saleEndsAt: sale && !isOpenEnded(sale.endsAt) ? sale.endsAt : null,
     };
   });
   return { product: p, images, variants: pricedVariants, category: cat[0] ?? null, brand: brand[0] ?? null, reviews: approved };

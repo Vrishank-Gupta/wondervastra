@@ -5,6 +5,8 @@ import { Check, Link2, Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteDiscount, saveCoupon, saveOffer, saveSale } from "@/app/admin/actions";
 import type { schema } from "@/db";
 import { formatDateTime, money } from "@/lib/format";
+import { isOpenEnded, NO_END } from "@/lib/pricing";
+import { OfferLadder } from "./offer-ladder";
 import { Empty, Panel } from "./ui";
 
 type Sale = typeof schema.sales.$inferSelect;
@@ -61,12 +63,13 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
 
   return (
     <div className="space-y-4">
-      <div role="tablist" className="flex flex-wrap gap-2">{tabBtn("offers", "Cart offers", offers.length)}{tabBtn("sales", "Timed sales", sales.length)}{tabBtn("coupons", "Coupons", coupons.length)}</div>
+      <div role="tablist" className="flex flex-wrap gap-2">{tabBtn("offers", "Cart offers", offers.length)}{tabBtn("sales", "Sales", sales.length)}{tabBtn("coupons", "Coupons", coupons.length)}</div>
       {error && <p className="rounded-sm bg-clay-soft p-3 text-sm font-medium" role="alert">{error}</p>}
 
+      {tab === "offers" && <OfferLadder offers={offers} />}
       {tab === "offers" && (
-        <Panel title="Cart offers" actions={!offer && <button className="btn btn-primary btn-sm" onClick={() => setOffer({ name: "", type: "free_shipping", value: "", min: "", max: "", combines: true, starts: "", ends: "", active: true })}><Plus size={14} aria-hidden /> New offer</button>}>
-          <p className="mb-3 text-sm text-ink-soft">Applied automatically, e.g. “Above ₹499, free delivery” or “Above ₹999, 10% off”. Buyers see a progress bar nudging them to the next reward.</p>
+        <Panel title="All cart offers" actions={!offer && <button className="btn btn-primary btn-sm" onClick={() => setOffer({ name: "", type: "free_shipping", value: "", min: "", max: "", combines: true, starts: "", ends: "", active: true })}><Plus size={14} aria-hidden /> New offer</button>}>
+          <p className="mb-3 text-sm text-ink-soft">Each offer on its own, for anything the ladder above doesn&apos;t cover, such as a ₹ amount off or an offer with an end date. The buyer always gets the single best one.</p>
           {offer && (
             <form className="mb-4 grid gap-3 rounded-sm bg-ivory p-3 sm:grid-cols-3" onSubmit={async (e) => {
               e.preventDefault();
@@ -95,25 +98,27 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
       )}
 
       {tab === "sales" && (
-        <Panel title="Limited-time sales" actions={!sale && <button className="btn btn-primary btn-sm" onClick={() => setSale({ name: "", badge: "", type: "percent", value: "", scope: "all", targetIds: [], starts: toLocal(Date.now()), ends: toLocal(Date.now() + 3 * 86400000), banner: true, active: true })}><Plus size={14} aria-hidden /> New sale</button>}>
-          <p className="mb-3 text-sm text-ink-soft">Starts and ends by itself, with a live countdown on the store. If several sales apply, the buyer gets the best price.</p>
+        <Panel title="Sales" actions={!sale && <button className="btn btn-primary btn-sm" onClick={() => setSale({ name: "", badge: "", type: "percent", value: "", scope: "all", targetIds: [], starts: toLocal(Date.now()), ends: toLocal(Date.now() + 3 * 86400000), noEnd: false, q: "", banner: true, active: true })}><Plus size={14} aria-hidden /> New sale</button>}>
+          <p className="mb-3 text-sm text-ink-soft">Discount the whole store, whole categories, brands or single listings. Starts and ends by itself, with a live countdown on the store, or runs with no end date. If several sales apply, the buyer gets the best price.</p>
           {sale && (
             <form className="mb-4 grid gap-3 rounded-sm bg-ivory p-3 sm:grid-cols-3" onSubmit={async (e) => {
               e.preventDefault();
               const s = sale as Record<string, never>;
               const type = s.type as string;
-              const r = await saveSale({ id: s.id || undefined, name: s.name, badge: s.badge || null, type, value: type === "percent" ? Number(s.value) : toP(s.value), scope: s.scope, targetIds: s.targetIds, startsAt: fromLocal(s.starts), endsAt: fromLocal(s.ends), showBanner: s.banner, active: s.active });
+              const r = await saveSale({ id: s.id || undefined, name: s.name, badge: s.badge || null, type, value: type === "percent" ? Number(s.value) : toP(s.value), scope: s.scope, targetIds: s.targetIds, startsAt: fromLocal(s.starts), endsAt: s.noEnd ? NO_END : fromLocal(s.ends), showBanner: s.banner, active: s.active });
               after(r, () => setSale(null));
             }}>
               <F id="sn" label="Sale name"><input id="sn" className="input" required placeholder="Diwali Dhamaka" value={String(sale.name)} onChange={(e) => setSale({ ...sale, name: e.target.value })} /></F>
               <F id="st" label="Discount type"><select id="st" className="input" value={String(sale.type)} onChange={(e) => setSale({ ...sale, type: e.target.value })}><option value="percent">% off</option><option value="flat">₹ off each item</option></select></F>
               <F id="sv" label={sale.type === "percent" ? "Percent off" : "₹ off"}><input id="sv" className="input" type="number" min="1" required value={String(sale.value)} onChange={(e) => setSale({ ...sale, value: e.target.value })} /></F>
               <F id="ss" label="Starts"><input id="ss" className="input" type="datetime-local" required value={String(sale.starts)} onChange={(e) => setSale({ ...sale, starts: e.target.value })} /></F>
-              <F id="se" label="Ends"><input id="se" className="input" type="datetime-local" required value={String(sale.ends)} onChange={(e) => setSale({ ...sale, ends: e.target.value })} /></F>
-              <F id="sc" label="Applies to"><select id="sc" className="input" value={String(sale.scope)} onChange={(e) => setSale({ ...sale, scope: e.target.value, targetIds: [] })}><option value="all">Whole store</option><option value="category">Selected categories</option><option value="brand">Selected brands</option><option value="products">Selected listings</option></select></F>
+              <div><F id="se" label="Ends">{sale.noEnd ? <p className="input bg-line/40 text-ink-soft">No end date</p> : <input id="se" className="input" type="datetime-local" required value={String(sale.ends)} onChange={(e) => setSale({ ...sale, ends: e.target.value })} />}</F>
+                <label className="mt-1 flex items-center gap-2 text-xs"><input type="checkbox" className="size-3.5 accent-ink" checked={Boolean(sale.noEnd)} onChange={(e) => setSale({ ...sale, noEnd: e.target.checked })} /> No end date (runs until you turn it off, no countdown)</label></div>
+              <F id="sc" label="Applies to"><select id="sc" className="input" value={String(sale.scope)} onChange={(e) => setSale({ ...sale, scope: e.target.value, targetIds: [] })}><option value="all">Whole store</option><option value="category">Whole categories</option><option value="brand">Whole brands</option><option value="products">Single listings</option></select></F>
               {sale.scope !== "all" && (
-                <fieldset className="max-h-48 overflow-y-auto rounded-sm border border-line bg-white p-2 sm:col-span-3"><legend className="px-1 text-xs font-medium">Choose</legend>
-                  <div className="grid gap-1 sm:grid-cols-2">{(sale.scope === "category" ? categories : sale.scope === "brand" ? brands : products).map((o) => {
+                <fieldset className="max-h-64 overflow-y-auto rounded-sm border border-line bg-white p-2 sm:col-span-3"><legend className="px-1 text-xs font-medium">Choose ({(sale.targetIds as string[]).length} selected)</legend>
+                  {sale.scope === "products" && <input aria-label="Search listings" className="input mb-2" placeholder="Search listings" value={String(sale.q ?? "")} onChange={(e) => setSale({ ...sale, q: e.target.value })} />}
+                  <div className="grid gap-1 sm:grid-cols-2">{(sale.scope === "category" ? categories : sale.scope === "brand" ? brands : products.filter((o) => (sale.targetIds as string[]).includes(o.id) || o.name.toLowerCase().includes(String(sale.q ?? "").toLowerCase()))).map((o) => {
                     const ids = sale.targetIds as string[];
                     return <label key={o.id} className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-ink" checked={ids.includes(o.id)} onChange={(e) => setSale({ ...sale, targetIds: e.target.checked ? [...ids, o.id] : ids.filter((x) => x !== o.id) })} />{o.name}</label>;
                   })}</div>
@@ -124,8 +129,8 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
             </form>
           )}
           {sales.length ? <ul>{sales.map((s) => (
-            <Row key={s.id} title={s.name} badge={<Badge r={s} />} sub={`${s.type === "percent" ? `${s.value}%` : money(s.value)} off · ${s.scope === "all" ? "whole store" : `${s.targetIds.length} ${s.scope === "category" ? "categories" : s.scope === "brand" ? (s.targetIds.length === 1 ? "brand" : "brands") : "listings"}`} · ${formatDateTime(s.startsAt)} to ${formatDateTime(s.endsAt)}`}
-              onEdit={() => setSale({ id: s.id, name: s.name, badge: s.badge ?? "", type: s.type, value: s.type === "percent" ? String(s.value) : rup(s.value), scope: s.scope, targetIds: s.targetIds, starts: toLocal(s.startsAt), ends: toLocal(s.endsAt), banner: s.showBanner, active: s.active })} onDelete={() => del("sale", s.id)} />
+            <Row key={s.id} title={s.name} badge={<Badge r={s} />} sub={`${s.type === "percent" ? `${s.value}%` : money(s.value)} off · ${s.scope === "all" ? "whole store" : `${s.targetIds.length} ${s.scope === "category" ? "categories" : s.scope === "brand" ? (s.targetIds.length === 1 ? "brand" : "brands") : "listings"}`} · ${isOpenEnded(s.endsAt) ? `from ${formatDateTime(s.startsAt)}, no end date` : `${formatDateTime(s.startsAt)} to ${formatDateTime(s.endsAt)}`}`}
+              onEdit={() => setSale({ id: s.id, name: s.name, badge: s.badge ?? "", type: s.type, value: s.type === "percent" ? String(s.value) : rup(s.value), scope: s.scope, targetIds: s.targetIds, starts: toLocal(s.startsAt), ends: isOpenEnded(s.endsAt) ? toLocal(Date.now() + 7 * 86400000) : toLocal(s.endsAt), noEnd: isOpenEnded(s.endsAt), q: "", banner: s.showBanner, active: s.active })} onDelete={() => del("sale", s.id)} />
           ))}</ul> : <Empty>No sales yet.</Empty>}
         </Panel>
       )}
