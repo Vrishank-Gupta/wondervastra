@@ -288,6 +288,9 @@ export const orders = sqliteTable(
     whatsappOptIn: bool("whatsapp_opt_in").notNull().default(true),
     stockHeld: bool("stock_held").notNull().default(true),
     placedAt: ts("placed_at"),
+    /** Sequential GST invoice number (e.g. WV/2026-27/00001), given when the invoice is first issued. */
+    invoiceNumber: text("invoice_number").unique(),
+    invoicedAt: ts("invoiced_at"),
     shippedAt: ts("shipped_at"),
     deliveredAt: ts("delivered_at"),
     createdAt: created(),

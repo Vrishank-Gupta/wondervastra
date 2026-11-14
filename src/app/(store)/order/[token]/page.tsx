@@ -1,3 +1,4 @@
+import { emailConfigured, whatsappConfigured } from "@/lib/notifications";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PartyPopper } from "lucide-react";
@@ -18,7 +19,9 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const { order, items, events } = data;
   const settings = await getSettings();
   const canReturn = await returnEligible(order, items);
-  const fb = order.deliveredAt && settings.deliveryFeedbackEnabled ? "delivery" : order.placedAt && settings.orderFeedbackEnabled ? "order" : null;
+  const closed = order.status === "cancelled" || order.status === "pending_payment";
+  const sentTo = [emailConfigured() && order.email, whatsappConfigured() && order.whatsappOptIn && "your WhatsApp"].filter(Boolean) as string[];
+  const fb = closed ? null : order.deliveredAt && settings.deliveryFeedbackEnabled ? "delivery" : order.placedAt && settings.orderFeedbackEnabled ? "order" : null;
   return (
     <div className="container-x py-6">
       {placed && <CartResetOnPlaced />}
@@ -27,7 +30,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           <PartyPopper aria-hidden className="shrink-0" />
           <div>
             <p className="font-display text-2xl">Your order is confirmed.</p>
-            <p className="text-sm">We&apos;ve sent the details to {order.email}{order.whatsappOptIn ? " and your WhatsApp" : ""}. Bookmark this page to track it anytime.</p>
+            <p className="text-sm">{sentTo.length ? <>We&apos;ve sent the details to {sentTo.join(" and ")}. </> : null}Bookmark this page to track it anytime.</p>
           </div>
         </div>
       )}

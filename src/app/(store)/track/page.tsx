@@ -30,10 +30,10 @@ export default async function Track({ searchParams }: { searchParams: Promise<{ 
       <form action={lookup} className="card-pop w-full max-w-md space-y-4 p-6">
         <PackageSearch size={36} aria-hidden />
         <h1 className="text-3xl">Where&apos;s my order?</h1>
-        <p className="text-sm text-ink-soft">No login needed. Use the order number from your WhatsApp or email.</p>
+        <p className="text-sm text-ink-soft">No login needed. Use the order number from your order confirmation.</p>
         {e === "notfound" && <p className="rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">We couldn&apos;t find that order. Please check both details.</p>}
         {e === "limit" && <p className="rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">Too many attempts. Please try again in a few minutes.</p>}
-        <div><label className="label" htmlFor="number">Order number</label><input id="number" name="number" className="input uppercase" required placeholder="VVXXXXXXX" /></div>
+        <div><label className="label" htmlFor="number">Order number</label><input id="number" name="number" className="input uppercase" required placeholder="WVXXXXXXX" /></div>
         <div><label className="label" htmlFor="contact">Phone or email used for the order</label><input id="contact" name="contact" className="input" required /></div>
         <button className="btn btn-primary w-full">Track order</button>
       </form>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BadgeCheck, CreditCard, MessageCircle, RotateCcw, Truck } from "lucide-react";
 import type { StoreSettings } from "@/lib/settings";
+import { capabilities, paymentLine } from "@/lib/capabilities";
 import { Logo } from "../brand-logo";
 
 export function WhatsAppFab({ number }: { number: string }) {
@@ -17,8 +18,9 @@ export function WhatsAppFab({ number }: { number: string }) {
 }
 
 export function TrustStrip({ settings }: { settings: StoreSettings }) {
+  const online = capabilities().onlinePayments;
   const items = [
-    { icon: CreditCard, title: "Secure payment", text: settings.codEnabled ? "UPI, cards & cash on delivery" : "UPI, cards & netbanking" },
+    { icon: CreditCard, title: online ? "Secure payment" : "Easy payment", text: paymentLine(online, settings.codEnabled).replace(/ available$/, "") },
     { icon: Truck, title: `Ships in ${settings.dispatchDays} days`, text: `Delivered in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` },
     { icon: BadgeCheck, title: "100% original brands", text: "At the lowest prices" },
     { icon: RotateCcw, title: `${settings.returnWindowDays}-day returns`, text: "On eligible items" },
@@ -79,7 +81,7 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         </div>
       </div>
       <div className="border-t border-white/15">
-        <p className="container-x py-5 text-xs text-white/50">© {new Date().getFullYear()} {settings.legalName || settings.storeName}. Payments secured by Razorpay.</p>
+        <p className="container-x py-5 text-xs text-white/50">© {new Date().getFullYear()} {settings.legalName || settings.storeName}.{capabilities().razorpay ? " Payments secured by Razorpay." : ""}</p>
       </div>
     </footer>
   );

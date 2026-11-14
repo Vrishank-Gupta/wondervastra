@@ -24,7 +24,6 @@ async function createOrder(request: APIRequestContext, body: Record<string, unkn
 }
 async function adminLogin(page: Page) {
   await page.goto("/admin/login");
-  await page.getByLabel("Email").fill(ADMIN.email);
   await page.getByLabel("Password").fill(ADMIN.password);
   await page.getByRole("button", { name: "Log in" }).click();
   await page.waitForURL("**/admin");
@@ -40,6 +39,11 @@ test("browse, search, cart nudges, coupon, simulated payment, confirmation", asy
   await page.getByRole("link", { name: /Boys' Thermal Top/ }).first().click();
 
   await page.waitForURL("**/p/rupa-boys-thermal-top");
+  // No size is picked for the buyer: adding without one asks for it.
+  await expect(page.getByText("Select a size to see availability.")).toBeVisible();
+  await page.getByRole("button", { name: "Add to cart" }).first().click();
+  await expect(page.getByText("Please select a size first.")).toBeVisible();
+  await page.locator("#size-picker button:not(.line-through)").first().click();
   await expect(page.getByText(/pieces? (available|left)/)).toBeVisible();
   await page.getByRole("button", { name: "Add to cart" }).first().click();
 
@@ -70,8 +74,8 @@ test("browse, search, cart nudges, coupon, simulated payment, confirmation", asy
   expect(o.payment_status).toBe("paid");
   expect(o.utm_source).toBe("instagram");
   expect(o.coupon_code).toBe("WELCOME10");
-  // ₹299 list, no sale on kids' thermals; 10% coupon; ₹49 delivery.
-  expect(o.total).toBe(29900 - 2990 + 4900);
+  // ₹299 list, no sale on kids' thermals; 10% coupon (₹29.90, rounded to ₹30); ₹49 delivery.
+  expect(o.total).toBe(29900 - 3000 + 4900);
   const notif = await rows("select channel,event from notifications where order_id=?", [o.id as unknown as string]);
   expect(notif.map((n) => `${n.channel}:${n.event}`).sort()).toEqual(["email:order_placed", "whatsapp:order_placed"]);
 
@@ -180,6 +184,7 @@ test("out of stock: subscribe, seller restocks, buyer is notified exactly once",
   expect(msgs.length).toBe(1);
 
   await page.goto("/p/amul-girls-thermal-leggings");
+  await page.locator("#size-picker button:not(.line-through)").first().click();
   await expect(page.getByText(/7 pieces available/)).toBeVisible();
 });
 
@@ -237,12 +242,13 @@ test("cancelling restores stock and coupon use, and offers apply above a thresho
   expect(res.ok()).toBeTruthy();
   const { id, accessToken } = await res.json();
   const o = await one("select * from orders where id=?", [id]);
-  // ₹299 x 7 = ₹2093 (boys' thermal top): 10% off above ₹1,999 (₹209.30) + ₹50 coupon; free delivery above ₹799; ₹30 COD fee.
+  // ₹299 x 7 = ₹2093 (boys' thermal top): 10% off above ₹1,999 (₹209.30, rounded to ₹209) + ₹50 coupon; free delivery above ₹799; ₹30 COD fee.
   expect(o.subtotal).toBe(209300);
-  expect(o.offer_discount).toBe(20930);
+  expect(o.offer_discount).toBe(20900);
   expect(o.coupon_discount).toBe(5000);
   expect(o.shipping_total).toBe(0);
-  expect(o.total).toBe(209300 - 20930 - 5000 + 3000);
+  expect(o.total).toBe(209300 - 20900 - 5000 + 3000);
+  expect(o.number).toMatch(/^WV[2-9A-Z]{7}$/);
   expect((await one("select stock from variants where id=?", [v])).stock).toBe(3);
 
   await page.goto(`/order/${accessToken}`);
@@ -359,7 +365,7 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
 
   const png = await sharp({ create: { width: 800, height: 1000, channels: 3, background: "#c98" } }).png().toBuffer();
   await page.locator('input[type="file"][multiple]').setInputFiles({ name: "jhumka.png", mimeType: "image/png", buffer: png });
-  await expect(page.getByText("Cover")).toBeVisible();
+  await expect(page.getByText("Cover", { exact: true })).toBeVisible();
 
   // A non-image is refused.
   await page.locator('input[type="file"][multiple]').setInputFiles({ name: "evil.jpg", mimeType: "image/jpeg", buffer: Buffer.from("<script>alert(1)</script>") });
@@ -490,7 +496,7 @@ test("brands: brand pages, brand filter, own label hidden until it has stock, an
   // Multi-brand filter on the shop page, by URL.
   await page.goto("/shop?brand=amul,rupa");
   const ar = Number((await one("select count(*) n from products p join brands b on b.id=p.brand_id where b.slug in ('amul','rupa') and p.status='active'")).n);
-  await expect(page.getByText(`${ar} items`)).toBeVisible();
+  await expect(page.getByRole("main").getByText(`${ar} items`)).toBeVisible();
 
   // The product page names and links its brand.
   await page.goto("/p/amul-baby-thermal-bodysuit");
@@ -536,7 +542,7 @@ test("only thermals are on the site: kids' lead, other ranges are hidden and can
   expect(res.status()).toBe(409);
   await page.goto("/shop");
   const live = Number((await one("select count(*) n from products where status='active'")).n);
-  await expect(page.getByText(`${live} items`)).toBeVisible();
+  await expect(page.getByRole("main").getByText(`${live} items`)).toBeVisible();
 });
 
 test("listings: drafts are flagged and several can be published at once", async ({ page }) => {
@@ -552,4 +558,163 @@ test("listings: drafts are flagged and several can be published at once", async 
   await page.getByRole("button", { name: "Publish selected" }).click();
   await expect(page.getByText("Published 2 listings.")).toBeVisible();
   for (const s of slugs) expect((await one("select status from products where slug=?", [s])).status).toBe("active");
+});
+
+test("security: login can't redirect off-site; coupon guessing and alerts for hidden items are refused", async ({ page, request }) => {
+  // Open redirect: a crafted "next" lands on the account page, never another site.
+  await page.goto("/login?next=" + encodeURIComponent("/\\example.com"));
+  await page.getByLabel("Mobile number or email").fill("redirect@example.com");
+  await page.getByRole("button", { name: "Send login code" }).click();
+  const code = (await page.getByText(/your code is/).textContent())!.match(/\d{6}/)![0];
+  await page.getByLabel("6-digit code").fill(code);
+  await page.getByRole("button", { name: /log in/i }).click();
+  await page.waitForURL("**/account");
+  await page.goto("/login?next=//example.com/x");
+  await page.waitForURL("**/account");
+  expect(new URL(page.url()).host).toBe("localhost:3100");
+
+  // Guessing coupon codes: after 15 wrong codes the visitor is paused, even for real codes.
+  const v = await variantOf("lux-thermal-top-full-sleeve");
+  const quote = (couponCode: string) => request.post("/api/cart/quote", { headers: { "x-real-ip": "10.66.0.1" }, data: { items: [{ variantId: v, qty: 1 }], couponCode } }).then((r) => r.json());
+  for (let i = 0; i < 15; i++) expect((await quote(`GUESS${i}`)).couponError).toBe("That coupon code isn't valid.");
+  expect((await quote("WELCOME10")).couponError).toMatch(/Too many coupon attempts/);
+  expect((await request.post("/api/cart/quote", { headers: { "x-real-ip": "10.66.0.2" }, data: { items: [{ variantId: v, qty: 1 }], couponCode: "WELCOME10" } }).then((r) => r.json())).coupon?.code).toBe("WELCOME10");
+
+  // Restock alerts only for listings that are in the store.
+  const hidden = await one("select id from products where status='archived' limit 1");
+  const res = await request.post("/api/stock-alert", { headers: { "x-real-ip": "10.66.0.3" }, data: { productId: hidden.id, contact: "spam@example.com" } });
+  expect(res.status()).toBe(404);
+});
+
+test("orders: whole-rupee coupons, restock alerts after a cancel, publishing needs a photo, GST invoice", async ({ page, request }) => {
+  // A percent coupon never leaves paise in the total.
+  const v = await variantOf("lux-girls-thermal-set", 1);
+  const q = await request.post("/api/cart/quote", { headers: { "x-real-ip": "10.67.0.1" }, data: { items: [{ variantId: v, qty: 1 }], couponCode: "WELCOME10" } }).then((r) => r.json());
+  expect(q.coupon.discount % 100).toBe(0);
+  expect(q.total % 100).toBe(0);
+
+  // Someone takes the last piece; another buyer asks to be told; the order is cancelled → they're messaged.
+  const res = await createOrder(request, { ...buyer(70), items: [{ variantId: v, qty: 1 }] }, "10.67.0.2");
+  expect(res.ok()).toBeTruthy();
+  const { accessToken, id } = await res.json();
+  const pid = (await one("select product_id from variants where id=?", [v])).product_id as string;
+  await request.post("/api/stock-alert", { headers: { "x-real-ip": "10.67.0.3" }, data: { productId: pid, variantId: v, contact: "waiting@example.com" } });
+  await page.goto(`/order/${accessToken}`);
+  await page.getByRole("button", { name: "Cancel order" }).click();
+  await page.getByRole("button", { name: "Yes, cancel" }).click();
+  await expect(page.getByText("Cancelled").first()).toBeVisible();
+  await expect.poll(async () => (await rows("select * from notifications where event='back_in_stock' and recipient='waiting@example.com'")).length).toBe(1);
+  // A cancelled order offers no rating.
+  await expect(page.getByRole("link", { name: /Rate your/ })).toHaveCount(0);
+  expect((await one("select invoice_number from orders where id=?", [id])).invoice_number).toBeNull();
+
+  // Publishing from the listing's menu refuses a listing with no photo, and says why.
+  await adminLogin(page);
+  const draft = await one("select id, name from products where status='active' limit 1");
+  await db.execute({ sql: "update products set status='draft' where id=?", args: [draft.id as string] });
+  const photos = await rows("select * from product_images where product_id=?", [draft.id as string]);
+  await db.execute({ sql: "delete from product_images where product_id=?", args: [draft.id as string] });
+  await page.goto("/admin/products?status=draft");
+  await page.getByLabel(`More actions for ${draft.name}`, { exact: true }).first().click();
+  await page.locator("details[open]").getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("Add at least one photo before publishing.")).toBeVisible();
+  for (const ph of photos) await db.execute({ sql: "insert into product_images (id, product_id, url, alt, sort_order) values (?,?,?,?,?)", args: [ph.id, ph.product_id, ph.url, ph.alt, ph.sort_order] });
+  await db.execute({ sql: "update products set status='active' where id=?", args: [draft.id as string] });
+
+  // GST invoice: sequential number, place of supply, CGST+SGST in the seller's state.
+  await db.execute(`insert into settings (key, value, updated_at) values ('gstin', '"27ABCDE1234F1Z5"', 0), ('businessState', '"Maharashtra"', 0), ('legalName', '"WonderVastra Retail"', 0) on conflict(key) do update set value=excluded.value`);
+  const a = await (await createOrder(request, { ...buyer(71), items: [{ variantId: await variantOf("rupa-boys-thermal-top", 20), qty: 2 }] }, "10.67.0.4")).json();
+  const b = await (await createOrder(request, { ...buyer(72), state: "Karnataka", city: "Bengaluru", pincode: "560001", items: [{ variantId: await variantOf("rupa-boys-thermal-top"), qty: 1 }] }, "10.67.0.5")).json();
+  await page.goto(`/admin/orders/${a.id}/invoice`);
+  await expect(page.getByText("Tax invoice")).toBeVisible();
+  const first = (await page.getByText(/^Invoice no\./).innerText()).match(/WV\/\d{4}-\d{2}\/(\d{5})/)!;
+  await expect(page.getByText("CGST + SGST (intra-state)")).toBeVisible();
+  await expect(page.getByText("GSTIN: 27ABCDE1234F1Z5")).toBeVisible();
+  await page.goto(`/admin/orders/${b.id}/invoice`);
+  await expect(page.getByText("IGST (inter-state)")).toBeVisible();
+  const second = (await page.getByText(/^Invoice no\./).innerText()).match(/WV\/\d{4}-\d{2}\/(\d{5})/)!;
+  expect(Number(second[1])).toBe(Number(first[1]) + 1);
+  // Re-opening keeps the same number.
+  await page.goto(`/admin/orders/${a.id}/invoice`);
+  await expect(page.getByText(first[0])).toBeVisible();
+  await db.execute("delete from settings where key in ('gstin','businessState','legalName')");
+});
+
+test("settings are checked before saving; phones never scroll sideways", async ({ page }) => {
+  await adminLogin(page);
+  await page.goto("/admin/settings");
+  await page.getByLabel("GSTIN (if registered)").fill("NOT-A-GSTIN");
+  await page.getByRole("button", { name: /save/i }).first().click();
+  await expect(page.getByText(/doesn't look like a GSTIN/)).toBeVisible();
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  for (const path of ["/", "/shop", "/p/rupa-boys-thermal-top", "/admin/brands", "/admin/products", "/admin/settings", "/admin/products/new"]) {
+    await page.goto(path);
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(over, `${path} scrolls sideways`).toBeLessThanOrEqual(0);
+  }
+});
+
+test("search engines and AI assistants: structured data, sitemap, robots, llms.txt", async ({ page, request }) => {
+  const ld = async (path: string) => {
+    await page.goto(path);
+    const blocks = await page.locator('script[type="application/ld+json"]').allTextContents();
+    return blocks.flatMap((b) => { const j = JSON.parse(b); return Array.isArray(j) ? j : [j]; });
+  };
+  const home = await ld("/");
+  expect(home.map((x) => x["@type"])).toEqual(expect.arrayContaining(["OnlineStore", "WebSite"]));
+  expect(home.find((x) => x["@type"] === "WebSite").potentialAction.target.urlTemplate).toContain("/shop?q=");
+
+  const product = await ld("/p/rupa-boys-thermal-top");
+  const p = product.find((x) => x["@type"] === "Product");
+  expect(p.name).toBe("Rupa Boys' Thermal Top");
+  expect(p.brand.name).toBe("Rupa");
+  expect(p.offers.priceCurrency).toBe("INR");
+  expect(p.offers.availability).toMatch(/InStock|OutOfStock/);
+  expect(p.offers.shippingDetails.shippingDestination.addressCountry).toBe("IN");
+  expect(product.find((x) => x["@type"] === "BreadcrumbList").itemListElement.length).toBe(3);
+  expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe("http://localhost:3100/p/rupa-boys-thermal-top");
+
+  const cat = await ld("/c/kids-thermals");
+  expect(cat.find((x) => x["@type"] === "ItemList").numberOfItems).toBeGreaterThan(0);
+  const faq = await ld("/info/faq");
+  expect(faq.find((x) => x["@type"] === "FAQPage").mainEntity.length).toBeGreaterThan(5);
+
+  // Search results pages aren't indexed; category pages are.
+  await page.goto("/shop?q=thermal");
+  expect(await page.locator('meta[name="robots"]').getAttribute("content")).toContain("noindex");
+  await page.goto("/c/kids-thermals?collection=baby");
+  expect(await page.locator('meta[name="robots"]').count()).toBe(0);
+
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).toContain("GPTBot");
+  expect(robots).toContain("ClaudeBot");
+  expect(robots).toContain("PerplexityBot");
+  expect(robots).toMatch(/Disallow: \/admin/);
+  const sitemap = await (await request.get("/sitemap.xml")).text();
+  expect(sitemap).toContain("/p/rupa-boys-thermal-top");
+  expect(sitemap).toContain("<image:loc>");
+  expect(sitemap).toContain("collection=baby");
+  const llms = await request.get("/llms.txt");
+  expect(llms.headers()["content-type"]).toContain("text/markdown");
+  const text = await llms.text();
+  expect(text).toMatch(/^# WonderVastra/);
+  expect(text).toContain("Rupa Boys' Thermal Top");
+  expect(text).toContain("/c/kids-thermals");
+  // IndexNow key file, so Bing (ChatGPT search) accepts change notifications.
+  const key = (await import("../src/lib/indexnow")).INDEXNOW_KEY;
+  expect(await (await request.get(`/${key}.txt`)).text()).toBe(key);
+  // Nothing claims WhatsApp updates while WhatsApp isn't connected.
+  await page.goto("/");
+  await expect(page.getByText("Order updates on WhatsApp")).toHaveCount(0);
+});
+
+test("admin login is password-only, and wrong guesses are capped", async ({ page }) => {
+  await page.goto("/admin/login");
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+  await page.getByLabel("Password").fill("not-the-password");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByText("Wrong password.")).toBeVisible();
+  await adminLogin(page);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });

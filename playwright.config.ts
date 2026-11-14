@@ -10,6 +10,14 @@ const env: Record<string, string> = {
   RAZORPAY_WEBHOOK_SECRET: "e2e-webhook-secret",
   RESEND_API_KEY: "",
   WHATSAPP_TOKEN: "",
+  // Blank on purpose: production builds also read local .env files, and tests must never touch real services.
+  CLOUDINARY_CLOUD_NAME: "",
+  CLOUDINARY_API_KEY: "",
+  CLOUDINARY_API_SECRET: "",
+  DATABASE_AUTH_TOKEN: "",
+  EMAIL_FROM: "",
+  WHATSAPP_PHONE_NUMBER_ID: "",
+  CRON_SECRET: "",
   NEXT_PUBLIC_SITE_URL: "http://localhost:3100",
   NEXT_DIST_DIR: ".next-e2e",
 };

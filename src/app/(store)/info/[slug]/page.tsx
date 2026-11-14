@@ -1,10 +1,32 @@
+import { faqPage, JsonLd } from "@/lib/seo";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSettings, type StoreSettings } from "@/lib/settings";
+import { capabilities } from "@/lib/capabilities";
+
+/** "email and WhatsApp" only when both are really connected. */
+const channels = () => (capabilities().whatsapp ? "email and WhatsApp" : "email");
 
 type Page = { title: string; body: (s: StoreSettings) => React.ReactNode };
 
 const contactLine = (s: StoreSettings) => s.supportEmail || s.whatsappNumber ? `at ${[s.supportEmail, s.whatsappNumber].filter(Boolean).join(" or ")}` : "through our contact page";
+
+/** One source for the FAQ page and its FAQPage search data, so both always say the same thing. */
+function faqItems(s: StoreSettings): { q: string; a: string }[] {
+  const online = capabilities().onlinePayments;
+  return [
+    { q: "Are your products original?", a: "Yes. Everything we sell is 100% original branded stock, never copies, at the lowest prices we can offer." },
+    { q: "Do I need an account to order?", a: "No. You can check out as a guest and track your order with the link we send you." },
+    { q: "How do I pay?", a: online ? `UPI, cards, netbanking and wallets through Razorpay${s.codEnabled ? ", or cash on delivery on eligible items" : ""}.` : s.codEnabled ? "Cash on delivery on eligible items. Online payment (UPI and cards) is opening soon." : "Online payment is opening soon. Please contact us to order." },
+    { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners. Delivery charges are shown on each product page and in your cart before you pay." },
+    { q: "When will my order arrive?", a: `We dispatch within ${s.dispatchDays} working days, and delivery usually takes ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after that depending on your location.` },
+    { q: "What sizes do kids' thermals come in?", a: "Baby thermals come in sizes from 0–6 months up to 18–24 months, and kids' thermals for boys and girls from 2–4 years up to 12–14 years. Each product page shows the sizes in stock." },
+    { q: "How do I track my order?", a: `We'll send you a tracking link by ${channels()} when it ships. You can also use the Track Order page anytime.` },
+    { q: "Can I cancel my order?", a: "Yes, from your order page, until it has been packed." },
+    { q: "Can I return an item?", a: `Eligible items can be returned within ${s.returnWindowDays} days of delivery. For hygiene reasons, items must be unused with original packaging. See our returns policy.` },
+    { q: "An item is sold out. Will it come back?", a: "Tap “Notify me” on the product page and we'll message you as soon as it's restocked." },
+  ];
+}
 
 const PAGES: Record<string, Page> = {
   about: { title: "Our story", body: (s) => <>
@@ -21,20 +43,12 @@ const PAGES: Record<string, Page> = {
     {s.gstin && <p><b>GSTIN:</b> {s.gstin}</p>}
     <p>Please keep your order number handy so we can help you faster.</p>
   </> },
-  faq: { title: "FAQs", body: (s) => <>
-    <h2>Do I need an account to order?</h2><p>No. You can check out as a guest and track your order with the link we send you.</p>
-    <h2>How do I pay?</h2><p>UPI, cards, netbanking and wallets through Razorpay{s.codEnabled ? ", or cash on delivery on eligible items" : ""}.</p>
-    <h2>When will my order arrive?</h2><p>We dispatch within {s.dispatchDays} working days, and delivery usually takes {s.deliveryDaysMin}–{s.deliveryDaysMax} days after that depending on your location.</p>
-    <h2>How do I track my order?</h2><p>We&apos;ll send you a tracking link on email and WhatsApp when it ships. You can also use the Track Order page anytime.</p>
-    <h2>Can I cancel my order?</h2><p>Yes, from your order page, until it has been packed.</p>
-    <h2>Can I return an item?</h2><p>Eligible items can be returned within {s.returnWindowDays} days of delivery. For hygiene reasons, items must be unused with original packaging. See our returns policy.</p>
-    <h2>An item is sold out. Will it come back?</h2><p>Tap &ldquo;Notify me&rdquo; on the product page and we&apos;ll message you as soon as it&apos;s restocked.</p>
-  </> },
+  faq: { title: "FAQs", body: (s) => <>{faqItems(s).map((x) => <div key={x.q}><h2>{x.q}</h2><p>{x.a}</p></div>)}</> },
   "shipping-policy": { title: "Shipping policy", body: (s) => <>
     <p>We ship across India through trusted courier partners.</p>
     <h2>Dispatch & delivery time</h2><p>Orders are dispatched within {s.dispatchDays} working days. Delivery usually takes {s.deliveryDaysMin}–{s.deliveryDaysMax} days after dispatch, and may take longer for remote areas.</p>
     <h2>Delivery charges</h2><p>Delivery charges depend on the item and are shown on each product page, in your cart and at checkout before you pay. Many items and larger orders ship free.</p>
-    <h2>Tracking</h2><p>When your order ships, you&apos;ll get the courier name, AWB number and tracking link by email and WhatsApp.</p>
+    <h2>Tracking</h2><p>When your order ships, you&apos;ll get the courier name, AWB number and tracking link by {channels()}.</p>
     <h2>Failed delivery</h2><p>If delivery fails because of an incorrect address or if the recipient is unavailable, please contact us {contactLine(s)}.</p>
   </> },
   "returns-policy": { title: "Returns & refunds", body: (s) => <>
@@ -47,7 +61,7 @@ const PAGES: Record<string, Page> = {
   "privacy-policy": { title: "Privacy policy", body: (s) => <>
     <p>This policy explains how {s.legalName || s.storeName} handles your information.</p>
     <h2>What we collect</h2><p>Your name, contact details and delivery address when you order; order history; and basic data on how you found us (such as a link from Instagram or WhatsApp).</p>
-    <h2>Payments</h2><p>Payments are processed by Razorpay. We never see or store your card, UPI or banking credentials.</p>
+    <h2>Payments</h2><p>Online payments are processed by Razorpay. We never see or store your card, UPI or banking credentials.</p>
     <h2>How we use it</h2><p>To fulfil your order, send order and delivery updates by email and WhatsApp, provide support, and improve our store. We share only what&apos;s needed with couriers and service providers that help us do this. We don&apos;t sell your data.</p>
     <h2>Your choices</h2><p>You can opt out of WhatsApp updates at checkout and ask us to access or delete your data by contacting us {contactLine(s)}.</p>
   </> },
@@ -62,16 +76,19 @@ const PAGES: Record<string, Page> = {
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const p = PAGES[(await params).slug];
-  return p ? { title: p.title } : {};
+  const { slug } = await params;
+  const p = PAGES[slug];
+  return p ? { title: p.title, alternates: { canonical: `/info/${slug}` } } : {};
 }
 export default async function InfoPage({ params }: Props) {
-  const p = PAGES[(await params).slug];
+  const { slug } = await params;
+  const p = PAGES[slug];
   if (!p) notFound();
   const s = await getSettings();
   return (
     <div className="container-x py-8">
       <article className="mx-auto max-w-2xl">
+        {slug === "faq" && <JsonLd data={faqPage(faqItems(s))} />}
         <h1 className="text-4xl sm:text-5xl">{p.title}</h1>
         <div className="prose-vv mt-5">{p.body(s)}</div>
       </article>

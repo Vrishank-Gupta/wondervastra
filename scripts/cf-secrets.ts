@@ -1,12 +1,12 @@
 /**
- * Uploads the runtime secrets from .env.production.local to the Cloudflare Worker (encrypted at rest).
+ * Uploads the runtime secrets from .env.cloudflare to the Cloudflare Worker (encrypted at rest).
  * Blank values are skipped; values never print. Run: npx tsx scripts/cf-secrets.ts
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { parse } from "dotenv";
 
-const env = parse(readFileSync(".env.production.local"));
+const env = parse(readFileSync(".env.cloudflare"));
 // Only what the running site reads. Admin login and contact details live in the database instead.
 const KEYS = [
   "DATABASE_URL", "DATABASE_AUTH_TOKEN", "CRON_SECRET",

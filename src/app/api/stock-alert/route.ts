@@ -16,8 +16,9 @@ export async function POST(req: Request) {
   const email = normalizeEmail(contact);
   const phone = email ? null : normalizePhone(contact);
   if (!email && !phone) return NextResponse.json({ error: "Enter a valid email or 10-digit mobile number." }, { status: 400 });
-  const [p] = await db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.id, productId));
+  const [p] = await db.select({ id: schema.products.id }).from(schema.products).where(and(eq(schema.products.id, productId), eq(schema.products.status, "active")));
   if (!p) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  if (!(await rateLimit(`alert-contact:${email ?? phone}`, 10, 24 * 60 * 60_000))) return NextResponse.json({ error: "You've signed up for a lot of alerts today. Try again tomorrow." }, { status: 429 });
   const existing = await db.select().from(schema.stockAlerts).where(and(
     eq(schema.stockAlerts.productId, productId), eq(schema.stockAlerts.status, "waiting"),
     email ? eq(schema.stockAlerts.email, email) : eq(schema.stockAlerts.phone, phone!),

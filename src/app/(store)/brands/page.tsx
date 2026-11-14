@@ -1,9 +1,13 @@
+import { brandPhrase } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandTile } from "@/components/store/brand-tile";
 import { getActiveBrands } from "@/lib/catalog";
 
-export const metadata: Metadata = { title: "Shop by brand", description: "Thermals from the brands you already trust, 100% original at the lowest prices." };
+export async function generateMetadata(): Promise<Metadata> {
+  const names = (await getActiveBrands()).filter((b) => !b.isHouse).map((b) => b.name);
+  return { title: "Shop by brand", description: `Thermals from the brands you already trust (${brandPhrase(names)}), 100% original at the lowest prices.`, alternates: { canonical: "/brands" } };
+}
 
 export default async function Brands() {
   const brands = await getActiveBrands();

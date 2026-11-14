@@ -95,7 +95,7 @@ export function Header({ categories, announcements, loggedIn }: { categories: Na
       <header className="sticky top-0 z-30 border-b border-line bg-white no-print">
         <div className="container-x flex items-center gap-3 py-3 lg:gap-8">
           <button aria-label="Open menu" className="-ml-2 grid size-10 place-items-center lg:hidden" onClick={() => setMenu(true)}><Menu size={24} /></button>
-          <Link href="/" aria-label="WonderVastra home" className="shrink-0"><Logo className="max-[380px]:[&_svg]:h-7 max-[380px]:[&>span>span:last-child]:text-[1.1rem]" /></Link>
+          <Link href="/" aria-label="WonderVastra home" className="shrink-0"><Logo className="max-[380px]:[&_svg]:h-7 max-[380px]:[&>span:last-child]:text-[1.05rem]" /></Link>
           <nav aria-label="Categories" className="hidden min-w-0 flex-1 items-center gap-5 overflow-x-auto lg:flex scrollbar-none">
             <Link href="/shop" className={navLink(pathname === "/shop")}>Shop all</Link>
             <Link href="/brands" className={navLink(pathname.startsWith("/brands"))}>Brands</Link>

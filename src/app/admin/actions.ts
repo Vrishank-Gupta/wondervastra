@@ -5,9 +5,10 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { audit } from "@/lib/audit";
-import { clientIp, createSession, destroySession, rateLimit, requireAdmin, requireOwner } from "@/lib/auth";
+import { clientIp, createSession, destroySession, peekLimit, rateLimit, requireAdmin, requireOwner } from "@/lib/auth";
 import { courierLink } from "@/lib/couriers";
 import { processStockAlerts } from "@/lib/inventory";
+import { pingIndexNow } from "@/lib/indexnow";
 import { previewMode } from "@/lib/preview";
 import { retryNotification, notifyOrder } from "@/lib/notifications";
 import { addEvent, changeOrderStatus } from "@/lib/orders";
@@ -18,15 +19,43 @@ import { getSettings, saveSettings, type StoreSettings } from "@/lib/settings";
 import { newId, slugify } from "@/lib/utils";
 
 export type Result = { error?: string; ok?: boolean; id?: string; message?: string };
-const fail = (e: unknown): Result => ({ error: e instanceof z.ZodError ? e.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") : (e as Error).message });
+/** Field names as the seller sees them on the form, so errors read "Name is too short", not "name: Too small…". */
+const FIELD: Record<string, string> = {
+  name: "Name", price: "Selling price", compareAtPrice: "MRP", categoryId: "Category", variants: "Sizes & colours", option1: "Size", option2: "Colour",
+  stock: "Stock", sku: "SKU", slug: "Link", code: "Coupon code", value: "Amount", minSubtotal: "Minimum order", startsAt: "Start time", endsAt: "End time",
+  tagline: "Tagline", description: "Description", shortDescription: "Short description", deliveryCharge: "Delivery charge", images: "Photos", url: "Photo",
+};
+function friendly(i: z.ZodIssue) {
+  const key = [...i.path].reverse().find((p) => typeof p === "string") as string | undefined;
+  const row = i.path.find((p) => typeof p === "number");
+  const label = (key && FIELD[key]) ?? (key ? key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()) : "A field");
+  const where = typeof row === "number" && key !== "variants" ? ` (row ${row + 1})` : "";
+  const msg = i.code === "too_small" ? (i.origin === "string" ? "is too short" : i.origin === "array" ? "needs at least one entry" : "is too low")
+    : i.code === "too_big" ? (i.origin === "string" ? "is too long" : "is too high")
+    : i.code === "invalid_type" ? "is missing or invalid" : i.message.charAt(0).toLowerCase() + i.message.slice(1);
+  return `${label}${where} ${msg}.`;
+}
+const fail = (e: unknown): Result => ({ error: e instanceof z.ZodError ? [...new Set(e.issues.map(friendly))].join(" ") : (e as Error).message });
 
 /* ---------- auth ---------- */
-export async function adminLogin(email: string, password: string): Promise<Result> {
+/**
+ * Password-only login (the owner's choice): the password identifies the account. Because there's no
+ * username to guess as well, wrong attempts are capped per device AND across the whole store.
+ */
+export async function adminLogin(password: string): Promise<Result> {
   if (previewMode()) return { error: "The seller admin is switched off on this preview." };
+  if (typeof password !== "string" || !password || password.length > 200) return { error: "Enter your password." };
   const ip = await clientIp();
-  if (!(await rateLimit(`admin:${ip}`, 10, 15 * 60_000))) return { error: "Too many attempts. Wait 15 minutes." };
-  const [a] = await db.select().from(schema.admins).where(eq(schema.admins.email, email.trim().toLowerCase()));
-  if (!a || !a.active || !(await verifyPassword(password, a.passwordHash))) return { error: "Wrong email or password." };
+  if (!(await peekLimit(`admin:${ip}`, 10, 15 * 60_000)) || !(await peekLimit("admin-all", 30, 15 * 60_000))) return { error: "Too many attempts. Wait 15 minutes." };
+  const team = await db.select().from(schema.admins).where(eq(schema.admins.active, true));
+  team.sort((x, y) => Number(y.role === "owner") - Number(x.role === "owner"));
+  let a: (typeof team)[number] | undefined;
+  for (const t of team) if (await verifyPassword(password, t.passwordHash)) { a = t; break; }
+  if (!a) {
+    await rateLimit(`admin:${ip}`, 10, 15 * 60_000);
+    await rateLimit("admin-all", 30, 15 * 60_000);
+    return { error: "Wrong password." };
+  }
   await createSession("admin", a.id);
   await db.update(schema.admins).set({ lastLoginAt: Date.now() }).where(eq(schema.admins.id, a.id));
   await audit({ id: a.id, name: a.name }, "login", "admin", a.id, "Logged in");
@@ -64,8 +93,10 @@ export async function saveCategory(input: unknown): Promise<Result> {
 }
 export async function deleteCategory(id: string): Promise<Result> {
   const a = await requireAdmin();
-  const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(schema.products).where(and(eq(schema.products.categoryId, id), ne(schema.products.status, "archived")));
+  const [{ n, archived }] = await db.select({ n: sql<number>`sum(case when ${schema.products.status} != 'archived' then 1 else 0 end)`, archived: sql<number>`sum(case when ${schema.products.status} = 'archived' then 1 else 0 end)` })
+    .from(schema.products).where(eq(schema.products.categoryId, id));
   if (Number(n) > 0) return { error: `Move its ${n} listing(s) to another category first, or hide the category instead.` };
+  if (Number(archived) > 0) return { error: `${archived} archived listing(s) still belong to this category. Hide the category instead, so they keep working if you bring them back.` };
   const [before] = await db.select().from(schema.categories).where(eq(schema.categories.id, id));
   await db.delete(schema.categories).where(eq(schema.categories.id, id));
   await audit(a, "delete", "category", id, `Deleted category ${before?.name}`, before);
@@ -104,6 +135,8 @@ export async function deleteBrand(id: string): Promise<Result> {
   const a = await requireAdmin();
   const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(schema.products).where(and(eq(schema.products.brandId, id), ne(schema.products.status, "archived")));
   if (Number(n) > 0) return { error: `Move its ${n} listing(s) to another brand first, or hide the brand instead.` };
+  // Archived listings simply lose the brand (brand is optional), so nothing points at a deleted row.
+  await db.update(schema.products).set({ brandId: null }).where(eq(schema.products.brandId, id));
   const [before] = await db.select().from(schema.brands).where(eq(schema.brands.id, id));
   await db.delete(schema.brands).where(eq(schema.brands.id, id));
   await audit(a, "delete", "brand", id, `Deleted brand ${before?.name}`, before);
@@ -199,6 +232,7 @@ export async function saveProduct(input: unknown): Promise<Result> {
     // Switching off "Coming soon" is a launch: everyone who signed up hears about it once.
     const launched = Boolean(before?.comingSoon && !d.comingSoon);
     const notified = await processStockAlerts(id, launched);
+    if (d.status === "active") await pingIndexNow([`/p/${slug}`, "/sitemap.xml"]);
     revalidatePath("/admin/products");
     return { ok: true, id, message: notified ? `Saved. ${notified} waiting customer(s) notified it's ${launched ? "now available" : "back in stock"}.` : "Saved." };
   } catch (e) { return fail(e); }
@@ -221,6 +255,7 @@ export async function duplicateProduct(id: string): Promise<Result> {
 export async function bulkSetProductStatus(ids: string[], status: "draft" | "active" | "archived"): Promise<Result> {
   const a = await requireAdmin();
   if (!ids.length) return { error: "Select at least one listing." };
+  if (!["draft", "active", "archived"].includes(status)) return { error: "Unknown status." };
   let ok = ids;
   if (status === "active") {
     const withImg = new Set((await db.select({ id: schema.productImages.productId }).from(schema.productImages).where(inArray(schema.productImages.productId, ids))).map((r) => r.id));
@@ -228,6 +263,11 @@ export async function bulkSetProductStatus(ids: string[], status: "draft" | "act
   }
   if (ok.length) await db.update(schema.products).set({ status, updatedAt: Date.now() }).where(inArray(schema.products.id, ok));
   await audit(a, "update", "product", ok.join(","), `Set ${ok.length} listing(s) to ${status}`, null, { ids: ok, status });
+  if (status === "active") {
+    for (const id of ok) await processStockAlerts(id);
+    const slugs = await db.select({ slug: schema.products.slug }).from(schema.products).where(inArray(schema.products.id, ok));
+    await pingIndexNow(slugs.map((x) => `/p/${x.slug}`));
+  }
   revalidatePath("/admin/products");
   const skipped = ids.length - ok.length;
   const verb = status === "active" ? "Published" : status === "draft" ? "Unpublished" : "Archived";
@@ -235,12 +275,19 @@ export async function bulkSetProductStatus(ids: string[], status: "draft" | "act
 }
 export async function setProductStatus(id: string, status: "draft" | "active" | "archived"): Promise<Result> {
   const a = await requireAdmin();
+  if (!["draft", "active", "archived"].includes(status)) return { error: "Unknown status." };
   const [p] = await db.select().from(schema.products).where(eq(schema.products.id, id));
   if (!p) return { error: "Not found" };
+  if (status === "active") {
+    const [img] = await db.select({ id: schema.productImages.id }).from(schema.productImages).where(eq(schema.productImages.productId, id)).limit(1);
+    if (!img) return { error: "Add at least one photo before publishing." };
+  }
   await db.update(schema.products).set({ status, updatedAt: Date.now() }).where(eq(schema.products.id, id));
   await audit(a, "status", "product", id, `${p.name}: ${p.status} → ${status}`, { status: p.status }, { status });
+  const notified = status === "active" ? await processStockAlerts(id) : 0;
+  if (status === "active") await pingIndexNow([`/p/${p.slug}`]);
   revalidatePath("/admin/products");
-  return { ok: true };
+  return { ok: true, message: notified ? `Published. ${notified} waiting customer(s) notified.` : undefined };
 }
 export async function setForceOutOfStock(id: string, value: boolean): Promise<Result> {
   const a = await requireAdmin();
@@ -338,7 +385,9 @@ export async function addOrderNote(orderId: string, note: string): Promise<Resul
   return { ok: true };
 }
 export async function refundOrder(orderId: string, amountPaise: number, reason: string): Promise<Result> {
-  const a = await requireAdmin();
+  await requireAdmin();
+  const a = await requireOwner().catch(() => null);
+  if (!a) return { error: "Only the store owner can send refunds." };
   try {
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     if (!o) return { error: "Order not found" };
@@ -463,10 +512,30 @@ export async function setCustomerBlocked(id: string, blocked: boolean): Promise<
 }
 
 /* ---------- settings & team ---------- */
-export async function updateSettings(values: Partial<StoreSettings>): Promise<Result> {
+const money = z.number().int("Use whole paise").min(0, "Can't be negative").max(10_000_000);
+const days = z.number().int().min(0).max(90);
+const text = (max: number) => z.string().trim().max(max);
+const url = z.union([z.literal(""), z.string().trim().url("Enter a full link starting with https://").max(300)]);
+const email = z.union([z.literal(""), z.string().trim().email("Enter a valid email").max(200)]);
+/** Every setting has a type and a sensible range, so a typo can't break checkout (e.g. a negative COD fee). */
+const SettingsInput = z.object({
+  storeName: text(60).min(2), tagline: text(200), announcement: text(160), supportEmail: email, whatsappNumber: text(20).regex(/^[+\d\s-]*$/, "Digits only"),
+  instagramUrl: url, facebookUrl: url, legalName: text(120), businessAddress: text(400), businessState: text(60),
+  gstin: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, "That doesn't look like a GSTIN (15 characters)")]),
+  shippingCombine: z.enum(["highest", "sum"]), defaultDeliveryCharge: money, codEnabled: z.boolean(), codFee: money, codMaxOrder: money,
+  dispatchDays: days, deliveryDaysMin: days, deliveryDaysMax: days, returnWindowDays: days,
+  orderFeedbackEnabled: z.boolean(), deliveryFeedbackEnabled: z.boolean(), adminAlertEmail: email,
+}).partial(); // Unknown keys are dropped.
+
+export async function updateSettings(input: Partial<StoreSettings>): Promise<Result> {
   const a = await requireOwner().catch(() => null);
   if (!a) return { error: "Only the store owner can change settings." };
+  const parsed = SettingsInput.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => `${String(i.path[0] ?? "Setting")}: ${i.message}`).join("; ") };
+  const values = parsed.data as Partial<StoreSettings>;
   const before = await getSettings();
+  const min = values.deliveryDaysMin ?? before.deliveryDaysMin, max = values.deliveryDaysMax ?? before.deliveryDaysMax;
+  if (min > max) return { error: "Fastest delivery days can't be more than the slowest." };
   await saveSettings(values);
   await audit(a, "update", "settings", null, "Updated store settings", before, values);
   revalidatePath("/", "layout");
@@ -474,17 +543,23 @@ export async function updateSettings(values: Partial<StoreSettings>): Promise<Re
 }
 export async function changeOwnPassword(current: string, next: string): Promise<Result> {
   const a = await requireAdmin();
-  if (next.length < 10) return { error: "Use at least 10 characters." };
+  if (next.length < 8) return { error: "Use at least 8 characters." };
   if (!(await verifyPassword(current, a.passwordHash))) return { error: "Current password is wrong." };
+  for (const t of await db.select().from(schema.admins)) if (t.id !== a.id && (await verifyPassword(next, t.passwordHash))) return { error: "Choose a different password: someone on the team already uses this one." };
   await db.update(schema.admins).set({ passwordHash: await hashPassword(next) }).where(eq(schema.admins.id, a.id));
+  // Sign out every other device, then start a fresh session here.
+  await db.delete(schema.sessions).where(and(eq(schema.sessions.subjectId, a.id), eq(schema.sessions.subjectType, "admin")));
+  await createSession("admin", a.id);
   await audit(a, "password", "admin", a.id, "Changed own password");
-  return { ok: true, message: "Password changed." };
+  return { ok: true, message: "Password changed. Other devices have been signed out." };
 }
 export async function addStaff(email: string, name: string, password: string): Promise<Result> {
   const a = await requireOwner().catch(() => null);
   if (!a) return { error: "Only the store owner can add staff." };
   const clean = email.trim().toLowerCase();
-  if (!clean.includes("@") || password.length < 10 || !name.trim()) return { error: "Enter a name, an email and a password of at least 10 characters." };
+  if (!clean.includes("@") || password.length < 8 || !name.trim()) return { error: "Enter a name, an email and a password of at least 8 characters." };
+  // Login is by password alone, so each person needs their own.
+  for (const t of await db.select().from(schema.admins)) if (await verifyPassword(password, t.passwordHash)) return { error: "Choose a different password: someone on the team already uses this one." };
   const [dupe] = await db.select().from(schema.admins).where(eq(schema.admins.email, clean));
   if (dupe) return { error: "That email already has access." };
   const id = newId();

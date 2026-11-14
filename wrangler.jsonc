@@ -13,7 +13,9 @@
     { "pattern": "wondervastra.in", "custom_domain": true },
     { "pattern": "www.wondervastra.in", "custom_domain": true }
   ],
-  "vars": { "CF_BUILD": "1", "NEXT_PUBLIC_SITE_URL": "https://wondervastra.in" },
+  "vars": { "CF_BUILD": "1", "NEXT_PUBLIC_SITE_URL": "https://wondervastra.in", "CATALOG_CACHE_SECONDS": "20" },
+  // Run next to the Turso database in Mumbai: pages make several queries, so each round trip counts.
+  "placement": { "mode": "targeted", "region": "aws:ap-south-1" },
   // Expires unpaid orders and releases their stock (see src/app/api/cron/route.ts).
   "triggers": { "crons": ["*/15 * * * *"] },
   "observability": { "enabled": true }

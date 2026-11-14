@@ -51,7 +51,7 @@ export default function CartPage() {
             <CouponBox quote={quote} />
             {quote && <PriceSummary quote={quote} />}
             <Link href="/checkout" className="btn btn-primary w-full text-lg">Proceed to checkout</Link>
-            <p className="text-center text-xs text-ink-soft">Secure checkout by Razorpay · No account needed</p>
+            <p className="text-center text-xs text-ink-soft">No account needed · Track your order anytime</p>
           </div>
         </aside>
       </div>

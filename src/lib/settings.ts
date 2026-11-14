@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { db, schema } from "@/db";
+import { clearMemo, memo } from "./memo";
 
 export const DEFAULT_SETTINGS = {
   storeName: "WonderVastra",
@@ -11,6 +12,8 @@ export const DEFAULT_SETTINGS = {
   facebookUrl: "",
   legalName: "",
   businessAddress: "",
+  /** State the business is registered in; decides CGST+SGST vs IGST on invoices. */
+  businessState: "",
   gstin: "",
   shippingCombine: "highest" as "highest" | "sum",
   defaultDeliveryCharge: 4900,
@@ -28,12 +31,18 @@ export const DEFAULT_SETTINGS = {
 export type StoreSettings = typeof DEFAULT_SETTINGS;
 
 export const getSettings = cache(async (): Promise<StoreSettings> => {
-  const rows = await db.select().from(schema.settings);
+  const rows = await memo("settings", () => db.select().from(schema.settings));
   const out: Record<string, unknown> = { ...DEFAULT_SETTINGS };
   for (const r of rows) out[r.key] = r.value;
   return out as StoreSettings;
 });
+/** Always reads the database: for the admin settings page, right after a save. */
+export async function getSettingsFresh(): Promise<StoreSettings> {
+  const rows = await db.select().from(schema.settings);
+  return { ...DEFAULT_SETTINGS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) } as StoreSettings;
+}
 export async function saveSettings(values: Partial<StoreSettings>) {
+  clearMemo();
   for (const [key, value] of Object.entries(values)) {
     await db
       .insert(schema.settings)

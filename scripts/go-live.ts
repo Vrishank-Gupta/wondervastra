@@ -8,17 +8,17 @@
  *    live database already has listings, so re-running never overwrites real edits.
  * 3. Creates the owner admin login, and saves the store's contact details.
  *
- * Reads .env.production.local. Never touches customers or orders.
+ * Reads .env.cloudflare. Never touches customers or orders.
  */
 import { config } from "dotenv";
-config({ path: ".env.production.local", override: true });
+config({ path: ".env.cloudflare", override: true });
 
 import { randomBytes } from "node:crypto";
 import { createClient } from "@libsql/client";
 
 const url = process.env.DATABASE_URL ?? "";
 if (!url.startsWith("libsql://") && !url.startsWith("https://")) {
-  console.error("DATABASE_URL in .env.production.local must be your Turso URL (libsql://…)."); process.exit(1);
+  console.error("DATABASE_URL in .env.cloudflare must be your Turso URL (libsql://…)."); process.exit(1);
 }
 const listings = process.argv.find((a) => a.startsWith("--listings="))?.split("=")[1];
 if (listings !== "draft" && listings !== "live") { console.error("Pass --listings=draft or --listings=live"); process.exit(1); }

@@ -3,7 +3,12 @@ import Link from "next/link";
 import { filtersFromParams, Listing } from "@/components/store/listing";
 import { getActiveCategories, getAllCards } from "@/lib/catalog";
 
-export const metadata: Metadata = { title: "Shop all", description: "Kids' and men's thermals from top brands: 100% original, at the lowest prices." };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }): Promise<Metadata> {
+  const sp = await searchParams;
+  const base: Metadata = { title: "Shop all thermals", description: "Shop 100% original kids' and men's thermals online in India from top brands at the lowest prices. Cash on delivery available.", alternates: { canonical: "/shop" } };
+  // Search results and filter combinations aren't indexed: endless near-duplicates. Links on them still count.
+  return Object.keys(sp).length ? { ...base, robots: { index: false, follow: true } } : base;
+}
 const TITLES: Record<string, string> = { kids: "Kids' thermals", baby: "Baby thermals (0–24 months)", boys: "Boys' thermals", girls: "Girls' thermals", winter: "Winter warmers", everyday: "Everyday essentials", new: "New in", value: "Value packs", sport: "Sport & active", bestseller: "Bestsellers" };
 
 export default async function Shop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

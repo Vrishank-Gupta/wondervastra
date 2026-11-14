@@ -47,9 +47,10 @@ export default async function Products({ searchParams }: { searchParams: Promise
           <Link className="font-medium underline underline-offset-4" href="/admin/products?status=draft">Show drafts only</Link>
         </p>
       )}
+      {/* Always mounted, so its "Published 3 listings" message survives the list emptying out after publishing. */}
+      <ListingBulkBar />
       {rows.length ? (
         <>
-        <ListingBulkBar />
         <Tbl>
           <thead><tr><th className="w-8"><span className="sr-only">Select</span></th><th>Listing</th><th>Status</th><th className="text-right">Price</th><th className="text-right">Stock</th><th>Delivery</th><th>Limit</th><th>Share & manage</th></tr></thead>
           <tbody>

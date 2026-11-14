@@ -22,6 +22,13 @@
       "when": 1794584734475,
       "tag": "0002_brands",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794646715653,
+      "tag": "0003_invoice_numbers",
+      "breakpoints": true
     }
   ]
 }

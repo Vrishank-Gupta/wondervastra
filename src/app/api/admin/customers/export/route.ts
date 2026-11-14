@@ -7,6 +7,7 @@ import { toCsv } from "@/lib/csv";
 export async function GET() {
   const a = await getAdmin();
   if (!a) return new Response("Unauthorized", { status: 401 });
+  if (a.role !== "owner") return new Response("Only the store owner can export customer data.", { status: 403 });
   const o = schema.orders;
   const rows = await db.select({
     name: sql<string>`max(${o.name})`, phone: o.phone, email: sql<string>`max(${o.email})`, orders: sql<number>`count(*)`,

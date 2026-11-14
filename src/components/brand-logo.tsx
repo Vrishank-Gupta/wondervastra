@@ -1,4 +1,3 @@
-import React from "react";
 /**
  * WonderVastra logo, "Lotus Crown": a high-contrast serif W with a gold lotus on its centre peak.
  * The full mark adds fine gold threads fanning from the lotus; the compact mark (used at header/icon sizes)
@@ -49,8 +48,8 @@ export function Logo({ className = "", onDark = false, size = "md" }: { classNam
     return (
       <span className={`inline-flex flex-col items-start gap-2 ${className}`}>
         <span className="inline-flex items-center gap-3">
-          <LogoMark variant="full" onDark={onDark} className="h-14 w-auto shrink-0" />
-          <span className={`font-brand text-[2rem] leading-none font-semibold tracking-[0.04em] ${word}`}>WONDERVASTRA</span>
+          <LogoMark variant="full" onDark={onDark} className="h-11 w-auto shrink-0 min-[400px]:h-14" />
+          <span className={`font-brand text-[1.45rem] leading-none font-semibold tracking-[0.04em] min-[400px]:text-[2rem] ${word}`}>WONDERVASTRA</span>
         </span>
         <span className={`text-[0.66rem] font-medium tracking-[0.32em] uppercase ${onDark ? "text-gold-light" : "text-gold"}`}>Crafted with trust</span>
       </span>

@@ -5,18 +5,19 @@ import { db, schema } from "@/db";
 import { Countdown } from "@/components/store/countdown";
 import { filtersFromParams, Listing } from "@/components/store/listing";
 import { CopyCode } from "@/components/store/copy-code";
-import { getAllCards, getLiveOffers, getLiveSales } from "@/lib/catalog";
+import { getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
 import { isLive } from "@/lib/pricing";
 import { money } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Offers & sales", description: "Live discounts, coupons and limited-time sales." };
+export const metadata: Metadata = { title: "Offers & sales", description: "Live discounts, coupons and limited-time sales on original branded thermals at WonderVastra.", alternates: { canonical: "/sale" } };
 
 export default async function SalePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [cards, sales, offers, coupons] = await Promise.all([
+  const [cards, allSales, offers, coupons] = await Promise.all([
     getAllCards(), getLiveSales(), getLiveOffers(),
     db.select().from(schema.coupons).where(eq(schema.coupons.active, true)).orderBy(desc(schema.coupons.createdAt)),
   ]);
   const now = Date.now();
+  const sales = salesWithItems(allSales, cards);
   const shown = coupons.filter((c) => isLive(c, now) && (c.usageLimit == null || c.usedCount < c.usageLimit) && c.description);
   const onOffer = cards.filter((c) => c.discountPct > 0);
   return (
@@ -45,7 +46,7 @@ export default async function SalePage({ searchParams }: { searchParams: Promise
           </div>
         </div>
       </div>
-      <div className="container-x py-6"><Listing cards={onOffer} filters={filtersFromParams(await searchParams)} /></div>
+      <div className="container-x py-6"><Listing cards={onOffer} filters={filtersFromParams(await searchParams)} empty={{ title: "No sale items right now", text: "The offers above still apply to everything in the store." }} /></div>
     </>
   );
 }

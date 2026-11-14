@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -35,8 +35,7 @@ export function HeroCarousel({ slides }: { slides: Slide[] }) {
         {slides.map((s, i) => (
           <div key={s.key} className="relative w-full shrink-0 snap-start" role="group" aria-roledescription="slide" aria-label={`${i + 1} of ${slides.length}`}>
             <Link href={s.href} className="relative block aspect-[4/5] max-h-[74svh] w-full overflow-hidden md:aspect-auto md:h-[min(64vh,600px)] md:max-h-none">
-              <Image src={s.tall} alt={s.alt} fill priority={i === 0} sizes="100vw" className="object-cover md:hidden" />
-              <Image src={s.wide} alt={s.alt} fill priority={i === 0} sizes="100vw" className="hidden object-cover md:block" />
+              <HeroPicture tall={s.tall} wide={s.wide} alt={s.alt} priority={i === 0} />
               <span aria-hidden className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/25 to-transparent md:bg-gradient-to-r md:from-black/75 md:via-black/35" />
               <div className="absolute inset-x-0 top-0 p-6 text-white sm:p-10 md:inset-y-0 md:flex md:w-1/2 md:flex-col md:justify-center md:p-14 lg:p-20">
                 <p className="eyebrow text-white/80">{s.eyebrow}</p>
@@ -56,5 +55,20 @@ export function HeroCarousel({ slides }: { slides: Slide[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Art direction: phones get the tall crop, wider screens the wide one, and each device downloads only its own. */
+function HeroPicture({ tall, wide, alt, priority }: { tall: string; wide: string; alt: string; priority: boolean }) {
+  const common = { alt, fill: true, sizes: "100vw", priority };
+  const { props: { srcSet: wideSet } } = getImageProps({ ...common, src: wide });
+  const { props: { srcSet: tallSet, ...img } } = getImageProps({ ...common, src: tall });
+  return (
+    <picture>
+      <source media="(min-width: 768px)" srcSet={wideSet} />
+      <source media="(max-width: 767px)" srcSet={tallSet} />
+      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+      <img {...img} className="object-cover" />
+    </picture>
   );
 }

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { JsonLd, organization, website } from "@/lib/seo";
 import Image from "next/image";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
@@ -11,11 +13,13 @@ import { ProductCard } from "@/components/store/product-card";
 import { ProductRail, SectionTitle } from "@/components/store/product-rail";
 import { wishedIds } from "@/components/store/listing";
 import { BrandTile } from "@/components/store/brand-tile";
-import { getActiveBrands, getActiveCategories, getAllCards, getLiveOffers, getLiveSales } from "@/lib/catalog";
+import { getActiveBrands, getActiveCategories, getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
 import { isLive } from "@/lib/pricing";
 import { money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { AUDIENCES, bannerSrc } from "@/lib/home-banners";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function Home() {
   const [settings, categories, brands, cards, sales, offers, wished, topReviews, coupons] = await Promise.all([
@@ -32,7 +36,7 @@ export default async function Home() {
   const partners = brands.filter((b) => !b.isHouse);
   // House-label drops get their own section, so the generic rail only shows partner-brand launches.
   const soon = cards.filter((c) => c.comingSoon && !c.isHouse);
-  const sale = sales[0];
+  const sale = salesWithItems(sales, cards)[0];
   const saleItems = buyable.filter((c) => c.saleName === sale?.name).slice(0, 10);
   const shownCoupons = coupons.filter((c) => isLive(c, now) && (c.usageLimit == null || c.usedCount < c.usageLimit) && c.description).slice(0, 2);
   const quotes = topReviews.filter((r) => r.rating >= 4 && r.body).slice(0, 3);
@@ -71,6 +75,7 @@ export default async function Home() {
 
   return (
     <>
+      <JsonLd data={[organization(settings, partners.map((b) => b.name)), website(settings)]} />
       <h1 className="sr-only">WonderVastra: 100% original branded kids' and men's thermals at the lowest prices</h1>
       <HeroCarousel slides={slides} />
 

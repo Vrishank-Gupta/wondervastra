@@ -137,25 +137,30 @@ export function buildOrderMessage(event: OrderEventName, o: Order, opts: { order
 
 export function renderEmail(m: Pick<Message, "heading" | "lines" | "cta" | "secondary">, footer: string) {
   const button = (c: { label: string; url: string }) =>
-    `<a href="${escapeHtml(c.url)}" style="display:inline-block;background:#1F1C18;color:#F8F5EF;font-weight:500;text-decoration:none;padding:14px 26px;border-radius:2px">${escapeHtml(c.label)}</a>`;
-  return `<!doctype html><html><body style="margin:0;background:#F8F5EF;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1F1C18">
+    `<a href="${escapeHtml(c.url)}" style="display:inline-block;background:#7A1F35;color:#FFFFFF;font-weight:600;text-decoration:none;padding:14px 26px;border-radius:2px">${escapeHtml(c.label)}</a>`;
+  // Brand colours from the Lotus Crown logo: maroon wordmark, gold tagline, ivory page.
+  return `<!doctype html><html><body style="margin:0;background:#FBF8F1;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1A1414">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFDF9;border:1px solid #E2DBCF;border-radius:2px;overflow:hidden">
-<tr><td style="padding:20px 24px 0;font-family:Georgia,serif;font-size:24px;font-weight:400">WonderVastra</td></tr>
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E9DFD3;border-radius:2px;overflow:hidden">
+<tr><td style="padding:22px 24px 16px;background:#2A0E16;text-align:center">
+<div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;letter-spacing:3px;color:#F3E7D3">WONDERVASTRA</div>
+<div style="margin-top:6px;font-size:10px;letter-spacing:4px;color:#C9A45C">CRAFTED WITH TRUST</div></td></tr>
 <tr><td style="padding:28px 24px">
-<h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:22px;font-weight:400">${escapeHtml(m.heading)}</h1>
+<h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:22px;font-weight:400;color:#5B1A2A">${escapeHtml(m.heading)}</h1>
 ${m.lines.map((l) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.55">${l}</p>`).join("")}
 ${m.cta ? `<p style="margin:22px 0 4px">${button(m.cta)}</p>` : ""}
 </td></tr></table>
-<p style="max-width:520px;font-size:12px;color:#655E54;margin:14px 0 0">${escapeHtml(footer)}</p>
+<p style="max-width:520px;font-size:12px;color:#6C6064;margin:14px 0 0">${escapeHtml(footer)}</p>
 </td></tr></table></body></html>`;
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
+  // Replies go to the shop's real mailbox; the sending address (orders@) has no inbox.
+  const replyTo = (await getSettings()).supportEmail || undefined;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM || "WonderVastra <onboarding@resend.dev>", to, subject, html }),
+    body: JSON.stringify({ from: process.env.EMAIL_FROM || "WonderVastra <onboarding@resend.dev>", to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
     signal: AbortSignal.timeout(10_000),
   });
   const json = await res.json().catch(() => ({}));

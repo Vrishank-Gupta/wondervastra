@@ -1,4 +1,5 @@
 "use client";
+import { paymentLine } from "@/lib/payment-copy";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,7 +23,7 @@ type Props = {
   brand?: { name: string; slug: string; isHouse: boolean } | null;
   product: Product; images: { url: string; alt: string | null }[]; variants: Variant[];
   rating: { avg: number; count: number }; wished: boolean;
-  settings: { codEnabled: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number };
+  settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number };
 };
 
 function Accordion({ title, children, open = false }: { title: string; children: React.ReactNode; open?: boolean }) {
@@ -76,7 +77,10 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   }, [variants]);
   const first = variants.find((v) => v.stock > 0) ?? variants[0];
   const [color, setColor] = useState(first?.option2 ?? "Default");
-  const [size, setSize] = useState(first?.option1 ?? "Free size");
+  // Clothing: the buyer must choose a size themselves; guessing one leads to wrong-size orders and returns.
+  const needsSize = sizes.length > 1;
+  const [size, setSize] = useState(needsSize ? "" : first?.option1 ?? "Free size");
+  const [sizeError, setSizeError] = useState(false);
   const [qty, setQty] = useState(1);
   const [imgIdx, setImgIdx] = useState(0);
   const [heart, setHeart] = useState(wished);
@@ -84,7 +88,9 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
 
   const variant = variants.find((v) => v.option1 === size && v.option2 === color) ?? null;
   const soon = p.comingSoon;
-  const sold = soon || !variant || variant.stock === 0;
+  const nothingLeft = !variants.some((v) => v.stock > 0);
+  const choosing = needsSize && !size && !nothingLeft;
+  const sold = soon || nothingLeft || (!choosing && (!variant || variant.stock === 0));
   const cap = variant ? Math.min(variant.stock, p.maxPerOrder ?? Infinity, p.maxPerCustomer ?? Infinity) : 0;
   const price = variant?.price ?? first?.price ?? 0;
   const mrp = variant?.mrp ?? first?.mrp ?? 0;
@@ -98,8 +104,12 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     if (i >= 0) setImgIdx(i);
   };
   const shareUrl = () => `${window.location.origin}/p/${p.slug}`;
-  const buyNow = () => { if (variant) { add(variant.id, qty, { open: false }); router.push("/checkout"); } };
-  const addCart = () => { if (variant) { add(variant.id, qty); setQty(1); } };
+  const askSize = () => {
+    setSizeError(true);
+    document.getElementById("size-picker")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  const buyNow = () => { if (choosing) return askSize(); if (variant) { add(variant.id, qty, { open: false }); router.push("/checkout"); } };
+  const addCart = () => { if (choosing) return askSize(); if (variant) { add(variant.id, qty); setQty(1); } };
   const toggleWish = async () => {
     const next = !heart;
     setHeart(next);
@@ -166,14 +176,14 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
           </fieldset>
         )}
         {(sizes.length > 1 || sizes[0] !== "Free size") && (
-          <fieldset className="mt-5">
-            <legend className="mb-2 text-xs font-bold tracking-[0.08em] uppercase">{p.option1Label}</legend>
+          <fieldset id="size-picker" className={`mt-5 ${sizeError && choosing ? "-m-2 border border-clay p-2" : ""}`}>
+            <legend className="mb-2 text-xs font-bold tracking-[0.08em] uppercase">{choosing ? `Select ${p.option1Label.toLowerCase()}` : p.option1Label}</legend>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const v = variants.find((x) => x.option1 === s && x.option2 === color);
                 const out = !v || v.stock === 0;
                 return (
-                  <button key={s} type="button" aria-pressed={s === size} onClick={() => { setSize(s); setQty(1); }}
+                  <button key={s} type="button" aria-pressed={s === size} onClick={() => { setSize(s); setQty(1); setSizeError(false); }}
                     className={`min-w-12 border px-3.5 py-2.5 text-sm font-semibold ${s === size ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${out ? "text-ink/40 line-through" : ""}`}>{s}</button>
                 );
               })}
@@ -186,14 +196,15 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
             <NotifyForm product={p} variant={soon ? null : variant} soon={soon} />
           ) : (
             <>
-              {p.showStockCount && (
+              {choosing && <p className={`mb-3 text-sm font-medium ${sizeError ? "text-clay" : "text-ink-soft"}`} role={sizeError ? "alert" : undefined}>{sizeError ? `Please select a ${p.option1Label.toLowerCase()} first.` : `Select a ${p.option1Label.toLowerCase()} to see availability.`}</p>}
+              {!choosing && p.showStockCount && (
                 <p className={`mb-3 flex items-center gap-2 text-sm ${low ? "text-clay" : "text-pine"}`}>
                   <span className={`size-1.5 rounded-full ${low ? "bg-clay" : "bg-pine"}`} aria-hidden />
                   {low ? `Only ${variant!.stock} ${variant!.stock === 1 ? "piece" : "pieces"} left` : `${variant!.stock} pieces available`}
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-3">
-                <QtyStepper qty={qty} max={cap} label={p.name} onChange={setQty} />
+                {!choosing && <QtyStepper qty={qty} max={cap} label={p.name} onChange={setQty} />}
                 {(p.maxPerOrder || p.maxPerCustomer) && <span className="text-xs font-medium text-ink-soft">Limit {[p.maxPerOrder && `${p.maxPerOrder} per order`, p.maxPerCustomer && `${p.maxPerCustomer} per customer`].filter(Boolean).join(", ")}</span>}
               </div>
               <div className="mt-4 hidden gap-3 md:flex">
@@ -207,7 +218,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         <ul className="mt-5 grid gap-2 text-sm">
           <li className="flex items-center gap-2"><Truck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.deliveryMode === "free" ? <span className="text-pine">Free delivery on this item</span> : <span>Delivery charge: {money(p.deliveryCharge)}</span>}</li>
           <li className="flex items-center gap-2"><ShieldCheck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />Dispatched in {settings.dispatchDays} working days, delivered in about {settings.deliveryDaysMin}–{settings.deliveryDaysMax} days</li>
-          <li className="flex items-center gap-2"><Wallet size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.codAllowed && settings.codEnabled ? "UPI, cards & cash on delivery available" : "Prepaid only: UPI, cards & netbanking"}</li>
+          <li className="flex items-center gap-2"><Wallet size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{paymentLine(settings.onlinePayments, p.codAllowed && settings.codEnabled)}</li>
           <li className="flex items-center gap-2"><RotateCcw size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.returnable ? `Returnable within ${settings.returnWindowDays} days of delivery` : "This item can't be returned"}</li>
         </ul>
 

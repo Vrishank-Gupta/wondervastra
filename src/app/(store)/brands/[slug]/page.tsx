@@ -1,3 +1,4 @@
+import { breadcrumbs, itemList, JsonLd } from "@/lib/seo";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,11 +9,17 @@ import { getActiveBrands, getAllCards } from "@/lib/catalog";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const b = (await getActiveBrands()).find((x) => x.slug === slug);
+  const [b, sp] = await Promise.all([getActiveBrands().then((all) => all.find((x) => x.slug === slug)), searchParams]);
   if (!b) return {};
-  return { title: `${b.name} thermals`, description: b.tagline ?? `Shop ${b.name} at WonderVastra.`, openGraph: { images: b.image ? [b.image] : undefined } };
+  return {
+    title: `${b.name} thermals online`,
+    description: `Buy 100% original ${b.name} thermals online in India at the lowest prices${b.tagline ? `: ${b.tagline.toLowerCase()}` : ""}. Delivered across India by WonderVastra.`,
+    alternates: { canonical: `/brands/${b.slug}` },
+    ...(Object.keys(sp).length ? { robots: { index: false, follow: true } } : {}),
+    openGraph: { images: b.image ? [b.image] : undefined },
+  };
 }
 
 export default async function BrandPage({ params, searchParams }: Props) {
@@ -27,6 +34,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
   const dark = brand.isHouse;
   return (
     <>
+      <JsonLd data={[breadcrumbs([{ name: "Home", path: "/" }, { name: "Brands", path: "/brands" }, { name: brand.name, path: `/brands/${brand.slug}` }]), itemList(`${brand.name} thermals`, cards.filter((c) => c.brandId === brand.id && c.inStock))]} />
       <div className={`relative overflow-hidden ${dark ? "bg-ink text-white" : "bg-sand-soft"}`}>
         {brand.image && <Image src={brand.image} alt="" fill priority sizes="100vw" className="object-cover opacity-35" />}
         <div className="container-x relative flex flex-wrap items-center gap-x-8 gap-y-4 py-7 sm:py-10">

@@ -17,3 +17,5 @@ preview/
 .open-next/
 .wrangler/
 .dev.vars
+.env.cloudflare
+*.cfbuild-hidden

@@ -1,4 +1,5 @@
 "use client";
+import { STATES } from "@/lib/states";
 import Image from "next/image";
 import Link from "next/link";
 import Script from "next/script";
@@ -17,7 +18,6 @@ type Props = {
 };
 declare global { interface Window { Razorpay?: new (o: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void } } }
 
-const STATES = ["Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli and Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Ladakh","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Puducherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
 
 export function CheckoutClient({ customer, addresses, online, simulated, codFee }: Props) {
   const { items, ready, coupon, clear, setCoupon, attribution } = useCart();
@@ -85,7 +85,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee 
       if (!window.Razorpay) throw new Error("Payment window couldn't load. Check your connection and try again.");
       const rzp = new window.Razorpay({
         key: json.keyId, amount: json.total, currency: "INR", name: "WonderVastra", description: `Order ${json.number}`, order_id: json.razorpayOrderId,
-        prefill: { name, email, contact: phone }, theme: { color: "#1F1C18" },
+        prefill: { name, email, contact: phone }, theme: { color: "#7A1F35" },
         handler: async (r: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
           const v = await fetch("/api/checkout/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: json.id, ...r }) });
           // If verify hiccups the webhook still confirms it, so the order page is always the right place to land.

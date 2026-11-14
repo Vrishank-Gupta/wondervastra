@@ -138,4 +138,9 @@ describe("razorpay signatures", () => {
     expect(verifyWebhookSignature('{"a":1}', sig, "wh")).toBe(true);
     expect(verifyWebhookSignature('{"a": 1}', sig, "wh")).toBe(false);
   });
+  it("rounds percent coupons and offers to the whole rupee", () => {
+    const q = priceCart({ lines: [line({ basePrice: 54900 })], sales: [], offers: [], coupon, shippingCombine: "highest", codFee: 0, paymentMethod: "razorpay", now: NOW });
+    expect(q.coupon?.discount).toBe(5500); // 10% of ₹549 = ₹54.90 → ₹55
+    expect(q.total % 100).toBe(0);
+  });
 });

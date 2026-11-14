@@ -7,6 +7,7 @@ import { toCsv } from "@/lib/csv";
 export async function GET(req: Request) {
   const a = await getAdmin();
   if (!a) return new Response("Unauthorized", { status: 401 });
+  if (a.role !== "owner") return new Response("Only the store owner can export customer data.", { status: 403 });
   const u = new URL(req.url).searchParams;
   const conds: SQL[] = [];
   const status = u.get("status");

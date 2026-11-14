@@ -1,3 +1,5 @@
+import { abs, breadcrumbs, JsonLd, returnPolicy, shippingDetails } from "@/lib/seo";
+import { capabilities } from "@/lib/capabilities";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -41,17 +43,44 @@ export default async function ProductPage({ params }: Props) {
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
   const minPrice = variants.length ? Math.min(...variants.map((v) => v.price)) : p.price;
 
-  const jsonLd = {
-    "@context": "https://schema.org", "@type": "Product", name: p.name, description: p.shortDescription ?? undefined,
-    image: images.map((i) => (i.url.startsWith("http") ? i.url : `${siteUrl()}${i.url}`)),
-    sku: variants[0]?.sku ?? p.id, brand: { "@type": "Brand", name: brand?.name ?? "WonderVastra" },
-    offers: { "@type": "Offer", priceCurrency: "INR", price: (minPrice / 100).toFixed(2), url: `${siteUrl()}/p/${p.slug}`, availability: variants.some((v) => v.stock > 0) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
-    ...(reviews.length ? { aggregateRating: { "@type": "AggregateRating", ratingValue: avg.toFixed(1), reviewCount: reviews.length } } : {}),
+  const maxPrice = variants.length ? Math.max(...variants.map((v) => v.price)) : p.price;
+  const fullName = brand ? `${brand.name} ${p.name}` : p.name;
+  const url = `${siteUrl()}/p/${p.slug}`;
+  const inStock = !p.comingSoon && !p.forceOutOfStock && variants.some((v) => v.stock > 0);
+  const saleEnds = variants.find((v) => v.saleEndsAt)?.saleEndsAt;
+  const colours = [...new Set(variants.map((v) => v.option2).filter((c) => c !== "Default"))];
+  const sizes = [...new Set(variants.map((v) => v.option1).filter((x) => x !== "Free size"))];
+  const offer = {
+    priceCurrency: "INR", url, itemCondition: "https://schema.org/NewCondition",
+    availability: p.comingSoon ? "https://schema.org/PreOrder" : inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    ...(saleEnds ? { priceValidUntil: new Date(saleEnds).toISOString().slice(0, 10) } : {}),
+    seller: { "@id": `${siteUrl()}/#store` },
+    shippingDetails: shippingDetails(settings, p.deliveryMode === "free" ? 0 : p.deliveryCharge),
+    ...(p.returnable ? { hasMerchantReturnPolicy: returnPolicy(settings) } : {}),
   };
+  const jsonLd = [{
+    "@context": "https://schema.org", "@type": "Product", "@id": `${url}#product`, name: fullName, url,
+    description: p.shortDescription ?? p.description ?? undefined,
+    image: images.map((i) => abs(i.url)),
+    sku: variants[0]?.sku ?? p.id, mpn: p.id,
+    brand: { "@type": "Brand", name: brand?.name ?? "WonderVastra" },
+    category: category?.name, material: p.material ?? undefined,
+    ...(colours.length ? { color: colours.join(", ") } : {}), ...(sizes.length ? { size: sizes.join(", ") } : {}),
+    audience: p.tags.includes("baby") || p.tags.includes("boys") || p.tags.includes("girls") || p.tags.includes("kids")
+      ? { "@type": "PeopleAudience", suggestedMinAge: p.tags.includes("baby") ? 0 : 2, suggestedMaxAge: p.tags.includes("baby") ? 2 : 14, ...(p.tags.includes("boys") && !p.tags.includes("girls") ? { suggestedGender: "male" } : p.tags.includes("girls") && !p.tags.includes("boys") ? { suggestedGender: "female" } : {}) }
+      : undefined,
+    offers: minPrice === maxPrice
+      ? { "@type": "Offer", price: (minPrice / 100).toFixed(2), ...offer }
+      : { "@type": "AggregateOffer", lowPrice: (minPrice / 100).toFixed(2), highPrice: (maxPrice / 100).toFixed(2), offerCount: variants.length, ...offer },
+    ...(reviews.length ? {
+      aggregateRating: { "@type": "AggregateRating", ratingValue: avg.toFixed(1), reviewCount: reviews.length },
+      review: reviews.slice(0, 5).map((r) => ({ "@type": "Review", author: { "@type": "Person", name: r.name }, reviewRating: { "@type": "Rating", ratingValue: r.rating }, reviewBody: r.body ?? undefined })),
+    } : {}),
+  }, breadcrumbs([{ name: "Home", path: "/" }, ...(category ? [{ name: category.name, path: `/c/${category.slug}` }] : [{ name: "Shop", path: "/shop" }]), { name: fullName, path: `/p/${p.slug}` }])];
 
   return (
     <div className="container-x py-4 sm:py-6">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <JsonLd data={jsonLd} />
       <nav aria-label="Breadcrumb" className="mb-3 truncate text-xs font-medium text-ink-soft">
         <Link href="/shop" className="hover:underline">Shop</Link>{brand && <> / <Link href={`/brands/${brand.slug}`} className="hover:underline">{brand.name}</Link></>}{category && <> / <Link href={`/c/${category.slug}`} className="hover:underline">{category.name}</Link></>} / <span>{p.name}</span>
       </nav>
@@ -66,7 +95,7 @@ export default async function ProductPage({ params }: Props) {
         variants={variants}
         rating={{ avg, count: reviews.length }}
         wished={wished.includes(p.id)}
-        settings={{ codEnabled: settings.codEnabled, dispatchDays: settings.dispatchDays, deliveryDaysMin: settings.deliveryDaysMin, deliveryDaysMax: settings.deliveryDaysMax, returnWindowDays: settings.returnWindowDays }}
+        settings={{ codEnabled: settings.codEnabled, onlinePayments: capabilities().onlinePayments, dispatchDays: settings.dispatchDays, deliveryDaysMin: settings.deliveryDaysMin, deliveryDaysMax: settings.deliveryDaysMax, returnWindowDays: settings.returnWindowDays }}
       />
 
       {reviews.length > 0 && (

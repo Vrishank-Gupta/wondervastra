@@ -68,9 +68,9 @@ export function BrandManager({ brands }: { brands: Brand[] }) {
           <div className="flex gap-2 sm:col-span-2"><button className="btn btn-ink btn-sm">Save</button><button type="button" className="btn btn-white btn-sm" onClick={() => setEdit(null)}>Cancel</button></div>
         </form>
       )}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {brands.map((b) => (
-          <div key={b.id} className="flex items-center gap-3 rounded-sm border border-line bg-white p-3">
+          <div key={b.id} className="flex min-w-0 items-center gap-3 rounded-sm border border-line bg-white p-3">
             <span className={`relative grid h-14 w-20 shrink-0 place-items-center overflow-hidden rounded-sm border border-line px-1 text-center text-xs font-bold uppercase ${b.isHouse ? "bg-ink text-white" : ""}`}>
               {b.logo ? <Image src={b.logo} alt="" fill sizes="80px" className="object-contain p-1" /> : b.name}
             </span>

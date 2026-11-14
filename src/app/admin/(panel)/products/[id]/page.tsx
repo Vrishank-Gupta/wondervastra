@@ -34,7 +34,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
         images: imgs.map((i) => ({ url: i.url, alt: i.alt ?? p.name })),
         variants: vars.filter((v) => v.active).map((v) => ({ id: v.id, sku: v.sku ?? "", option1: v.option1, option2: v.option2, colorHex: v.colorHex ?? "", price: str(v.price, 100), stock: String(v.stock), active: v.active })),
       }} />
-      <div className="mt-5 grid gap-5 md:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 [&>*]:min-w-0">
         <Panel title={`Waiting for restock (${alerts.length})`}>
           {alerts.length ? <ul className="space-y-1 text-sm">{alerts.map((a) => <li key={a.id} className="flex justify-between gap-2"><span>{a.email ?? a.phone}</span><span className="text-xs text-ink-soft">{formatDateTime(a.createdAt)}</span></li>)}</ul> : <p className="text-sm text-ink-soft">Nobody yet. They&apos;re messaged automatically when stock returns.</p>}
         </Panel>

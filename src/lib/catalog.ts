@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { memo } from "./memo";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { bestSalePrice, isLive, type OfferRule, type SaleRule } from "./pricing";
@@ -16,21 +17,25 @@ export type ProductCard = {
   freeDelivery: boolean; deliveryCharge: number;
   rating: number; ratingCount: number;
   colors: { name: string; hex: string | null }[]; sizes: string[];
-  tags: string[]; featured: boolean; createdAt: number;
+  tags: string[]; featured: boolean; createdAt: number; updatedAt: number;
   singleVariantId: string | null;
 };
 
+/** Sales that actually discount something buyable right now. Others aren't advertised (no "Winter Sale" with nothing in it). */
+export function salesWithItems<T extends { name: string }>(sales: T[], cards: { saleName: string | null; inStock: boolean }[]) {
+  return sales.filter((s) => cards.some((c) => c.inStock && c.saleName === s.name));
+}
 export const getLiveSales = cache(async (): Promise<SaleRule[]> => {
   const now = Date.now();
-  const rows = await db.select().from(sales).where(eq(sales.active, true));
+  const rows = await memo("sales", () => db.select().from(sales).where(eq(sales.active, true)));
   return rows.filter((s) => isLive(s, now)) as SaleRule[];
 });
 export const getLiveOffers = cache(async (): Promise<OfferRule[]> => {
   const now = Date.now();
-  const rows = await db.select().from(cartOffers).where(eq(cartOffers.active, true));
+  const rows = await memo("offers", () => db.select().from(cartOffers).where(eq(cartOffers.active, true)));
   return rows.filter((o) => isLive(o, now)) as OfferRule[];
 });
-export const getActiveCategories = cache(async () => {
+export const getActiveCategories = cache(() => memo("categories", async () => {
   const cats = await db.select().from(categories).where(eq(categories.active, true)).orderBy(asc(categories.sortOrder), asc(categories.name));
   const counts = await db.select({ id: products.categoryId, n: sql<number>`count(*)`, onSale: sql<number>`sum(case when ${products.comingSoon} then 0 else 1 end)` })
     .from(products).where(eq(products.status, "active")).groupBy(products.categoryId);
@@ -42,17 +47,17 @@ export const getActiveCategories = cache(async () => {
     .filter((c) => c.productCount > 0)
     .map((c) => ({ ...c, comingSoon: c.buyableCount === 0 }))
     .sort((a, b) => Number(a.comingSoon) - Number(b.comingSoon));
-});
+}));
 
 /** Visible brands that have live listings, in the seller's display order. */
-export const getActiveBrands = cache(async () => {
+export const getActiveBrands = cache(() => memo("brands", async () => {
   const rows = await db.select().from(brands).where(eq(brands.active, true)).orderBy(asc(brands.sortOrder), asc(brands.name));
   const counts = await db.select({ id: products.brandId, n: sql<number>`count(*)` }).from(products).where(eq(products.status, "active")).groupBy(products.brandId);
   const map = new Map(counts.map((c) => [c.id, Number(c.n)]));
   return rows.map((b) => ({ ...b, productCount: map.get(b.id) ?? 0 })).filter((b) => b.productCount > 0);
-});
+}));
 
-export const getAllCards = cache(async (): Promise<ProductCard[]> => {
+export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", async () => {
   const rows = await db.select().from(products).where(eq(products.status, "active")).orderBy(desc(products.featured), desc(products.createdAt));
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
@@ -92,11 +97,11 @@ export const getAllCards = cache(async (): Promise<ProductCard[]> => {
       rating: r ? Number(r.avg) : 0, ratingCount: r ? Number(r.n) : 0,
       colors: [...colors].map(([name, hex]) => ({ name, hex })),
       sizes: [...new Set(vs.map((v) => v.option1))],
-      tags: p.tags, featured: p.featured, createdAt: p.createdAt,
+      tags: p.tags, featured: p.featured, createdAt: p.createdAt, updatedAt: p.updatedAt,
       singleVariantId: vs.length === 1 ? vs[0].id : null,
     }];
   });
-});
+}));
 
 export type Filters = {
   q?: string; category?: string; brand?: string; collection?: string; sort?: string; color?: string; size?: string;

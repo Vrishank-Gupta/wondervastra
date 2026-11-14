@@ -34,8 +34,9 @@ export async function wishedIds() {
 }
 
 /** Shared results layout: filters sidebar / bottom sheet, sort, grid and a useful empty state. */
-export async function Listing({ cards, filters }: { cards: ProductCard[]; filters: Filters }) {
+export async function Listing({ cards, filters, empty }: { cards: ProductCard[]; filters: Filters; empty?: { title: string; text: string } }) {
   const results = applyFilters(cards, filters);
+  const filtered = Object.entries(filters).some(([k, v]) => k !== "sort" && k !== "collection" && v !== undefined && v !== false && v !== "");
   const facets = facetsFrom(cards);
   const wished = await wishedIds();
   return (
@@ -50,8 +51,8 @@ export async function Listing({ cards, filters }: { cards: ProductCard[]; filter
           {results.length ? <ProductGrid products={results} wished={wished} priorityCount={4} /> : (
             <div className="card flex flex-col items-center gap-3 p-10 text-center">
               <SearchX size={32} strokeWidth={1.25} aria-hidden />
-              <p className="font-display text-2xl">{filters.q ? `Nothing found for “${filters.q}”` : "No items match these filters"}</p>
-              <p className="text-sm text-ink-soft">Try a broader search, or browse everything we have.</p>
+              <p className="font-display text-2xl">{filters.q ? `Nothing found for “${filters.q}”` : filtered ? "No items match these filters" : empty?.title ?? "Nothing here yet"}</p>
+              <p className="text-sm text-ink-soft">{filters.q || filtered ? "Try a broader search, or browse everything we have." : empty?.text ?? "New stock is on the way. Have a look at everything else we have."}</p>
               <Link href="/shop" className="btn btn-primary">See all products</Link>
             </div>
           )}

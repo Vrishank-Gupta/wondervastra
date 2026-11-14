@@ -1,4 +1,5 @@
-import { headers } from "next/headers";
+import { clearMemo } from "./memo";
+import { clientIp } from "./auth";
 import { db, schema } from "@/db";
 import { newId } from "./utils";
 
@@ -13,10 +14,10 @@ export async function audit(
   before?: unknown,
   after?: unknown,
 ) {
+  clearMemo(); // Every admin change is audited, so this keeps the storefront cache in step with it.
   let ip: string | null = null;
   try {
-    const h = await headers();
-    ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+    ip = await clientIp();
   } catch {
     /* outside a request */
   }

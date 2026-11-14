@@ -102,9 +102,10 @@ export function bestSalePrice(
   }
   return best;
 }
+/** Percent discounts are rounded to the whole rupee, like sale prices, so totals never show paise. */
 function ruleDiscount(type: string, value: number, base: number, max?: number | null) {
   if (type === "free_shipping") return 0;
-  let d = type === "percent" ? Math.round((base * value) / 100) : value;
+  let d = type === "percent" ? Math.round((base * value) / 10000) * 100 : value;
   if (max != null) d = Math.min(d, max);
   return Math.max(0, Math.min(d, base));
 }

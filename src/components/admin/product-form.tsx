@@ -168,9 +168,10 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
   const isLive = f.status === "active";
   const actions = () => (
     <div className="flex gap-2 [&>*]:flex-1 lg:flex-wrap lg:[&>*]:flex-none">
-      <button type="submit" disabled={busy} className="btn btn-white btn-sm">{busy && <Loader2 size={14} className="animate-spin" aria-hidden />}{isLive ? "Save changes" : "Save draft"}</button>
-      {!isLive && <button type="button" disabled={busy} className="btn btn-primary btn-sm" onClick={() => submit("active")}>Publish</button>}
-      {isLive && <button type="button" disabled={busy} className="btn btn-white btn-sm" onClick={() => submit("draft")}>Unpublish</button>}
+      {/* Saving waits for photo uploads to finish, so a just-added photo is never left out. */}
+      <button type="submit" disabled={busy || uploading} className="btn btn-white btn-sm">{(busy || uploading) && <Loader2 size={14} className="animate-spin" aria-hidden />}{uploading ? "Uploading photos…" : isLive ? "Save changes" : "Save draft"}</button>
+      {!isLive && <button type="button" disabled={busy || uploading} className="btn btn-primary btn-sm" onClick={() => submit("active")}>Publish</button>}
+      {isLive && <button type="button" disabled={busy || uploading} className="btn btn-white btn-sm" onClick={() => submit("draft")}>Unpublish</button>}
     </div>
   );
 

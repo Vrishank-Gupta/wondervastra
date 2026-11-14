@@ -156,7 +156,7 @@ for (const p of PRODUCTS) {
     id, name: p.name, slug, categoryId: catIds.get(p.cat)!, brandId: brandIds.get(p.brand)!, status: SHOWN.has(p.cat) && !p.soon ? "active" : "archived",
     price: p.price * 100, compareAtPrice: p.mrp ? p.mrp * 100 : null,
     shortDescription: p.short,
-    description: `${p.short}\n\nSample listing text. Replace it with the real details of this product from the seller admin.`,
+    description: p.short,
     tags: p.tags ?? [], featured: p.featured ?? false, material: p.material, care: CARE,
     sizeGuide: sizes === MEN ? GUIDES.men : sizes === WOMEN ? GUIDES.women : sizes === HOODIE ? GUIDES.hoodie : sizes === BABY ? GUIDES.baby : sizes === KIDS ? GUIDES.kids : GUIDES.sock,
     deliveryMode: p.free ? "free" : "flat", deliveryCharge: p.free ? 0 : (p.charge ?? 49) * 100,

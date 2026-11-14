@@ -1,3 +1,5 @@
+import { brandPhrase, breadcrumbs, itemList, JsonLd } from "@/lib/seo";
+import { money } from "@/lib/format";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -8,11 +10,23 @@ import { AUDIENCES } from "@/lib/home-banners";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const cat = (await getActiveCategories()).find((c) => c.slug === slug);
+  const [cats, cards, sp] = await Promise.all([getActiveCategories(), getAllCards(), searchParams]);
+  const cat = cats.find((c) => c.slug === slug);
   if (!cat) return {};
-  return { title: cat.name, description: cat.tagline ?? undefined, openGraph: { images: cat.image ? [cat.image] : undefined } };
+  const items = cards.filter((c) => c.categoryId === cat.id && c.inStock);
+  const brands = [...new Set(items.map((c) => c.brandName).filter(Boolean))] as string[];
+  const from = items.length ? Math.min(...items.map((c) => c.price)) : 0;
+  const description = `Buy ${cat.name.toLowerCase()} online in India${brands.length ? ` from ${brandPhrase(brands)}` : ""}. 100% original${from ? `, from ${money(from)}` : ""}, at the lowest prices with delivery across India.${cat.tagline ? ` ${cat.tagline}.` : ""}`;
+  // Baby/Boys/Girls shortcuts are real landing pages; other filter combinations aren't indexed.
+  const indexable = Object.keys(sp).every((k) => k === "collection");
+  return {
+    title: `${cat.name} online${sp.collection ? ` · ${String(sp.collection).replace(/^./, (c) => c.toUpperCase())}` : ""}`, description,
+    alternates: { canonical: sp.collection && indexable ? `/c/${cat.slug}?collection=${sp.collection}` : `/c/${cat.slug}` },
+    ...(indexable ? {} : { robots: { index: false, follow: true } }),
+    openGraph: { images: cat.image ? [cat.image] : undefined },
+  };
 }
 
 export default async function CategoryPage({ params, searchParams }: Props) {
@@ -28,6 +42,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const chip = (on: boolean) => `shrink-0 border px-4 py-2 text-xs font-bold tracking-[0.06em] uppercase transition-colors ${on ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"}`;
   return (
     <>
+      <JsonLd data={[breadcrumbs([{ name: "Home", path: "/" }, { name: cat.name, path: `/c/${cat.slug}` }]), itemList(cat.name, inCat.filter((c) => c.inStock))]} />
       <div className="bg-sand-soft">
         <div className="container-x py-7 sm:py-10">
           <nav aria-label="Breadcrumb" className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-soft uppercase"><Link href="/" className="hover:underline">Home</Link> / <Link href="/shop" className="hover:underline">Shop</Link> / {cat.name}</nav>

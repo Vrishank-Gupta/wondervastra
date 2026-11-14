@@ -60,7 +60,8 @@ async function uploadToCloudinary(image: Buffer) {
     folder: "wondervastra",
     format: "jpg",
     timestamp: String(Math.floor(Date.now() / 1000)),
-    transformation: "a_auto/c_limit,w_1600,h_2000/b_white/q_84",
+    // fl_force_strip removes all photo metadata (GPS location, camera, date) from the stored file itself.
+    transformation: "a_auto/c_limit,w_1600,h_2000/b_white/q_84/fl_force_strip",
   };
   const toSign = Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join("&");
   const signature = createHash("sha1").update(`${toSign}${process.env.CLOUDINARY_API_SECRET}`).digest("hex");
@@ -75,9 +76,14 @@ async function uploadToCloudinary(image: Buffer) {
   return json.secure_url as string;
 }
 
-/** 1200x630 share image from a Cloudinary upload: the product centred on a blurred copy of itself. */
+/**
+ * 1200x630 share image from a Cloudinary upload: the product centred on a blurred, zoomed copy of itself.
+ * (Cloudinary's "blurred padding" only works for video, so the photo is layered over itself instead.)
+ */
 export function cloudinaryShareImage(url: string) {
-  return url.includes("res.cloudinary.com/") && url.includes("/upload/")
-    ? url.replace("/upload/", "/upload/c_pad,w_1200,h_630,b_blurred:400:15/f_jpg,q_82/")
-    : null;
+  const m = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(?:.*?\/)?(v\d+\/)?([^/]+(?:\/[^/]+)*?)\.(\w+)$/);
+  if (!m) return null;
+  const [, base, version = "", publicId, ext] = m;
+  const layer = publicId.replace(/\//g, ":");
+  return `${base}c_fill,w_1200,h_630/e_blur:1500/l_${layer},c_fit,w_1200,h_630/fl_layer_apply,g_center/f_jpg,q_82/${version}${publicId}.${ext}`;
 }

@@ -86,9 +86,21 @@ export async function rateLimit(key: string, limit: number, windowMs: number) {
   await db.update(schema.rateLimits).set({ count: row.count + 1 }).where(eq(schema.rateLimits.key, key));
   return true;
 }
+/**
+ * The visitor's IP, for rate limits. Only headers the host itself sets are trusted: Cloudflare overwrites
+ * cf-connecting-ip on every request, while X-Forwarded-For can be sent by anyone and is ignored there.
+ */
 export async function clientIp() {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "local";
+  const cf = h.get("cf-connecting-ip");
+  if (cf) return cf;
+  if (process.env.CF_BUILD === "1") return "unknown"; // On Cloudflare without the header: one shared, strict bucket.
+  return h.get("x-real-ip") || h.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+}
+/** Read a limiter's count without adding to it. */
+export async function peekLimit(key: string, limit: number, windowMs: number) {
+  const [row] = await db.select().from(schema.rateLimits).where(eq(schema.rateLimits.key, key));
+  return !row || Date.now() - row.windowStart > windowMs || row.count < limit;
 }
 
 const OTP_TTL = 10 * 60_000;

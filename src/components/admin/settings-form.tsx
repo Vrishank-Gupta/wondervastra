@@ -1,4 +1,5 @@
 "use client";
+import { STATES } from "@/lib/states";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addStaff, changeOwnPassword, updateSettings } from "@/app/admin/actions";
@@ -45,6 +46,7 @@ export function SettingsForm({ initial, isOwner }: { initial: StoreSettings; isO
           <Panel title="Business details (for invoices and policy pages)">
             <div className="grid gap-3 sm:grid-cols-2">
               {text("legalName", "Legal business name")}{text("gstin", "GSTIN (if registered)")}
+              <div><label className="label" htmlFor="bstate">Registered state</label><select id="bstate" className="input w-full min-w-0 truncate" value={s.businessState} onChange={(e) => up("businessState", e.target.value)}><option value="">Choose state</option>{STATES.map((x) => <option key={x}>{x}</option>)}</select></div>
               <div className="sm:col-span-2"><label className="label" htmlFor="ba">Business address</label><textarea id="ba" className="input" rows={2} value={s.businessAddress} onChange={(e) => up("businessAddress", e.target.value)} /></div>
             </div>
           </Panel>
@@ -76,7 +78,7 @@ export function SettingsForm({ initial, isOwner }: { initial: StoreSettings; isO
           if (!r.error) { setCur(""); setNext(""); }
         }}>
           <input aria-label="Current password" className="input min-w-40 flex-1" type="password" autoComplete="current-password" placeholder="Current password" required value={cur} onChange={(e) => setCur(e.target.value)} />
-          <input aria-label="New password" className="input min-w-40 flex-1" type="password" autoComplete="new-password" placeholder="New password (10+ characters)" required value={next} onChange={(e) => setNext(e.target.value)} />
+          <input aria-label="New password" className="input min-w-40 flex-1" type="password" autoComplete="new-password" placeholder="New password (8+ characters)" required value={next} onChange={(e) => setNext(e.target.value)} />
           <button className="btn btn-ink btn-sm">Update</button>
         </form>
       </Panel>

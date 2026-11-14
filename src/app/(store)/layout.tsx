@@ -1,15 +1,17 @@
+import { capabilities } from "@/lib/capabilities";
 import { CartProvider } from "@/components/store/cart-context";
 import { CartDrawer } from "@/components/store/cart-drawer";
 import { Footer, WhatsAppFab } from "@/components/store/footer";
 import { Header, MobileTabBar } from "@/components/store/header";
 import { getCustomer } from "@/lib/auth";
-import { getActiveCategories, getLiveOffers, getLiveSales } from "@/lib/catalog";
+import { getActiveCategories, getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
 import { money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { PREVIEW_MESSAGE, previewMode } from "@/lib/preview";
 
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
-  const [settings, categories, customer, offers, sales] = await Promise.all([getSettings(), getActiveCategories(), getCustomer(), getLiveOffers(), getLiveSales()]);
+  const [settings, categories, customer, offers, liveSales, cards] = await Promise.all([getSettings(), getActiveCategories(), getCustomer(), getLiveOffers(), getLiveSales(), getAllCards()]);
+  const sales = salesWithItems(liveSales, cards);
   // The seller's own message leads; live sales and cart offers fill the scrolling bar.
   const announcements = [
     settings.announcement,
@@ -17,7 +19,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     ...sales.map((s) => `${s.name}: ${s.type === "percent" ? `${s.value}% off` : `${money(s.value)} off`} selected styles`),
     ...[...offers].sort((a, b) => a.minSubtotal - b.minSubtotal).map((o) => o.type === "free_shipping" ? `Free delivery above ${money(o.minSubtotal)}` : o.name),
     settings.codEnabled ? "Cash on delivery available" : null,
-    "Order updates on WhatsApp",
+    capabilities().whatsapp ? "Order updates on WhatsApp" : null,
   ].filter(Boolean) as string[];
   const nav = categories.map((c) => ({ name: c.name, slug: c.slug, comingSoon: c.comingSoon }));
   return (

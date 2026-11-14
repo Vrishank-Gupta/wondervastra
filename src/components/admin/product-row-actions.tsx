@@ -9,6 +9,7 @@ export function ProductRowActions({ id, slug, name, status, forceOut, base }: { 
   const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [err, setErr] = useState(false);
   const link = (src: string) => `${base}/p/${slug}?utm_source=${src}&utm_campaign=listing`;
   const copy = async (src: string) => { await navigator.clipboard?.writeText(link(src)).catch(() => {}); setCopied(src); setTimeout(() => setCopied(null), 1500); };
   const btn = "grid size-8 place-items-center rounded-sm border border-line bg-white hover:bg-sand-soft";
@@ -21,14 +22,14 @@ export function ProductRowActions({ id, slug, name, status, forceOut, base }: { 
       <details className="relative">
         <summary className={`${btn} list-none cursor-pointer`} aria-label={`More actions for ${name}`}><MoreHorizontal size={15} /></summary>
         <div className="absolute right-0 z-20 mt-1 w-44 rounded-sm border border-line bg-white p-1 text-sm shadow-lg">
-          <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { const r = await setForceOutOfStock(id, !forceOut); setMsg(r.message ?? ""); router.refresh(); }}>{forceOut ? "Put back on sale" : "Mark out of stock"}</button>
-          {status !== "active" && <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { await setProductStatus(id, "active"); router.refresh(); }}>Publish</button>}
-          {status === "active" && <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { await setProductStatus(id, "draft"); router.refresh(); }}>Unpublish</button>}
-          {status !== "archived" && <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { await setProductStatus(id, "archived"); router.refresh(); }}>Archive</button>}
+          <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { const r = await setForceOutOfStock(id, !forceOut); setMsg(r.message ?? ""); setErr(false); router.refresh(); }}>{forceOut ? "Put back on sale" : "Mark out of stock"}</button>
+          {status !== "active" && <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { const r = await setProductStatus(id, "active"); setMsg(r.error ?? r.message ?? ""); setErr(Boolean(r.error)); router.refresh(); }}>Publish</button>}
+          {status === "active" && <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { const r = await setProductStatus(id, "draft"); setMsg(r.error ?? r.message ?? ""); setErr(Boolean(r.error)); router.refresh(); }}>Unpublish</button>}
+          {status !== "archived" && <button className="w-full rounded-sm px-2 py-1.5 text-left hover:bg-ivory" onClick={async () => { const r = await setProductStatus(id, "archived"); setMsg(r.error ?? r.message ?? ""); setErr(Boolean(r.error)); router.refresh(); }}>Archive</button>}
           <a className="block rounded-sm px-2 py-1.5 hover:bg-ivory" href={`/p/${slug}`} target="_blank" rel="noreferrer">View on store</a>
         </div>
       </details>
-      {msg && <span className="text-xs font-medium text-pine" role="status">{msg}</span>}
+      {msg && <span className={`text-xs font-medium ${err ? "text-clay" : "text-pine"}`} role={err ? "alert" : "status"}>{msg}</span>}
     </div>
   );
 }

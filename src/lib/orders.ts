@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { quoteCart, type CartInput } from "./cart";
 import { STATUS_LABEL } from "./format";
@@ -28,7 +28,7 @@ export type CheckoutInput = {
 
 function orderNumber() {
   const alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-  let out = "VV";
+  let out = "WV";
   for (let i = 0; i < 7; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
 }
@@ -140,6 +140,8 @@ export async function markPaid(orderId: string, paymentId: string, actor: string
         else await tx.insert(stockMovements).values({ id: newId(), variantId: i.variantId, productId: i.productId, delta: -i.qty, reason: "late_payment", orderId, actor: "system" });
       }
       await tx.update(orders).set({ stockHeld: true }).where(eq(orders.id, orderId));
+      // The expired hold gave the coupon use back; the buyer did use it, so count it again.
+      if (o.couponCode) await tx.update(coupons).set({ usedCount: sql`${coupons.usedCount} + 1` }).where(eq(coupons.code, o.couponCode));
       await addEvent(tx, orderId, "attention", short ? "⚠ Paid after the stock hold expired and some items are short. Check stock and contact the buyer." : "Paid after the stock hold expired; stock taken again.", { actor: "system" });
     }
   });
@@ -153,9 +155,18 @@ export async function markPaymentFailed(orderId: string, reason: string) {
   if (res.rowsAffected) await addEvent(db, orderId, "payment_failed", `Payment failed: ${reason}`);
 }
 
+/** Stock just came back for these orders' items: message anyone waiting for them. */
+async function alertRestocked(orderIds: string[]) {
+  if (!orderIds.length) return;
+  const { processStockAlerts } = await import("./inventory");
+  const items = await db.select({ productId: orderItems.productId }).from(orderItems).where(inArray(orderItems.orderId, orderIds));
+  for (const pid of new Set(items.map((i) => i.productId))) await processStockAlerts(pid).catch((e) => console.error("stock alerts failed", e));
+}
+
 export async function expireUnpaidOrders() {
   const cutoff = Date.now() - HOLD_MINUTES * 60_000;
   const stale = await db.select().from(orders).where(and(eq(orders.status, "pending_payment"), lt(orders.createdAt, cutoff)));
+  const released: string[] = [];
   for (const o of stale) {
     await db.transaction(async (tx) => {
       const res = await tx.update(orders).set({ status: "cancelled", updatedAt: Date.now() })
@@ -163,8 +174,10 @@ export async function expireUnpaidOrders() {
       if (!res.rowsAffected) return;
       await releaseHold(tx, o.id, o.couponCode, "payment_timeout", "system");
       await addEvent(tx, o.id, "expired", "Unpaid checkout expired, stock released");
+      released.push(o.id);
     });
   }
+  await alertRestocked(released);
   return stale.length;
 }
 
@@ -228,7 +241,33 @@ export async function changeOrderStatus(
     if (next === "returned" && opts.restock) await releaseHold(tx, orderId, null, "order_returned", opts.actor);
   });
   const ev = EVENT_FOR[next];
+  if (next === "shipped") await ensureInvoiceNumber(orderId).catch((e) => console.error("invoice number", e));
   if (ev && !opts.silent) await notifyOrder(orderId, ev);
+  if (next === "cancelled" || (next === "returned" && opts.restock)) await alertRestocked([orderId]);
+}
+
+/**
+ * Gives the order its GST invoice number the first time an invoice is issued (printed or shipped).
+ * Numbers run in sequence per financial year (WV/2026-27/00001, 00002…); the unique index stops duplicates,
+ * and a clash from two simultaneous requests just retries with the next number.
+ */
+export async function ensureInvoiceNumber(orderId: string): Promise<string | null> {
+  const { financialYear } = await import("./gst");
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [o] = await db.select({ n: orders.invoiceNumber, status: orders.status, placedAt: orders.placedAt }).from(orders).where(eq(orders.id, orderId));
+    if (!o) return null;
+    if (o.n) return o.n;
+    if (o.status === "pending_payment" || o.status === "cancelled") return null;
+    const now = Date.now();
+    const prefix = `WV/${financialYear(now)}/`;
+    const [{ last }] = await db.select({ last: sql<string | null>`max(${orders.invoiceNumber})` }).from(orders).where(sql`${orders.invoiceNumber} LIKE ${prefix + "%"}`);
+    const next = `${prefix}${String((last ? Number(last.slice(prefix.length)) : 0) + 1).padStart(5, "0")}`;
+    try {
+      const res = await db.update(orders).set({ invoiceNumber: next, invoicedAt: now }).where(and(eq(orders.id, orderId), sql`${orders.invoiceNumber} IS NULL`));
+      if (res.rowsAffected) return next;
+    } catch { /* another order took this number at the same moment: try the next one */ }
+  }
+  throw new Error("Couldn't assign an invoice number. Please try again.");
 }
 
 export async function pendingOrderCount() {

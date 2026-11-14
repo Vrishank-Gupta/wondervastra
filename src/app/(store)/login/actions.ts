@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { checkOtp, clientIp, createSession, destroySession, issueOtp, rateLimit } from "@/lib/auth";
 import { emailConfigured, sendOtpMessage, whatsappConfigured } from "@/lib/notifications";
-import { devConveniences, newId, normalizeEmail, normalizePhone } from "@/lib/utils";
+import { devConveniences, newId, normalizeEmail, normalizePhone, safeNext } from "@/lib/utils";
 import { redirect } from "next/navigation";
 
 function parse(input: string) {
@@ -44,7 +44,7 @@ export async function verifyOtp(identifier: string, code: string, next: string):
   if (c.blocked) return { error: "This account has been disabled. Please contact us." };
   await db.update(schema.customers).set({ lastLoginAt: Date.now() }).where(eq(schema.customers.id, c.id));
   await createSession("customer", c.id);
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/account");
+  redirect(safeNext(next));
 }
 
 export async function logout() {
