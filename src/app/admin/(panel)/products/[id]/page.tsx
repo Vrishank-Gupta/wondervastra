@@ -25,7 +25,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
   return (
     <>
       <PageHead title={p.name} sub={`Last updated ${formatDateTime(p.updatedAt)}`} actions={<Link className="btn btn-white btn-sm" href={`/p/${p.slug}`} target="_blank">View on store</Link>} />
-      <ProductForm categories={cats.map((c) => ({ id: c.id, name: c.name }))} brands={brands.map((b) => ({ id: b.id, name: b.name, isHouse: b.isHouse }))} initial={{
+      <ProductForm categories={cats.filter((c) => c.active || c.id === p.categoryId).map((c) => ({ id: c.id, name: c.name }))} brands={brands.filter((b) => b.active || b.id === p.brandId).map((b) => ({ id: b.id, name: b.name, isHouse: b.isHouse }))} initial={{
         id: p.id, name: p.name, slug: p.slug, shortDescription: p.shortDescription ?? "", description: p.description ?? "", categoryId: p.categoryId, brandId: p.brandId ?? "", status: p.status,
         price: str(p.price, 100), compareAtPrice: str(p.compareAtPrice, 100), tags: p.tags.join(", "), featured: p.featured, material: p.material ?? "", care: p.care ?? "", sizeGuide: p.sizeGuide ?? "",
         option1Label: p.option1Label, option2Label: p.option2Label, deliveryMode: p.deliveryMode, deliveryCharge: str(p.deliveryCharge, 100), codAllowed: p.codAllowed, returnable: p.returnable,

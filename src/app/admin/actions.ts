@@ -158,6 +158,17 @@ export async function saveProduct(input: unknown): Promise<Result> {
       maxPerOrder: d.maxPerOrder ?? null, maxPerCustomer: d.maxPerCustomer ?? null, lowStockThreshold: d.lowStockThreshold,
       hsnCode: d.hsnCode, seoTitle: d.seoTitle, seoDescription: d.seoDescription, updatedAt: Date.now(),
     };
+    // Blank SKUs are filled in (brand-name-colour-size), so stock sheets and invoices always have one.
+    const brandRow = d.brandId ? (await db.select({ name: schema.brands.name }).from(schema.brands).where(eq(schema.brands.id, d.brandId)))[0] : undefined;
+    const code = (s: string, n: number) => s.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, n);
+    const usedSkus = new Set(d.variants.map((v) => v.sku).filter(Boolean));
+    for (const v of d.variants) {
+      if (v.sku) continue;
+      const base = [code(brandRow?.name ?? "WV", 3), code(slug.replace(/-/g, ""), 8), v.option2 !== "Default" && code(v.option2, 3), v.option1 !== "Free size" && code(v.option1.split(" ")[0], 5)].filter(Boolean).join("-");
+      let sku = base; let n = 2;
+      while (usedSkus.has(sku)) sku = `${base}-${n++}`;
+      usedSkus.add(sku); v.sku = sku;
+    }
     await db.transaction(async (tx) => {
       if (before) await tx.update(schema.products).set(values).where(eq(schema.products.id, id));
       else await tx.insert(schema.products).values({ id, ...values });
@@ -205,6 +216,22 @@ export async function duplicateProduct(id: string): Promise<Result> {
   await audit(a, "create", "product", newPid, `Duplicated ${p.name} as a draft`);
   revalidatePath("/admin/products");
   return { ok: true, id: newPid };
+}
+/** Publish, unpublish or archive several listings at once. Publishing skips listings with no photo. */
+export async function bulkSetProductStatus(ids: string[], status: "draft" | "active" | "archived"): Promise<Result> {
+  const a = await requireAdmin();
+  if (!ids.length) return { error: "Select at least one listing." };
+  let ok = ids;
+  if (status === "active") {
+    const withImg = new Set((await db.select({ id: schema.productImages.productId }).from(schema.productImages).where(inArray(schema.productImages.productId, ids))).map((r) => r.id));
+    ok = ids.filter((id) => withImg.has(id));
+  }
+  if (ok.length) await db.update(schema.products).set({ status, updatedAt: Date.now() }).where(inArray(schema.products.id, ok));
+  await audit(a, "update", "product", ok.join(","), `Set ${ok.length} listing(s) to ${status}`, null, { ids: ok, status });
+  revalidatePath("/admin/products");
+  const skipped = ids.length - ok.length;
+  const verb = status === "active" ? "Published" : status === "draft" ? "Unpublished" : "Archived";
+  return { ok: true, message: `${verb} ${ok.length} listing${ok.length === 1 ? "" : "s"}.${skipped ? ` ${skipped} skipped: add a photo first.` : ""}` };
 }
 export async function setProductStatus(id: string, status: "draft" | "active" | "archived"): Promise<Result> {
   const a = await requireAdmin();

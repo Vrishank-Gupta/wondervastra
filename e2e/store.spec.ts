@@ -338,28 +338,39 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
   await expect(page.getByRole("link", { name: "Artificial Jewellery" })).toHaveCount(0);
 
   await page.goto("/admin/products/new");
+  // Publishing with nothing filled in names what's missing instead of failing silently.
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("To publish, add a photo, a category, a name, a price and stock.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Artificial Jewellery" }).click();
   await page.getByLabel("Name", { exact: true }).fill("Kundan Jhumka Earrings");
-  await page.getByLabel("Category").selectOption({ label: "Artificial Jewellery" });
-  await page.getByLabel("Selling price ₹").fill("499");
-  await page.getByLabel("MRP ₹").fill("799");
+  await page.getByLabel(/Selling price/).fill("499");
+  await page.getByLabel(/MRP/).fill("799");
+  await expect(page.getByText("Buyers see 38% off MRP")).toBeVisible();
   await page.getByText("Free delivery", { exact: true }).click();
+  // Colours outside the ready-made list are typed in; sizes stay "Free size" for jewellery.
+  for (const c of ["Gold", "Silver"]) { await page.getByLabel("Other colour").fill(c); await page.getByRole("button", { name: "Add colour" }).click(); }
+  await page.getByLabel("Same for all").fill("9");
+  await page.getByRole("button", { name: "Fill all" }).click();
+  await page.getByLabel("Stock for Silver").fill("3");
+  await expect(page.getByRole("heading", { name: /Stock: 12 pieces/ })).toBeVisible();
+  await page.getByText("More options").click();
   await page.getByLabel("Max per order").fill("2");
-  await page.getByLabel(/Colour options/).fill("Gold, Silver");
-  await page.getByRole("button", { name: "Generate" }).click();
-  const stock = page.getByLabel("Stock", { exact: true });
-  await stock.nth(0).fill("9");
-  await stock.nth(1).fill("3");
 
   const png = await sharp({ create: { width: 800, height: 1000, channels: 3, background: "#c98" } }).png().toBuffer();
-  await page.locator('input[type="file"]').setInputFiles({ name: "jhumka.png", mimeType: "image/png", buffer: png });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "jhumka.png", mimeType: "image/png", buffer: png });
   await expect(page.getByText("Cover")).toBeVisible();
 
   // A non-image is refused.
-  await page.locator('input[type="file"]').setInputFiles({ name: "evil.jpg", mimeType: "image/jpeg", buffer: Buffer.from("<script>alert(1)</script>") });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "evil.jpg", mimeType: "image/jpeg", buffer: Buffer.from("<script>alert(1)</script>") });
   await expect(page.getByText(/couldn't be read as an image/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Save & publish" }).click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await page.waitForURL(/admin\/products\/(?!new)/);
+  await expect(page.getByRole("heading", { name: "Live in your store" })).toBeVisible();
+  // SKUs were filled in automatically.
+  const skus = await rows("select v.sku from variants v join products p on p.id=v.product_id where p.slug='kundan-jhumka-earrings' order by v.sku");
+  expect(skus.map((r) => r.sku)).toEqual(["WV-KUNDANJH-GOL", "WV-KUNDANJH-SIL"]);
 
   await page.goto("/p/kundan-jhumka-earrings");
   await expect(page.getByRole("heading", { name: "Kundan Jhumka Earrings" })).toBeVisible();
@@ -446,14 +457,15 @@ test("coming soon: listed but not buyable, buyers sign up, launching notifies th
   // Seller switches it live from the listing editor.
   await adminLogin(page);
   await page.goto(`/admin/products/${p.id}`);
+  await page.getByText("More options").click();
   await page.getByLabel(/^Coming soon/).uncheck();
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText(/notified it's now available/)).toBeVisible();
   const sent = await rows("select * from notifications where event='launched' and recipient='launch@example.com'");
   expect(sent.length).toBe(1);
 
   // Saving again doesn't message anyone twice.
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   expect((await rows("select * from notifications where event='launched' and recipient='launch@example.com'")).length).toBe(1);
 
@@ -525,4 +537,19 @@ test("only thermals are on the site: kids' lead, other ranges are hidden and can
   await page.goto("/shop");
   const live = Number((await one("select count(*) n from products where status='active'")).n);
   await expect(page.getByText(`${live} items`)).toBeVisible();
+});
+
+test("listings: drafts are flagged and several can be published at once", async ({ page }) => {
+  const slugs = ["lux-boys-high-neck-thermal", "amul-baby-thermal-bodysuit"];
+  for (const s of slugs) await db.execute({ sql: "update products set status='draft' where slug=?", args: [s] });
+  await adminLogin(page);
+  await page.goto("/admin/products?status=draft");
+  for (const s of slugs) {
+    const name = (await one("select name from products where slug=?", [s])).name as string;
+    await page.getByLabel(`Select ${name}`, { exact: true }).check();
+  }
+  await expect(page.getByText("2 selected")).toBeVisible();
+  await page.getByRole("button", { name: "Publish selected" }).click();
+  await expect(page.getByText("Published 2 listings.")).toBeVisible();
+  for (const s of slugs) expect((await one("select status from products where slug=?", [s])).status).toBe("active");
 });
