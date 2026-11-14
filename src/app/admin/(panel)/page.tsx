@@ -10,7 +10,7 @@ import { Empty, PageHead, Panel, PayBadge, StatusBadge } from "@/components/admi
 import { dashboardStats } from "@/lib/admin-stats";
 import { formatDateTime, money } from "@/lib/format";
 import { emailConfigured, whatsappConfigured } from "@/lib/notifications";
-import { razorpayConfigured } from "@/lib/razorpay";
+import { razorpayConfigured, razorpayTestMode } from "@/lib/razorpay";
 import { getSettings } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -36,7 +36,9 @@ export default async function Dashboard() {
   const [{ n: productCount }] = await db.select({ n: sql<number>`count(*)` }).from(schema.products).where(eq(schema.products.status, "active"));
 
   const checklist = [
-    { done: razorpayConfigured(), label: "Turn on online payments (Razorpay, needs your developer)", href: "/admin/settings" },
+    razorpayTestMode()
+      ? { done: false, label: "Online payments are in TEST mode (no real money). Swap in your live Razorpay keys before selling", href: "/admin/settings" }
+      : { done: razorpayConfigured(), label: "Turn on online payments (Razorpay, needs your developer)", href: "/admin/settings" },
     { done: emailConfigured(), label: "Turn on order emails (needs your developer)", href: "/admin/settings" },
     { done: whatsappConfigured(), label: "Optional: automatic WhatsApp messages (until then, send each with one tap)", href: "/admin/settings" },
     { done: Boolean(settings.legalName && settings.businessAddress), label: "Add your legal business name and address", href: "/admin/settings" },

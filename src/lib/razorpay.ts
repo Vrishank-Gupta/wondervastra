@@ -13,6 +13,10 @@ export function simulationAllowed() {
 export function onlinePaymentsAvailable() {
   return razorpayConfigured() || simulationAllowed();
 }
+/** Test keys (rzp_test_…) take no real money: the store says so at checkout and on the dashboard. */
+export function razorpayTestMode() {
+  return razorpayConfigured() && (process.env.RAZORPAY_KEY_ID ?? "").startsWith("rzp_test_");
+}
 export function razorpayKeyId() {
   return process.env.RAZORPAY_KEY_ID ?? "";
 }

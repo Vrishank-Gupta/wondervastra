@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { CheckoutClient } from "@/components/store/checkout-client";
 import { getCustomer } from "@/lib/auth";
-import { onlinePaymentsAvailable, razorpayConfigured, simulationAllowed } from "@/lib/razorpay";
+import { onlinePaymentsAvailable, razorpayConfigured, razorpayTestMode, simulationAllowed } from "@/lib/razorpay";
 import { getSettings } from "@/lib/settings";
 import { areaLabel, deliversTo } from "@/lib/delivery-area";
 
@@ -22,6 +22,7 @@ export default async function CheckoutPage() {
       online={onlinePaymentsAvailable()}
       simulated={simulationAllowed()}
       live={razorpayConfigured()}
+      testMode={razorpayTestMode()}
       codFee={settings.codFee}
       deliveryArea={areaLabel(settings)}
     />

@@ -7,7 +7,7 @@ import { PageHead, Panel } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { emailConfigured, whatsappConfigured } from "@/lib/notifications";
-import { razorpayConfigured } from "@/lib/razorpay";
+import { razorpayConfigured, razorpayTestMode } from "@/lib/razorpay";
 import { getSettingsFresh } from "@/lib/settings";
 import { siteUrl } from "@/lib/utils";
 
@@ -23,7 +23,7 @@ export default async function Settings() {
   ]);
   const demand = { total: Number(total), top: top.map((t) => ({ ...t, n: Number(t.n) })), recent: recent.map((r) => ({ pincode: r.pincode, contact: r.email ?? r.phone ?? "", at: r.createdAt })) };
   const conn = [
-    { name: "Online payments (UPI, cards)", on: razorpayConfigured(), what: "Customers can pay online through Razorpay.", off: "Until this is on, customers can only pay cash on delivery. Needs your Razorpay account to be approved.", keys: "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" },
+    { name: "Online payments (UPI, cards)", on: razorpayConfigured(), test: razorpayTestMode(), what: "Customers can pay online through Razorpay.", off: "Until this is on, customers can only pay cash on delivery. Needs your Razorpay account to be approved.", keys: "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" },
     { name: "Order emails", on: emailConfigured(), what: "Customers get emails when they order and when it ships.", off: "Customers won't get order emails yet.", keys: "RESEND_API_KEY, EMAIL_FROM" },
     { name: "Automatic WhatsApp messages", on: whatsappConfigured(), what: "Order updates go out on WhatsApp by themselves.", off: "You can still send each update with one tap from the order page.", keys: "WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID" },
   ];
@@ -36,8 +36,8 @@ export default async function Settings() {
           <Panel title="Services">
             <ul className="space-y-3 text-sm">
               {conn.map((c) => (
-                <li key={c.name}><span className="flex items-center justify-between gap-2 font-medium">{c.name}<span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${c.on ? "bg-pine-soft" : "bg-line"}`}>{c.on ? "On" : "Not set up"}</span></span>
-                  <span className="block text-xs text-ink-soft">{c.on ? c.what : c.off}</span></li>
+                <li key={c.name}><span className="flex items-center justify-between gap-2 font-medium">{c.name}<span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${c.on ? "bg-pine-soft" : "bg-line"}`}>{c.on ? (c.test ? "Test mode" : "On") : "Not set up"}</span></span>
+                  <span className="block text-xs text-ink-soft">{c.test ? "Test mode: payments are pretend and no money moves. Your developer swaps in the live keys once Razorpay approves your account." : c.on ? c.what : c.off}</span></li>
               ))}
             </ul>
             <p className="mt-3 text-xs text-ink-soft">Setting these up needs your developer.</p>

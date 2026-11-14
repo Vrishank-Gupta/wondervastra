@@ -15,12 +15,12 @@ import { AreaWaitlist, lookupPin, rememberPin, savedPin, type PinResult } from "
 type Addr = { id: string; name: string; phone: string; line1: string; line2: string | null; city: string; state: string; pincode: string };
 type Props = {
   customer: { name: string | null; email: string | null; phone: string | null } | null;
-  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; deliveryArea: string;
+  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; deliveryArea: string; testMode?: boolean;
 };
 declare global { interface Window { Razorpay?: new (o: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void } } }
 
 
-export function CheckoutClient({ customer, addresses, online, simulated, codFee, deliveryArea }: Props) {
+export function CheckoutClient({ customer, addresses, online, simulated, codFee, deliveryArea, testMode = false }: Props) {
   const { items, ready, coupon, clear, setCoupon, attribution } = useCart();
   const [email, setEmail] = useState(customer?.email ?? "");
   const [name, setName] = useState(customer?.name ?? addresses[0]?.name ?? "");
@@ -148,6 +148,9 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
       {online && !simulated && <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />}
       <h1 className="mb-1 text-4xl">Checkout</h1>
       {!customer && <p className="mb-5 text-sm text-ink-soft">Checking out as a guest. <Link href="/login?next=/checkout" className="font-medium underline">Log in</Link> to use saved addresses.</p>}
+      {testMode && (
+        <p className="mb-4 flex items-start gap-2 rounded-sm border border-line bg-sand-soft p-3 text-sm font-medium"><AlertTriangle size={18} aria-hidden className="shrink-0" /> Online payment is being tested: no real money is taken. To place a real order, please choose cash on delivery.</p>
+      )}
       {simulated && (
         <p className="mb-4 flex items-start gap-2 rounded-sm border border-line bg-sand-soft p-3 text-sm font-medium"><AlertTriangle size={18} aria-hidden className="shrink-0" /> Test mode: Razorpay keys aren&apos;t set, so online payment is simulated and no money moves.</p>
       )}
