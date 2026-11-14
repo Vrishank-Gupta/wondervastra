@@ -1,5 +1,5 @@
 "use server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { checkOtp, clientIp, createSession, destroySession, issueOtp, rateLimit } from "@/lib/auth";
 import { emailConfigured, sendOtpMessage, whatsappConfigured } from "@/lib/notifications";
@@ -44,7 +44,17 @@ export async function verifyOtp(identifier: string, code: string, next: string):
   if (c.blocked) return { error: "This account has been disabled. Please contact us." };
   await db.update(schema.customers).set({ lastLoginAt: Date.now() }).where(eq(schema.customers.id, c.id));
   await createSession("customer", c.id);
-  redirect(safeNext(next));
+  // A wishlist tap that sent them here is completed now, then they land back where they were.
+  let dest = safeNext(next);
+  const u = new URL(dest, "https://x.invalid");
+  const wish = u.searchParams.get("wish");
+  if (wish) {
+    const [p] = await db.select({ id: schema.products.id }).from(schema.products).where(and(eq(schema.products.id, wish), eq(schema.products.status, "active")));
+    if (p) await db.insert(schema.wishlist).values({ customerId: c.id, productId: p.id }).onConflictDoNothing();
+    u.searchParams.delete("wish");
+    dest = u.pathname + (u.search || "");
+  }
+  redirect(dest);
 }
 
 export async function logout() {

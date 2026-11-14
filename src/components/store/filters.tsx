@@ -1,6 +1,6 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 
 export type FacetData = { brands: { slug: string; name: string }[]; colors: { name: string; hex: string | null }[]; sizes: string[]; maxPrice: number };
@@ -20,34 +20,43 @@ const SORTS = [
   { value: "rating", label: "Top rated" },
 ];
 
+/**
+ * Filters live in the URL (shareable, back-button friendly). The controls update instantly (optimistic)
+ * while the filtered results load, so a tap never looks ignored on a slow connection.
+ */
 function useParamsEditor() {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useSearchParams();
+  const real = useSearchParams();
+  const [params, setOptimistic] = useOptimistic(real as unknown as URLSearchParams, (_: URLSearchParams, next: URLSearchParams) => next);
+  const [pending, start] = useTransition();
+  const go = (next: URLSearchParams) => start(() => { setOptimistic(next); router.push(`${pathname}?${next.toString()}`, { scroll: false }); });
   return {
     params,
+    pending,
     set(patch: Record<string, string | null>) {
       const next = new URLSearchParams(params.toString());
       for (const [k, v] of Object.entries(patch)) { if (v) next.set(k, v); else next.delete(k); }
-      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+      go(next);
     },
     clear() {
       const next = new URLSearchParams();
       // Search terms, the brand page's category tab and the age shortcut aren't filters, so they survive "Clear".
       for (const k of ["q", "category", "collection"]) { const v = params.get(k); if (v) next.set(k, v); }
-      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+      go(next);
     },
   };
 }
 
 function FilterGroups({ facets }: { facets: FacetData }) {
-  const { params, set } = useParamsEditor();
+  const { params, set, pending } = useParamsEditor();
   const check = "flex cursor-pointer items-center gap-2 py-1 text-sm";
   const toggle = (k: string) => (
     <input type="checkbox" className="size-4 accent-ink" checked={params.get(k) === "1"} onChange={(e) => set({ [k]: e.target.checked ? "1" : null })} />
   );
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" aria-busy={pending}>
+      <p className={`text-xs font-medium text-ink-soft ${pending ? "" : "invisible"}`} role="status">{pending ? "Updating results…" : "Results up to date"}</p>
       <fieldset>
         <legend className="mb-1.5 font-sans text-sm font-medium">Availability & deals</legend>
         <label className={check}>{toggle("inStock")} In stock only</label>

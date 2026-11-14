@@ -32,7 +32,9 @@ type Message = {
   text: string;
 };
 
-export function buildOrderMessage(event: OrderEventName, o: Order, opts: { orderFeedback: boolean; deliveryFeedback: boolean }): Message {
+type Line = { name: string; variantLabel: string | null; qty: number; unitPrice: number };
+
+export function buildOrderMessage(event: OrderEventName, o: Order, opts: { orderFeedback: boolean; deliveryFeedback: boolean; items?: Line[] }): Message {
   const first = o.name.split(" ")[0];
   const track = trackingLink(o);
   const shipLine = [o.courier, o.awb ? `AWB ${o.awb}` : null].filter(Boolean).join(" · ");
@@ -44,7 +46,9 @@ export function buildOrderMessage(event: OrderEventName, o: Order, opts: { order
         heading: `Thanks ${first}, your order is confirmed`,
         lines: [
           `Order <b>${escapeHtml(o.number)}</b> for <b>${money(o.total)}</b> is confirmed (${o.paymentMethod === "cod" ? "cash on delivery" : "paid online"}).`,
-          "We'll message you as soon as it ships.",
+          ...(opts.items?.length ? [opts.items.map((i) => `${i.qty} × ${escapeHtml(i.name)}${i.variantLabel ? ` <span style="color:#6C6064">(${escapeHtml(i.variantLabel)})</span>` : ""} · ${money(i.unitPrice * i.qty)}`).join("<br>")] : []),
+          `Delivering to <b>${escapeHtml(o.name)}</b>, ${escapeHtml([o.line1, o.line2, o.city].filter(Boolean).join(", "))}, ${escapeHtml(o.state)} ${escapeHtml(o.pincode)}.`,
+          "We'll message you as soon as it ships. Questions? Just reply to this email.",
           ...(opts.orderFeedback ? [`How was ordering from us? <a href="${fb}">Tell us in 10 seconds</a>.`] : []),
         ],
         cta: { label: "Track your order", url: track },
@@ -154,13 +158,20 @@ ${m.cta ? `<p style="margin:22px 0 4px">${button(m.cta)}</p>` : ""}
 </td></tr></table></body></html>`;
 }
 
+/** Plain-text twin of an HTML email. Mail apps and spam filters both like having one. */
+function toText(html: string) {
+  return html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, "$2: $1").replace(/<br\s*\/?>/g, "\n")
+    .replace(/<\/(p|h1|div|tr)>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n\n");
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   // Replies go to the shop's real mailbox; the sending address (orders@) has no inbox.
   const replyTo = (await getSettings()).supportEmail || undefined;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM || "WonderVastra <onboarding@resend.dev>", to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+    body: JSON.stringify({ from: process.env.EMAIL_FROM || "WonderVastra <onboarding@resend.dev>", to, subject, html, text: toText(html), ...(replyTo ? { reply_to: replyTo } : {}) }),
     signal: AbortSignal.timeout(10_000),
   });
   const json = await res.json().catch(() => ({}));
@@ -232,7 +243,8 @@ export async function notifyOrder(orderId: string, event: OrderEventName) {
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     if (!o) return;
     const s = await getSettings();
-    const m = buildOrderMessage(event, o, { orderFeedback: s.orderFeedbackEnabled, deliveryFeedback: s.deliveryFeedbackEnabled });
+    const items = event === "order_placed" ? await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId)) : [];
+    const m = buildOrderMessage(event, o, { orderFeedback: s.orderFeedbackEnabled, deliveryFeedback: s.deliveryFeedbackEnabled, items });
     await dispatch({
       orderId,
       event,

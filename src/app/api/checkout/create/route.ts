@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { STATES } from "@/lib/states";
 import { db, schema } from "@/db";
 import { clientIp, getCustomer, rateLimit } from "@/lib/auth";
 import { CheckoutError, createOrder, expireUnpaidOrders } from "@/lib/orders";
@@ -19,7 +20,7 @@ const Body = z.object({
   line1: z.string().trim().min(3).max(200),
   line2: z.string().trim().max(200).optional().nullable(),
   city: z.string().trim().min(2).max(80),
-  state: z.string().trim().min(2).max(80),
+  state: z.string().trim().refine((s) => STATES.includes(s), "Choose a state from the list"),
   pincode: z.string().regex(/^[1-9]\d{5}$/),
   customerNote: z.string().trim().max(300).optional().nullable(),
   whatsappOptIn: z.boolean(),
@@ -35,7 +36,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many attempts. Please wait a few minutes." }, { status: 429 });
   }
   const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Please check your details and try again." }, { status: 400 });
+  if (!parsed.success) {
+    const field = String(parsed.error.issues[0]?.path[0] ?? "");
+    const what: Record<string, string> = { name: "your full name", line1: "your house and street", city: "your city", state: "your state", pincode: "a valid 6-digit pincode" };
+    return NextResponse.json({ error: what[field] ? `Please check ${what[field]}.` : "Please check your details and try again." }, { status: 400 });
+  }
   const b = parsed.data;
   const email = normalizeEmail(b.email);
   const phone = normalizePhone(b.phone);

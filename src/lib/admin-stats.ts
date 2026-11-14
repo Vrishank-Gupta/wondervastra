@@ -8,6 +8,8 @@ export const startOfIstDay = (ms: number) => istDay(ms) * DAY - IST;
 
 /** Orders that count as real sales: placed and not cancelled. */
 const REAL = sql`${schema.orders.status} NOT IN ('pending_payment','cancelled')`;
+/** For "what sold": returned items came back, so they don't count. */
+const KEPT = sql`${schema.orders.status} NOT IN ('pending_payment','cancelled','returned')`;
 
 export async function dashboardStats() {
   const now = Date.now();
@@ -40,12 +42,23 @@ export async function dashboardStats() {
   const [abandoned] = await db.select({ n, v: sql<number>`coalesce(sum(${o.total}),0)` }).from(o).where(and(eq(o.status, "cancelled"), eq(o.paymentMethod, "razorpay"), sql`${o.placedAt} IS NULL`, gte(o.createdAt, since)));
 
   const top = await db.select({ name: schema.orderItems.name, qty: sql<number>`sum(${schema.orderItems.qty})`, revenue: sql<number>`sum(${schema.orderItems.qty} * ${schema.orderItems.unitPrice})` })
-    .from(schema.orderItems).innerJoin(o, eq(o.id, schema.orderItems.orderId)).where(and(REAL, gte(o.createdAt, since)))
+    .from(schema.orderItems).innerJoin(o, eq(o.id, schema.orderItems.orderId)).where(and(KEPT, gte(o.createdAt, since)))
     .groupBy(schema.orderItems.productId, schema.orderItems.name).orderBy(sql`3 desc`).limit(5);
 
   const v = schema.variants, p = schema.products;
-  const lowStock = await db.select({ id: p.id, name: p.name, option1: v.option1, option2: v.option2, stock: v.stock, threshold: p.lowStockThreshold })
-    .from(v).innerJoin(p, eq(p.id, v.productId)).where(and(eq(p.status, "active"), eq(v.active, true), sql`${v.stock} <= ${p.lowStockThreshold}`)).orderBy(v.stock).limit(8);
+  // One line per listing (not per size/colour), worst first.
+  const lowRows = await db.select({ id: p.id, name: p.name, option1: v.option1, option2: v.option2, stock: v.stock })
+    .from(v).innerJoin(p, eq(p.id, v.productId)).where(and(eq(p.status, "active"), eq(v.active, true), sql`${v.stock} <= ${p.lowStockThreshold}`)).orderBy(v.stock);
+  const byProduct = new Map<string, { id: string; name: string; out: number; low: number; minStock: number; which: string[] }>();
+  for (const r of lowRows) {
+    const e = byProduct.get(r.id) ?? { id: r.id, name: r.name, out: 0, low: 0, minStock: r.stock, which: [] };
+    if (r.stock === 0) e.out++; else e.low++;
+    e.minStock = Math.min(e.minStock, r.stock);
+    e.which.push([r.option2 !== "Default" && r.option2, r.option1 !== "Free size" && r.option1].filter(Boolean).join(" ") || "all");
+    byProduct.set(r.id, e);
+  }
+  const lowStock = [...byProduct.values()].sort((a, b) => b.out - a.out || a.minStock - b.minStock).slice(0, 8)
+    .map((e) => ({ ...e, which: e.which.length > 4 ? `${e.which.slice(0, 4).join(", ")} +${e.which.length - 4} more` : e.which.join(", ") }));
 
   return {
     buckets, sources: [...sources].map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue),

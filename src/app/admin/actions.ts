@@ -437,6 +437,12 @@ export async function saveSale(input: unknown): Promise<Result> {
     if (d.endsAt <= d.startsAt) return { error: "End time must be after the start time." };
     if (d.type === "percent" && d.value > 90) return { error: "Percent sales can go up to 90%." };
     if (d.scope !== "all" && !d.targetIds.length) return { error: "Choose what this sale applies to." };
+    if (d.type === "flat") {
+      const p = schema.products;
+      const scope = d.scope === "all" ? undefined : d.scope === "category" ? inArray(p.categoryId, d.targetIds) : d.scope === "brand" ? inArray(p.brandId, d.targetIds) : inArray(p.id, d.targetIds);
+      const [cheap] = await db.select({ name: p.name, price: p.price }).from(p).where(and(eq(p.status, "active"), scope)).orderBy(p.price).limit(1);
+      if (cheap && d.value >= cheap.price) return { error: `₹${d.value / 100} off is more than ${cheap.name} costs (₹${cheap.price / 100}). Use a smaller amount or a percent sale.` };
+    }
     const id = d.id ?? newId();
     if (d.id) await db.update(schema.sales).set(d).where(eq(schema.sales.id, d.id));
     else await db.insert(schema.sales).values({ ...d, id });
@@ -458,6 +464,8 @@ export async function saveCoupon(input: unknown): Promise<Result> {
     const row = { ...d, code: d.code.toUpperCase() };
     if (row.type === "percent" && (row.value < 1 || row.value > 100)) return { error: "Percent must be 1 to 100." };
     if (row.type === "flat" && row.value < 100) return { error: "Enter a discount amount." };
+    if (row.startsAt && row.endsAt && row.endsAt <= row.startsAt) return { error: "End time must be after the start time." };
+    if (row.type === "flat" && row.minSubtotal > 0 && row.value >= row.minSubtotal) return { error: `₹${row.value / 100} off on orders above ₹${row.minSubtotal / 100} gives the order away almost free. Check the amounts.` };
     const [dupe] = await db.select().from(schema.coupons).where(eq(schema.coupons.code, row.code));
     if (dupe && dupe.id !== d.id) return { error: `A coupon named ${row.code} already exists.` };
     const id = d.id ?? newId();
@@ -477,6 +485,8 @@ export async function saveOffer(input: unknown): Promise<Result> {
   try {
     const d = OfferInput.parse(input);
     if (d.type === "percent" && (d.value < 1 || d.value > 90)) return { error: "Percent must be 1 to 90." };
+    if (d.startsAt && d.endsAt && d.endsAt <= d.startsAt) return { error: "End time must be after the start time." };
+    if (d.type === "flat" && d.minSubtotal > 0 && d.value >= d.minSubtotal) return { error: `₹${d.value / 100} off on carts above ₹${d.minSubtotal / 100} gives the order away almost free. Check the amounts.` };
     const id = d.id ?? newId();
     if (d.id) await db.update(schema.cartOffers).set(d).where(eq(schema.cartOffers.id, d.id));
     else await db.insert(schema.cartOffers).values({ ...d, id });

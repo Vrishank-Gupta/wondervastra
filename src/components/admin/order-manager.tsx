@@ -11,9 +11,11 @@ import { Panel } from "./ui";
 type Props = {
   order: { id: string; status: OrderStatus; courier: string | null; awb: string | null; trackingUrl: string | null; total: number; refundedTotal: number; paymentStatus: string; paymentMethod: string };
   nextStatuses: OrderStatus[];
+  /** "email", "email and WhatsApp", or "" when no channel is connected. */
+  notifyVia: string;
 };
 
-export function OrderManager({ order, nextStatuses }: Props) {
+export function OrderManager({ order, nextStatuses, notifyVia }: Props) {
   const router = useRouter();
   const [courier, setCourier] = useState(order.courier ?? "");
   const [awb, setAwb] = useState(order.awb ?? "");
@@ -47,7 +49,7 @@ export function OrderManager({ order, nextStatuses }: Props) {
       {msg && <p className={`rounded-sm border p-3 text-sm font-medium ${msg.ok ? "border-pine bg-pine-soft" : "border-clay bg-clay-soft"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
       {nextStatuses.length > 0 && (
         <Panel title="Update status">
-          <p className="mb-2 text-xs text-ink-soft">The customer is notified by email and WhatsApp.</p>
+          <p className="mb-2 text-xs text-ink-soft">{notifyVia ? `The customer is notified by ${notifyVia}.` : "No messages are sent automatically yet: use “Send on WhatsApp” below to tell the customer."}</p>
           <div className="flex flex-wrap gap-2">
             {nextStatuses.filter((s) => s !== "shipped").map((s) => (
               <button key={s} disabled={busy} className={`btn btn-sm ${danger(s) ? "btn-white" : "btn-white"}`} onClick={() => (danger(s) ? setConfirm(s) : run(() => setOrderStatus(order.id, s), `Marked as ${STATUS_LABEL[s]}.`)) }>
@@ -79,7 +81,7 @@ export function OrderManager({ order, nextStatuses }: Props) {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {canShip && <button disabled={busy || (!awb.trim() && !url.trim())} className="btn btn-primary btn-sm" onClick={() => run(() => updateShipment(order.id, { courier, awb, trackingUrl: url, markShipped: true }), "Marked shipped. Tracking link sent to the customer.")}>{busy && <Loader2 size={14} className="animate-spin" aria-hidden />}Save & mark shipped</button>}
+            {canShip && <button disabled={busy || (!awb.trim() && !url.trim())} className="btn btn-primary btn-sm" onClick={() => run(() => updateShipment(order.id, { courier, awb, trackingUrl: url, markShipped: true }), notifyVia ? `Marked shipped. Tracking link sent by ${notifyVia}.` : "Marked shipped. Send the tracking link with “Send on WhatsApp” below.")}>{busy && <Loader2 size={14} className="animate-spin" aria-hidden />}Save & mark shipped</button>}
             <button disabled={busy} className="btn btn-white btn-sm" onClick={() => run(() => updateShipment(order.id, { courier, awb, trackingUrl: url, markShipped: false }))}>Save details only</button>
           </div>
         </Panel>

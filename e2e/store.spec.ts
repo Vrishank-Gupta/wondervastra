@@ -718,3 +718,49 @@ test("admin login is password-only, and wrong guesses are capped", async ({ page
   await adminLogin(page);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
+
+test("round 2: wishlist survives login, real states only, discount typos refused, filters respond instantly", async ({ page, request }) => {
+  // Heart tapped while logged out → after login the item is saved and the buyer is back on the product.
+  await page.goto("/p/rupa-girls-thermal-top");
+  await page.getByRole("button", { name: /wishlist/i }).first().click();
+  await page.waitForURL(/\/login\?next=/);
+  await page.getByLabel("Mobile number or email").fill("wish.qa@example.com");
+  await page.getByRole("button", { name: "Send login code" }).click();
+  const code = (await page.getByText(/your code is/).textContent())!.match(/\d{6}/)![0];
+  await page.getByLabel("6-digit code").fill(code);
+  await page.getByRole("button", { name: /log in/i }).click();
+  await page.waitForURL("**/p/rupa-girls-thermal-top");
+  expect(page.url()).not.toContain("wish=");
+  await page.goto("/account/wishlist");
+  await expect(page.getByText("Girls' Thermal Top")).toBeVisible();
+
+  // Saved addresses pick the state from the list; checkout refuses a made-up state.
+  await page.goto("/account/addresses");
+  await page.getByRole("button", { name: /add address/i }).click();
+  await expect(page.getByLabel("State")).toHaveJSProperty("tagName", "SELECT");
+  const v = await variantOf("lux-thermal-top-full-sleeve");
+  const bad = await createOrder(request, { ...buyer(80), state: "Karnatka", items: [{ variantId: v, qty: 1 }] }, "10.80.0.1");
+  expect(bad.status()).toBe(400);
+  expect((await bad.json()).error).toBe("Please check your state.");
+
+  // A coupon that gives more off than its minimum order is a typo, and is refused.
+  await adminLogin(page);
+  await page.goto("/admin/discounts");
+  await page.getByRole("tab", { name: /Coupons/ }).click();
+  await page.getByRole("button", { name: /New coupon/i }).click();
+  await page.getByLabel("Code").fill("BIG500");
+  await page.getByLabel("Type").selectOption("flat");
+  await page.getByLabel(/₹ off/).fill("500");
+  await page.getByLabel(/Minimum|Min/).first().fill("300");
+  await page.getByRole("button", { name: "Save coupon" }).click();
+  await expect(page.getByText(/gives the order away almost free/)).toBeVisible();
+
+  // Filter tick boxes show the tap immediately.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/c/kids-thermals");
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  const box = page.getByRole("dialog").getByLabel("In stock only");
+  await box.check();
+  await expect(box).toBeChecked();
+  await page.waitForURL(/inStock=1/);
+});

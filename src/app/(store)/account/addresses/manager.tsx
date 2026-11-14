@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { STATES } from "@/lib/states";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteAddressAction, saveAddressAction } from "../../order-actions";
 
@@ -9,6 +10,17 @@ const EMPTY: Addr = { name: "", phone: "", line1: "", line2: "", city: "", state
 export function AddressManager({ addresses }: { addresses: Addr[] }) {
   const [edit, setEdit] = useState<Addr | null>(null);
   const [error, setError] = useState("");
+  // Pincode fills in city and state, like at checkout (only when they're still empty).
+  const pin = edit?.pincode ?? "";
+  useEffect(() => {
+    if (!/^[1-9]\d{5}$/.test(pin)) return;
+    let live = true;
+    fetch(`/api/pincode/${pin}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!live || !d?.city) return;
+      setEdit((x) => (x ? { ...x, city: x.city || d.city, state: x.state || (STATES.includes(d.state) ? d.state : "") } : x));
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [pin]);
   const f = (k: keyof Addr, label: string, opts: { required?: boolean; full?: boolean } = { required: true }) => (
     <div className={opts.full ? "sm:col-span-2" : ""}>
       <label className="label" htmlFor={k}>{label}</label>
@@ -35,7 +47,11 @@ export function AddressManager({ addresses }: { addresses: Addr[] }) {
           const r = await saveAddressAction(edit);
           if (r.error) setError(r.error); else { setEdit(null); setError(""); }
         }}>
-          {f("name", "Full name")}{f("phone", "Mobile")}{f("line1", "House no, building, street", { required: true, full: true })}{f("line2", "Area, landmark", { required: false, full: true })}{f("pincode", "Pincode")}{f("city", "City")}{f("state", "State", { required: true, full: true })}
+          {f("name", "Full name")}{f("phone", "Mobile")}{f("line1", "House no, building, street", { required: true, full: true })}{f("line2", "Area, landmark", { required: false, full: true })}{f("pincode", "Pincode")}{f("city", "City")}
+          <div className="sm:col-span-2"><label className="label" htmlFor="a-state">State</label>
+            <select id="a-state" className="input w-full" required value={edit.state} onChange={(e) => setEdit({ ...edit, state: e.target.value })}>
+              <option value="">Select state</option>{STATES.map((s) => <option key={s}>{s}</option>)}
+            </select></div>
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" className="size-4 accent-ink" checked={edit.isDefault} onChange={(e) => setEdit({ ...edit, isDefault: e.target.checked })} /> Make this my default</label>
           {error && <p className="text-sm font-medium text-clay sm:col-span-2" role="alert">{error}</p>}
           <div className="flex gap-2 sm:col-span-2"><button className="btn btn-primary">Save</button><button type="button" className="btn btn-white" onClick={() => setEdit(null)}>Cancel</button></div>

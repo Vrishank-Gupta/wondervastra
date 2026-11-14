@@ -91,6 +91,8 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   const nothingLeft = !variants.some((v) => v.stock > 0);
   const choosing = needsSize && !size && !nothingLeft;
   const sold = soon || nothingLeft || (!choosing && (!variant || variant.stock === 0));
+  // Prepaid-only item while online payment isn't live yet: say so instead of letting checkout fail.
+  const cannotPay = !settings.onlinePayments && !(p.codAllowed && settings.codEnabled);
   const cap = variant ? Math.min(variant.stock, p.maxPerOrder ?? Infinity, p.maxPerCustomer ?? Infinity) : 0;
   const price = variant?.price ?? first?.price ?? 0;
   const mrp = variant?.mrp ?? first?.mrp ?? 0;
@@ -114,7 +116,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     const next = !heart;
     setHeart(next);
     const res = await fetch("/api/wishlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: p.id, on: next }) });
-    if (res.status === 401) window.location.href = `/login?next=/p/${p.slug}`;
+    if (res.status === 401) window.location.href = `/login?next=${encodeURIComponent(`/p/${p.slug}?wish=${p.id}`)}`;
   };
   const current = images[imgIdx] ?? images[0];
 
@@ -207,10 +209,12 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
                 {!choosing && <QtyStepper qty={qty} max={cap} label={p.name} onChange={setQty} />}
                 {(p.maxPerOrder || p.maxPerCustomer) && <span className="text-xs font-medium text-ink-soft">Limit {[p.maxPerOrder && `${p.maxPerOrder} per order`, p.maxPerCustomer && `${p.maxPerCustomer} per customer`].filter(Boolean).join(", ")}</span>}
               </div>
-              <div className="mt-4 hidden gap-3 md:flex">
-                <button onClick={addCart} className="btn btn-white flex-1">Add to cart</button>
-                <button onClick={buyNow} className="btn btn-primary flex-1">Buy now</button>
-              </div>
+              {cannotPay
+                ? <p className="mt-4 rounded-sm border border-line bg-sand-soft p-3 text-sm font-medium">This item is prepaid only, and online payment opens soon. Please check back shortly.</p>
+                : <div className="mt-4 hidden gap-3 md:flex">
+                    <button onClick={addCart} className="btn btn-white flex-1">Add to cart</button>
+                    <button onClick={buyNow} className="btn btn-primary flex-1">Buy now</button>
+                  </div>}
             </>
           )}
         </div>
@@ -243,7 +247,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         </div>
       </div>
 
-      {!sold && (
+      {!sold && !cannotPay && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-line bg-white p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] md:hidden">
           <div className="min-w-14"><p className="text-lg leading-none font-bold">{money(price)}</p>{mrp > price && <s className="text-xs text-ink-soft">{money(mrp)}</s>}</div>
           <button onClick={addCart} className="btn btn-white flex-1 px-2">Add to cart</button>

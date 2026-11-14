@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SearchX } from "lucide-react";
 import { Suspense } from "react";
 import { applyFilters, type Filters, type ProductCard } from "@/lib/catalog";
+import { SIZE_SETS } from "@/lib/listing-presets";
 import { DesktopFilters, MobileFilters, SortSelect, type FacetData } from "./filters";
 import { ProductGrid } from "./product-grid";
 import { getCustomer } from "@/lib/auth";
@@ -24,7 +25,10 @@ export function facetsFrom(cards: ProductCard[]): FacetData {
   const brands = new Map<string, string>();
   cards.forEach((c) => { if (c.brandSlug && c.brandName) brands.set(c.brandSlug, c.brandName); });
   cards.forEach((c) => { c.colors.forEach((x) => colors.set(x.name, x.hex)); c.sizes.forEach((s) => sizes.add(s)); });
-  return { brands: [...brands].map(([slug, name]) => ({ slug, name })).sort((a, b) => a.name.localeCompare(b.name)), colors: [...colors].map(([name, hex]) => ({ name, hex })), sizes: [...sizes], maxPrice: Math.max(0, ...cards.map((c) => c.price)) };
+  // Sizes in natural order: baby months, then kids' years, then adult sizes; anything custom at the end.
+  const order = [...SIZE_SETS.baby, ...SIZE_SETS.kids, ...SIZE_SETS.men, ...SIZE_SETS.women, ...SIZE_SETS.free] as string[];
+  const rank = (s: string) => { const i = order.indexOf(s); return i < 0 ? order.length : i; };
+  return { brands: [...brands].map(([slug, name]) => ({ slug, name })).sort((a, b) => a.name.localeCompare(b.name)), colors: [...colors].map(([name, hex]) => ({ name, hex })), sizes: [...sizes].sort((a, b) => rank(a) - rank(b)), maxPrice: Math.max(0, ...cards.map((c) => c.price)) };
 }
 export async function wishedIds() {
   const c = await getCustomer();

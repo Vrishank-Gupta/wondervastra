@@ -50,7 +50,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee 
     fetch(`/api/pincode/${pincode}`).then((r) => r.ok ? r.json() : null).then((d) => {
       if (!live || !d?.city) return;
       setCity((c) => c || d.city);
-      setState((s) => s || d.state);
+      if (STATES.includes(d.state)) setState((s) => s || d.state);
       setPinNote(`${d.city}, ${d.state}`);
     }).catch(() => {});
     return () => { live = false; };

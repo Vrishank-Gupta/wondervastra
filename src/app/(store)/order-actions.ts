@@ -7,6 +7,7 @@ import { addEvent, changeOrderStatus } from "@/lib/orders";
 import { notifyOrder } from "@/lib/notifications";
 import { returnEligible } from "@/lib/order-access";
 import { newId, normalizePhone } from "@/lib/utils";
+import { STATES } from "@/lib/states";
 
 async function byToken(token: string) {
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.accessToken, token));
@@ -80,7 +81,8 @@ export async function saveAddressAction(data: { id?: string; name: string; phone
   const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const phone = normalizePhone(str(data?.phone, 20));
   data = { ...data, name: str(data?.name, 100), line1: str(data?.line1, 200), line2: str(data?.line2, 200), city: str(data?.city, 80), state: str(data?.state, 80), pincode: str(data?.pincode, 6) };
-  if (data.name.length < 2 || data.line1.length < 3 || data.city.length < 2 || !data.state) return { error: "Please fill in the name and full address." };
+  if (data.name.length < 2 || data.line1.length < 3 || data.city.length < 2) return { error: "Please fill in the name and full address." };
+  if (!STATES.includes(data.state)) return { error: "Choose your state from the list." };
   if (!phone) return { error: "Enter a valid 10-digit mobile number." };
   if (!/^[1-9]\d{5}$/.test(data.pincode)) return { error: "Enter a valid 6-digit pincode." };
   const values = { customerId: c.id, name: data.name, phone, line1: data.line1, line2: data.line2 || null, city: data.city, state: data.state, pincode: data.pincode, isDefault: Boolean(data.isDefault) };

@@ -27,7 +27,8 @@ export default async function Dashboard() {
   const [s, settings, recent, sample] = await Promise.all([
     dashboardStats(), getSettings(),
     db.select().from(schema.orders).where(sql`${schema.orders.status} != 'pending_payment'`).orderBy(desc(schema.orders.createdAt)).limit(8),
-    db.select({ n: sql<number>`count(*)` }).from(schema.productImages).where(sql`${schema.productImages.url} LIKE '/seed/%'`),
+    // Only listings you can still sell count; archived ones don't need new photos.
+    db.select({ n: sql<number>`count(*)` }).from(schema.productImages).innerJoin(schema.products, eq(schema.products.id, schema.productImages.productId)).where(sql`${schema.productImages.url} LIKE '/seed/%' AND ${schema.products.status} != 'archived'`),
   ]);
   const [{ n: productCount }] = await db.select({ n: sql<number>`count(*)` }).from(schema.products).where(eq(schema.products.status, "active"));
 
@@ -101,9 +102,10 @@ export default async function Dashboard() {
           <Panel title="Low stock" actions={<Link href="/admin/inventory" className="text-sm font-medium underline">Inventory</Link>}>
             {s.lowStock.length ? (
               <ul className="space-y-1.5 text-sm">
-                {s.lowStock.map((l, i) => (
-                  <li key={i} className="flex justify-between gap-2"><span className="min-w-0 truncate"><Link href={`/admin/products/${l.id}`} className="hover:underline">{l.name}</Link> <span className="text-xs text-ink-soft">{l.option2} {l.option1}</span></span>
-                    <b className={`flex shrink-0 items-center gap-1 ${l.stock === 0 ? "text-clay" : ""}`}>{l.stock === 0 && <AlertTriangle size={13} aria-hidden />}{l.stock}</b></li>
+                {s.lowStock.map((l) => (
+                  <li key={l.id} className="flex justify-between gap-2"><span className="min-w-0"><Link href={`/admin/products/${l.id}`} className="hover:underline">{l.name}</Link>
+                    <span className="block text-xs text-ink-soft">{l.out ? `${l.out} sold out` : ""}{l.out && l.low ? " · " : ""}{l.low ? `${l.low} running low` : ""}: {l.which}</span></span>
+                    <b className={`flex shrink-0 items-center gap-1 ${l.out ? "text-clay" : ""}`}>{l.out > 0 && <AlertTriangle size={13} aria-hidden />}{l.minStock}</b></li>
                 ))}
               </ul>
             ) : <p className="text-sm text-ink-soft">All listings are well stocked.</p>}

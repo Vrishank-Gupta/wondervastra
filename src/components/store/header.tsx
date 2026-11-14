@@ -42,7 +42,7 @@ function SearchBox({ autoFocus, onDone }: { autoFocus?: boolean; onDone?: () => 
     }}>
       <Search size={18} aria-hidden className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-soft" />
       <input
-        aria-label="Search products" autoFocus={autoFocus} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => results.length && setOpen(true)}
+        type="search" enterKeyHint="search" autoComplete="off" aria-label="Search products" autoFocus={autoFocus} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => results.length && setOpen(true)}
         placeholder="Search thermals, brands…" className="w-full border border-transparent bg-sand py-2.5 pr-3 pl-10 text-base outline-none transition-colors placeholder:text-ink-soft focus:border-ink focus:bg-white md:text-sm"
       />
       {open && q.trim().length >= 2 && (

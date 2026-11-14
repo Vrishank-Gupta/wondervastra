@@ -1,3 +1,4 @@
+import { capabilities } from "@/lib/capabilities";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -52,11 +53,12 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
       {attention.map((e) => <p key={e.id} className="mb-3 rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">{e.message}</p>)}
       {o.status === "cancelled" && o.paymentStatus === "paid" && <p className="mb-3 rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">This order is cancelled but paid. Issue the refund below.</p>}
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3 [&>*]:min-w-0">
         <div className="space-y-5 xl:col-span-2">
           <OrderManager
             order={{ id: o.id, status: o.status, courier: o.courier, awb: o.awb, trackingUrl: o.trackingUrl, total: o.total, refundedTotal: o.refundedTotal, paymentStatus: o.paymentStatus, paymentMethod: o.paymentMethod }}
             nextStatuses={TRANSITIONS[o.status]}
+            notifyVia={[capabilities().email && "email", capabilities().whatsapp && o.whatsappOptIn && "WhatsApp"].filter(Boolean).join(" and ")}
           />
           <Panel title={`Items (${items.reduce((a, i) => a + i.qty, 0)} pcs)`}>
             <ul className="divide-y divide-ink/10">

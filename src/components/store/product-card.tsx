@@ -17,7 +17,8 @@ export function ProductCard({ p, priority = false, wished = false }: { p: Card; 
     const next = !heart;
     setHeart(next);
     const res = await fetch("/api/wishlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: p.id, on: next }) });
-    if (res.status === 401) window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+    // Logged out: log in, and the heart tap is completed straight after (?wish=…).
+    if (res.status === 401) { const u = new URL(window.location.href); u.searchParams.set("wish", p.id); window.location.href = `/login?next=${encodeURIComponent(u.pathname + u.search)}`; }
   }
 
   const soldOut = !p.inStock && !p.comingSoon;
