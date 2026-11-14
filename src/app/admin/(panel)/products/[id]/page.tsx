@@ -33,7 +33,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
         price: str(p.price, 100), compareAtPrice: str(p.compareAtPrice, 100), tags: p.tags.join(", "), featured: p.featured, material: p.material ?? "", care: p.care ?? "", sizeGuide: p.sizeGuide ?? "",
         option1Label: p.option1Label, option2Label: p.option2Label, deliveryMode: p.deliveryMode, deliveryCharge: str(p.deliveryCharge, 100), codAllowed: p.codAllowed, returnable: p.returnable,
         forceOutOfStock: p.forceOutOfStock, comingSoon: p.comingSoon, launchNote: p.launchNote ?? "", showStockCount: p.showStockCount, maxPerOrder: str(p.maxPerOrder), maxPerCustomer: str(p.maxPerCustomer), lowStockThreshold: String(p.lowStockThreshold),
-        hsnCode: p.hsnCode ?? "", seoTitle: p.seoTitle ?? "", seoDescription: p.seoDescription ?? "",
+        hsnCode: p.hsnCode ?? "", seoTitle: p.seoTitle ?? "", seoDescription: p.seoDescription ?? "", sizeHeights: p.sizeHeights ?? {},
         images: imgs.map((i) => ({ url: i.url, alt: i.alt ?? p.name })),
         variants: vars.filter((v) => v.active).map((v) => ({ id: v.id, sku: v.sku ?? "", option1: v.option1, option2: v.option2, colorHex: v.colorHex ?? "", price: str(v.price, 100), stock: String(v.stock), active: v.active })),
       }} />

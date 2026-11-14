@@ -185,7 +185,7 @@ test("out of stock: subscribe, seller restocks, buyer is notified exactly once",
   await expect(page.getByRole("heading", { name: "Back in stock: message 1 buyer" })).toBeVisible();
   const panel = page;
   await expect(panel.getByText("9812345678")).toBeVisible();
-  await expect(panel.getByRole("link", { name: "Message" })).toHaveAttribute("href", /wa\.me\/919812345678\?text=.*back%20in%20stock/);
+  await expect(panel.getByRole("link", { name: "Message", exact: true })).toHaveAttribute("href", /wa\.me\/919812345678\?text=.*back%20in%20stock/);
   await panel.getByRole("button", { name: "Sent" }).click();
   await expect(page.getByRole("heading", { name: /Back in stock: message/ })).toHaveCount(0);
   expect((await one("select * from stock_alerts where id=?", [a.id as unknown as string])).status).toBe("notified");
@@ -368,7 +368,7 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
   await page.getByLabel("Stock for Silver").fill("3");
   await expect(page.getByRole("heading", { name: /Stock: 12 pieces/ })).toBeVisible();
   await page.getByText("More options").click();
-  await page.getByLabel("Max per order").fill("2");
+  await page.getByLabel("Most pieces in one order").fill("2");
 
   const png = await sharp({ create: { width: 800, height: 1000, channels: 3, background: "#c98" } }).png().toBuffer();
   await page.locator('input[type="file"][multiple]').setInputFiles({ name: "jhumka.png", mimeType: "image/png", buffer: png });
@@ -824,7 +824,7 @@ test("round 3: Delhi NCR delivery area, discount ladder, open-ended sale, WhatsA
     await ladder.getByLabel(`Step ${n} cart amount`).fill(min);
     await ladder.getByLabel(`Step ${n} percent off`).fill(pct);
   }
-  await ladder.getByLabel(/Free delivery when cart/).fill("799");
+  await ladder.getByLabel(/Free delivery when the cart is at least/).fill("799");
   await ladder.getByRole("button", { name: "Save discount ladder" }).click();
   await expect(ladder.getByText(/should give more than 8%/)).toBeVisible();
   await ladder.getByLabel("Step 3 percent off").fill("12");
@@ -855,8 +855,15 @@ test("round 3: Delhi NCR delivery area, discount ladder, open-ended sale, WhatsA
   await page.getByLabel("Check a pincode").fill("201301");
   await expect(page.getByText("Delivers", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Save settings" }).click();
-  await expect(page.getByText("Settings saved.")).toBeVisible();
-  await expect(page.getByText(/1 buyer has asked you to deliver/)).toBeVisible();
+  await expect(page.getByText("Saved. Your store shows the changes now.")).toBeVisible();
+  await expect(page.getByText(/1 customer has asked you to deliver/)).toBeVisible();
+  // Delivery area by tick-boxes: unticking a town takes its pincodes out; "all over India" clears the list.
+  await page.getByText("Faridabad", { exact: true }).click();
+  await page.getByLabel("Check a pincode").fill("121002");
+  await expect(page.getByText("Not covered", { exact: true })).toBeVisible();
+  await expect(page.getByText("You have changes that aren't saved yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Undo changes" }).click();
+  await expect(page.getByText("Delivers", { exact: true })).toBeVisible();
 
   await page.goto("/p/rupa-boys-thermal-top");
   await expect(page.getByTestId("tiers").getByText("12% off")).toBeVisible();
@@ -884,4 +891,34 @@ test("round 3: Delhi NCR delivery area, discount ladder, open-ended sale, WhatsA
   for (const o of before) await db.execute({ sql: `insert into cart_offers (${Object.keys(o).join(",")}) values (${Object.keys(o).map(() => "?").join(",")})`, args: Object.values(o) as never[] });
   await db.execute("delete from sales where name='Always On'");
   await db.execute("delete from settings where key='whatsappGroupUrl'");
+});
+
+test("kids' sizes show age and height together, set per listing", async ({ page }) => {
+  const prod = await one("select id from products where slug='rupa-boys-thermal-top'");
+  await adminLogin(page);
+  await page.goto(`/admin/products/${prod.id}`);
+  // Existing listing with no heights: empty boxes, typical values one tap away.
+  await expect(page.getByLabel("Height for 4–6 Y (cm)")).toHaveValue("");
+  await page.getByRole("button", { name: "Fill typical heights for the empty ones" }).click();
+  await expect(page.getByLabel("Height for 4–6 Y (cm)")).toHaveValue("104–116");
+  await page.getByLabel("Height for 2–4 Y (cm)").fill("92-104");
+  await page.getByLabel("Height for 12–14 Y (cm)").fill("");
+  await page.getByRole("button", { name: "Save changes" }).first().click();
+  await expect(page.getByText(/^Saved/).first()).toBeVisible();
+  const heights = JSON.parse((await one("select size_heights from products where id=?", [prod.id])).size_heights as string);
+  expect(heights["2–4 Y"]).toBe("92–104");
+  expect(heights["4–6 Y"]).toBe("104–116");
+  expect(heights["12–14 Y"]).toBeUndefined();
+
+  // A height that isn't a number is refused.
+  await page.getByLabel("Height for 2–4 Y (cm)").fill("92-");
+  await page.getByRole("button", { name: "Save changes" }).first().click();
+  await expect(page.getByText("The height for 2–4 Y should be a number in cm, like 104 or 104–116.")).toBeVisible();
+
+  await page.goto("/p/rupa-boys-thermal-top");
+  await expect(page.locator("#size-picker").getByRole("button", { name: /^4–6 Y, 104–116 cm/ })).toBeVisible();
+  await expect(page.locator("#size-picker").getByRole("button", { name: "12–14 Y", exact: true })).toBeVisible();
+  await page.getByText("Size guide").click();
+  await expect(page.getByRole("cell", { name: "92–104 cm" })).toBeVisible();
+  await db.execute({ sql: "update products set size_heights='{}' where id=?", args: [prod.id] });
 });

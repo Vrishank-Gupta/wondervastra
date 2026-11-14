@@ -5,7 +5,7 @@
  */
 import type { StoreSettings } from "./settings";
 import { siteUrl } from "./utils";
-import { areaLabel, parsePincodes } from "./delivery-area";
+import { areaLabel, parsePincodes, splitArea } from "./delivery-area";
 
 export function JsonLd({ data }: { data: object | object[] }) {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
@@ -21,7 +21,10 @@ export function brandPhrase(names: string[]) {
 /** "Delhi NCR (Delhi, Gurugram, Noida, Ghaziabad and Faridabad)" for the default list, else the area name. */
 export function areaPhrase(s: Pick<StoreSettings, "deliveryAreaName" | "deliveryPincodes">) {
   const a = areaLabel(s);
-  return /^delhi ncr$/i.test(a) ? "Delhi NCR (Delhi, Gurugram, Noida, Greater Noida, Ghaziabad and Faridabad)" : a;
+  if (a === "India") return a;
+  // Lists only the towns actually ticked in Settings, so the wording never promises more than the pincode list.
+  const towns = splitArea(s.deliveryPincodes).towns.map((t) => t.replace(" & ", ", "));
+  return towns.length ? `${a} (${brandPhrase(towns)})` : a;
 }
 export function seoDescription(brandNames: string[], s: Pick<StoreSettings, "deliveryAreaName" | "deliveryPincodes">) {
   return `WonderVastra is an online store for 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals, from ${brandPhrase(brandNames)}. Delivering across ${areaPhrase(s)}.`;

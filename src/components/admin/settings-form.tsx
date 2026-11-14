@@ -1,107 +1,189 @@
 "use client";
 import { STATES } from "@/lib/states";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { addStaff, changeOwnPassword, updateSettings } from "@/app/admin/actions";
 import type { StoreSettings } from "@/lib/settings";
 import { Panel } from "./ui";
-import { deliversTo, NCR_PINCODES, parsePincodes } from "@/lib/delivery-area";
+import { deliversTo, joinArea, NCR_PINCODES, NCR_TOWNS, splitArea } from "@/lib/delivery-area";
 
 export type AreaDemand = { total: number; top: { pincode: string; place: string | null; n: number }[]; recent: { pincode: string; contact: string; at: number }[] };
+
+/** A labelled field with a one-line plain-language hint underneath. */
+function Field({ id, label, hint, children, wide = false }: { id: string; label: string; hint?: string; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className={wide ? "sm:col-span-2" : ""}>
+      <label className="label" htmlFor={id}>{label}</label>
+      {children}
+      {hint && <p id={`${id}-hint`} className="mt-1 text-xs text-ink-soft">{hint}</p>}
+    </div>
+  );
+}
 
 export function SettingsForm({ initial, isOwner, demand }: { initial: StoreSettings; isOwner: boolean; demand?: AreaDemand }) {
   const router = useRouter();
   const [s, setS] = useState(initial);
+  const [saved, setSaved] = useState(initial);
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [staff, setStaff] = useState({ name: "", email: "", password: "" });
   const [testPin, setTestPin] = useState("");
-  const parsed = parsePincodes(s.deliveryPincodes);
-  const up = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => setS((x) => ({ ...x, [k]: v }));
-  const text = (k: keyof StoreSettings, label: string, ph = "") => (
-    <div><label className="label" htmlFor={k}>{label}</label><input id={k} className="input" placeholder={ph} value={String(s[k] ?? "")} onChange={(e) => up(k, e.target.value as never)} /></div>
+  const dirty = JSON.stringify(s) !== JSON.stringify(saved);
+  const area = splitArea(s.deliveryPincodes);
+  const allIndia = !s.deliveryPincodes.trim();
+
+  // Leaving with unsaved changes asks first, so nothing typed is lost by accident.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const up = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => { setS((x) => ({ ...x, [k]: v })); setMsg(null); };
+  const text = (k: keyof StoreSettings, label: string, hint?: string, ph = "", wide = false) => (
+    <Field id={k} label={label} hint={hint} wide={wide}><input id={k} className="input" placeholder={ph} aria-describedby={hint ? `${k}-hint` : undefined} value={String(s[k] ?? "")} onChange={(e) => up(k, e.target.value as never)} /></Field>
   );
-  const rupees = (k: keyof StoreSettings, label: string) => (
-    <div><label className="label" htmlFor={k}>{label}</label><input id={k} className="input" type="number" min="0" value={Number(s[k]) / 100} onChange={(e) => up(k, Math.round(Number(e.target.value) * 100) as never)} /></div>
+  const rupees = (k: keyof StoreSettings, label: string, hint?: string) => (
+    <Field id={k} label={label} hint={hint}><div className="flex items-center gap-2"><span aria-hidden>₹</span><input id={k} className="input" type="number" inputMode="numeric" min="0" value={Number(s[k]) / 100} onChange={(e) => up(k, Math.round(Number(e.target.value) * 100) as never)} /></div></Field>
   );
-  const num = (k: keyof StoreSettings, label: string) => (
-    <div><label className="label" htmlFor={k}>{label}</label><input id={k} className="input" type="number" min="0" value={Number(s[k])} onChange={(e) => up(k, Number(e.target.value) as never)} /></div>
+  const days = (k: keyof StoreSettings, label: string, hint?: string) => (
+    <Field id={k} label={label} hint={hint}><div className="flex items-center gap-2"><input id={k} className="input w-24" type="number" inputMode="numeric" min="0" value={Number(s[k])} onChange={(e) => up(k, Number(e.target.value) as never)} /><span className="text-sm text-ink-soft">days</span></div></Field>
   );
   const toggle = (k: keyof StoreSettings, label: string) => (
     <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" className="size-4 accent-ink" checked={Boolean(s[k])} onChange={(e) => up(k, e.target.checked as never)} /> {label}</label>
   );
+  const setTowns = (towns: string[], extra = area.extra) => up("deliveryPincodes", joinArea(towns, extra));
+
+  async function save() {
+    setBusy(true);
+    const r = await updateSettings(s);
+    setBusy(false);
+    if (r.error) return setMsg({ ok: false, text: r.error });
+    setSaved(s);
+    setMsg({ ok: true, text: "Saved. Your store shows the changes now." });
+    router.refresh();
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-20">
       {msg && <p className={`rounded-sm p-3 text-sm font-medium ${msg.ok ? "bg-pine-soft" : "bg-clay-soft"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
-      <form className="space-y-5" onSubmit={async (e) => {
-        e.preventDefault();
-        const r = await updateSettings(s);
-        setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: "Settings saved." });
-        if (!r.error) router.refresh();
-      }}>
+      <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <fieldset disabled={!isOwner} className="space-y-5">
-          <Panel title="Store">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {text("storeName", "Store name")}{text("tagline", "Tagline")}
-              <div className="sm:col-span-2">{text("announcement", "Top announcement bar", "Blank = shows your live sale or free-delivery offer")}</div>
-              {text("whatsappNumber", "Support WhatsApp number", "9876543210")}{text("supportEmail", "Support email")}
-              {text("supportHours", "Support hours", "Mon–Sat, 10am–7pm")}{text("whatsappGroupUrl", "WhatsApp group invite link", "https://chat.whatsapp.com/…")}
-              {text("instagramUrl", "Instagram URL")}{text("facebookUrl", "Facebook URL")}
-            </div>
-            <p className="mt-2 text-xs text-ink-soft">The support number and email show in the footer, on the Contact page and as a chat button. The group link adds a “Join our WhatsApp group” invite on the home page, in the footer and after each order. In WhatsApp: open the group → Invite via link → Copy link.</p>
-          </Panel>
-          <Panel title="Business details (for invoices and policy pages)">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {text("legalName", "Legal business name")}{text("gstin", "GSTIN (if registered)")}
-              <div><label className="label" htmlFor="bstate">Registered state</label><select id="bstate" className="input w-full min-w-0 truncate" value={s.businessState} onChange={(e) => up("businessState", e.target.value)}><option value="">Choose state</option>{STATES.map((x) => <option key={x}>{x}</option>)}</select></div>
-              <div className="sm:col-span-2"><label className="label" htmlFor="ba">Business address</label><textarea id="ba" className="input" rows={2} value={s.businessAddress} onChange={(e) => up("businessAddress", e.target.value)} /></div>
+          <Panel title="How customers reach you">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {text("whatsappNumber", "Your WhatsApp number", "Customers tap a green chat button to message you.", "9876543210")}
+              {text("supportEmail", "Your support email", "Shown on the Contact page and in order emails.", "support@wondervastra.in")}
+              {text("supportHours", "When you reply", "Shown next to your number, so customers know when to expect an answer.", "Mon–Sat, 10am–7pm")}
+              {text("whatsappGroupUrl", "WhatsApp group invite link", "Adds a “Join our WhatsApp group” button. In WhatsApp: open the group → tap its name → Invite via link → Copy link, then paste here.", "https://chat.whatsapp.com/…")}
+              {text("instagramUrl", "Instagram page link", "Optional. Adds an Instagram button in the footer.", "https://instagram.com/…")}
+              {text("facebookUrl", "Facebook page link", "Optional.", "https://facebook.com/…")}
             </div>
           </Panel>
-          <Panel title="Delivery area">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {text("deliveryAreaName", "Area name shown to buyers", "Delhi NCR")}
-              <div><label className="label" htmlFor="testpin">Check a pincode</label>
-                <div className="flex items-center gap-2"><input id="testpin" className="input" inputMode="numeric" maxLength={6} placeholder="110017" value={testPin} onChange={(e) => setTestPin(e.target.value.replace(/\D/g, ""))} />
-                  {testPin.length === 6 && <span className={`shrink-0 text-sm font-semibold ${deliversTo(testPin, s.deliveryPincodes) ? "text-pine" : "text-clay"}`}>{deliversTo(testPin, s.deliveryPincodes) ? "Delivers" : "Not covered"}</span>}</div></div>
-              <div className="sm:col-span-2"><label className="label" htmlFor="deliveryPincodes">Pincodes you deliver to</label>
-                <textarea id="deliveryPincodes" className="input font-mono text-xs" rows={6} value={s.deliveryPincodes} onChange={(e) => up("deliveryPincodes", e.target.value)} placeholder="Blank = all of India" />
-                <p className="mt-1 text-xs text-ink-soft">One per line or comma-separated: a pincode (110017), a range (110001-110099) or a prefix (110 = every pincode starting 110). Blank = deliver all over India. {s.deliveryPincodes.trim() ? `${parsed.rules.length} rules.` : ""}{parsed.bad.length ? <b className="text-clay"> Not understood: {parsed.bad.slice(0, 5).join(", ")}</b> : null}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-white btn-sm" onClick={() => { up("deliveryPincodes", NCR_PINCODES); up("deliveryAreaName", "Delhi NCR"); }}>Use Delhi NCR list</button>
-                  <button type="button" className="btn btn-white btn-sm" onClick={() => up("deliveryPincodes", "")}>Deliver all over India</button>
+
+          <Panel title="Where you deliver">
+            <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" className="size-4 accent-ink" checked={allIndia} onChange={(e) => up("deliveryPincodes", e.target.checked ? "" : NCR_PINCODES)} /> Deliver all over India</label>
+            {!allIndia && (
+              <div className="mt-3 space-y-4">
+                <fieldset>
+                  <legend className="label">Tick the areas you deliver to</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {NCR_TOWNS.map((t) => {
+                      const on = area.towns.includes(t.name);
+                      return (
+                        <label key={t.name} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium ${on ? "border-ink bg-ink text-white" : "border-line bg-white"}`}>
+                          <input type="checkbox" className="sr-only" checked={on} onChange={(e) => setTowns(e.target.checked ? [...area.towns, t.name] : area.towns.filter((x) => x !== t.name))} />{on && <Check size={14} aria-hidden />}{t.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+                <Field id="extraPins" label="Any other pincodes (optional)" hint="Type pincodes separated by commas, e.g. 122505, 131001. A range like 110001-110099 also works.">
+                  <input id="extraPins" className="input" inputMode="numeric" value={area.extra} onChange={(e) => setTowns(area.towns, e.target.value)} placeholder="122505, 131001" />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {text("deliveryAreaName", "Name customers see", "Used in messages like “We deliver across Delhi NCR”.", "Delhi NCR")}
+                  <Field id="testpin" label="Check a pincode" hint="Type any pincode to see if you deliver there.">
+                    <div className="flex items-center gap-2"><input id="testpin" className="input" inputMode="numeric" maxLength={6} placeholder="110017" value={testPin} onChange={(e) => setTestPin(e.target.value.replace(/\D/g, ""))} />
+                      {testPin.length === 6 && <span className={`shrink-0 text-sm font-semibold ${deliversTo(testPin, s.deliveryPincodes) ? "text-pine" : "text-clay"}`}>{deliversTo(testPin, s.deliveryPincodes) ? "Delivers" : "Not covered"}</span>}</div>
+                  </Field>
                 </div>
+                {!area.towns.length && !area.extra.trim() && <p className="text-sm font-medium text-clay">Tick at least one area, or tick “Deliver all over India”.</p>}
               </div>
-            </div>
+            )}
             {demand && demand.total > 0 && (
               <div className="mt-4 border-t border-line pt-3">
-                <p className="text-sm font-semibold">{demand.total} {demand.total === 1 ? "buyer has" : "buyers have"} asked you to deliver to their area</p>
+                <p className="text-sm font-semibold">{demand.total} {demand.total === 1 ? "customer has" : "customers have"} asked you to deliver to their area</p>
                 <p className="mt-1 text-xs text-ink-soft">Most asked: {demand.top.map((t) => `${t.pincode}${t.place ? ` ${t.place}` : ""} (${t.n})`).join(", ")}</p>
-                <details className="mt-2 text-sm"><summary className="cursor-pointer font-medium">Latest requests</summary>
+                <details className="mt-2 text-sm"><summary className="cursor-pointer font-medium">See who asked</summary>
                   <ul className="mt-1 space-y-0.5 text-xs">{demand.recent.map((r, i) => <li key={i}>{r.pincode} · {r.contact}</li>)}</ul>
                 </details>
               </div>
             )}
           </Panel>
-          <Panel title="Delivery">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {rupees("defaultDeliveryCharge", "Default charge for new listings ₹")}
-              <div><label className="label" htmlFor="sc">When a cart has several charged listings</label>
-                <select id="sc" className="input" value={s.shippingCombine} onChange={(e) => up("shippingCombine", e.target.value as "highest" | "sum")}><option value="highest">Charge only the highest (one parcel)</option><option value="sum">Add all charges together</option></select></div>
-              {num("dispatchDays", "Dispatch within (working days)")}{num("returnWindowDays", "Return window (days)")}{num("deliveryDaysMin", "Delivery time, from (days)")}{num("deliveryDaysMax", "Delivery time, to (days)")}
+
+          <Panel title="Delivery charges and time">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {rupees("defaultDeliveryCharge", "Usual delivery charge", "Filled in on each new listing. You can change it per listing.")}
+              <Field id="sc" label="If one order has items with different delivery charges" hint="Most shops charge once per parcel.">
+                <select id="sc" className="input" value={s.shippingCombine} onChange={(e) => up("shippingCombine", e.target.value as "highest" | "sum")}><option value="highest">Charge once (the highest charge)</option><option value="sum">Add up every item&apos;s charge</option></select>
+              </Field>
+              {days("dispatchDays", "You pack and send within", "Working days after an order comes in.")}
+              <div />
+              {days("deliveryDaysMin", "Courier delivers in, fastest", "Shown to customers as “delivered in 3–7 days”.")}
+              {days("deliveryDaysMax", "Courier delivers in, slowest")}
             </div>
-            <p className="mt-2 text-xs text-ink-soft">Set “free delivery above ₹X” under Discounts → Cart offers.</p>
+            <p className="mt-3 text-sm text-ink-soft">Free delivery above an amount is set in <a className="font-medium underline" href="/admin/discounts">Discounts</a>.</p>
           </Panel>
+
           <Panel title="Cash on delivery">
-            {toggle("codEnabled", "Offer cash on delivery")}
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">{rupees("codFee", "COD handling fee ₹")}{rupees("codMaxOrder", "Maximum COD order value ₹")}</div>
+            {toggle("codEnabled", "Let customers pay cash when the parcel arrives")}
+            {s.codEnabled && <div className="mt-3 grid gap-4 sm:grid-cols-2">{rupees("codFee", "Extra charge for cash on delivery", "Added to the order total. Put 0 for no extra charge.")}{rupees("codMaxOrder", "Allow cash on delivery for orders up to", "Bigger orders must be paid online.")}</div>}
           </Panel>
-          <Panel title="Feedback & alerts">
-            <div className="space-y-2">{toggle("orderFeedbackEnabled", "Ask for feedback after ordering")}{toggle("deliveryFeedbackEnabled", "Ask for feedback and reviews after delivery")}</div>
-            <div className="mt-3">{text("adminAlertEmail", "Email me about each new order")}</div>
+
+          <Panel title="Returns">
+            {days("returnWindowDays", "Customers can return within", "Days after delivery. Put 0 if you don't take returns.")}
           </Panel>
-          {isOwner ? <button className="btn btn-primary">Save settings</button> : <p className="text-sm text-ink-soft">Only the owner can change settings.</p>}
+
+          <Panel title="Shop name and top banner">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {text("storeName", "Shop name")}
+              {text("tagline", "One line about your shop", "Shown in the footer.")}
+              {text("announcement", "Message in the strip at the very top", "Leave empty to show your current sale and offers automatically.", "e.g. Diwali offers are live!", true)}
+            </div>
+          </Panel>
+
+          <Panel title="Business details (for GST bills)">
+            <p className="mb-3 text-sm text-ink-soft">Printed on invoices. Fill these when your GST registration is ready; leave empty until then.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {text("legalName", "Registered business name", "As on your GST certificate.")}
+              {text("gstin", "GSTIN (if registered)", "15 characters, e.g. 07ABCDE1234F1Z5.")}
+              <Field id="bstate" label="State you're registered in" hint="Decides CGST + SGST or IGST on each bill."><select id="bstate" className="input w-full min-w-0 truncate" value={s.businessState} onChange={(e) => up("businessState", e.target.value)}><option value="">Choose state</option>{STATES.map((x) => <option key={x}>{x}</option>)}</select></Field>
+              <Field id="ba" label="Business address" wide><textarea id="ba" className="input" rows={2} value={s.businessAddress} onChange={(e) => up("businessAddress", e.target.value)} /></Field>
+            </div>
+          </Panel>
+
+          <Panel title="Messages and alerts">
+            <div className="space-y-2">{toggle("orderFeedbackEnabled", "After an order, ask the customer how ordering went")}{toggle("deliveryFeedbackEnabled", "After delivery, ask for a rating and review")}</div>
+            <div className="mt-4">{text("adminAlertEmail", "Email me when a new order comes in", "Your own email address. Leave empty for no emails.", "you@gmail.com")}</div>
+          </Panel>
+
+          {!isOwner && <p className="text-sm text-ink-soft">Only the owner can change settings.</p>}
         </fieldset>
+        {isOwner && (
+          <div className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white px-4 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,.06)] lg:left-60 ${dirty || busy ? "" : "hidden"}`}>
+            <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">You have changes that aren&apos;t saved yet.</p>
+              <div className="flex gap-2">
+                <button type="button" className="btn btn-white btn-sm" disabled={busy} onClick={() => { setS(saved); setMsg(null); }}>Undo changes</button>
+                <button className="btn btn-primary btn-sm" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
       <Panel title="Change my password">
         <form className="flex flex-wrap gap-2" onSubmit={async (e) => {

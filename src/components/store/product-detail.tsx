@@ -16,7 +16,7 @@ type Variant = {
   stock: number; price: number; mrp: number; saleName: string | null; saleEndsAt: number | null;
 };
 type Product = {
-  id: string; name: string; slug: string; shortDescription: string | null; description: string | null; material: string | null; care: string | null; sizeGuide: string | null;
+  id: string; name: string; slug: string; shortDescription: string | null; description: string | null; material: string | null; care: string | null; sizeGuide: string | null; sizeHeights: Record<string, string>;
   option1Label: string; option2Label: string; deliveryMode: "free" | "flat"; deliveryCharge: number; codAllowed: boolean; returnable: boolean;
   showStockCount: boolean; lowStockThreshold: number; maxPerOrder: number | null; maxPerCustomer: number | null; forceOutOfStock: boolean; comingSoon: boolean; launchNote: string | null;
 };
@@ -196,9 +196,12 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
               {sizes.map((s) => {
                 const v = variants.find((x) => x.option1 === s && x.option2 === color);
                 const out = !v || v.stock === 0;
+                const h = p.sizeHeights[s];
                 return (
-                  <button key={s} type="button" aria-pressed={s === size} onClick={() => { setSize(s); setQty(1); setSizeError(false); }}
-                    className={`min-w-12 border px-3.5 py-2.5 text-sm font-semibold ${s === size ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${out ? "text-ink/40 line-through" : ""}`}>{s}</button>
+                  <button key={s} type="button" aria-pressed={s === size} aria-label={h ? `${s}, ${h} cm${out ? ", sold out" : ""}` : undefined} onClick={() => { setSize(s); setQty(1); setSizeError(false); }}
+                    className={`min-w-12 border px-3.5 text-sm font-semibold ${h ? "py-1.5 leading-tight" : "py-2.5"} ${s === size ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${out ? "text-ink/40 line-through" : ""}`}>
+                    {s}{h && <span className={`block text-[11px] font-medium ${s === size ? "text-white/80" : "text-ink-soft"}`}>{h} cm</span>}
+                  </button>
                 );
               })}
             </div>
@@ -267,7 +270,18 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         <div className="mt-5 border-t border-line">
           {p.description && <Accordion title="Description" open>{p.description}</Accordion>}
           {p.material && <Accordion title="Material">{p.material}</Accordion>}
-          {p.sizeGuide && <Accordion title="Size guide"><span className="flex items-start gap-2"><Ruler size={16} aria-hidden className="mt-0.5 shrink-0" /><span>{p.sizeGuide}</span></span></Accordion>}
+          {(p.sizeGuide || sizes.some((s) => p.sizeHeights[s])) && (
+            <Accordion title="Size guide" open={!p.description}>
+              {sizes.some((s) => p.sizeHeights[s]) && (
+                <table className="mb-2 w-full max-w-xs text-left text-sm whitespace-normal [&_td]:border-b [&_td]:border-line [&_td]:py-1 [&_th]:pb-1 [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase">
+                  <thead><tr><th>{p.option1Label}</th><th>Child&apos;s height</th></tr></thead>
+                  <tbody>{sizes.map((s) => <tr key={s}><td className="font-medium text-ink">{s}</td><td>{p.sizeHeights[s] ? `${p.sizeHeights[s]} cm` : "—"}</td></tr>)}</tbody>
+                </table>
+              )}
+              {sizes.some((s) => p.sizeHeights[s]) && <span className="mb-2 block text-xs">Between sizes? Pick by height, and size up for room to grow.</span>}
+              {p.sizeGuide && <span className="flex items-start gap-2"><Ruler size={16} aria-hidden className="mt-0.5 shrink-0" /><span>{p.sizeGuide}</span></span>}
+            </Accordion>
+          )}
           {p.care && <Accordion title="Care">{p.care}</Accordion>}
         </div>
       </div>

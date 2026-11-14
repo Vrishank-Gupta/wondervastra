@@ -32,6 +32,12 @@ export const SIZE_SETS = {
 } as const;
 export type SizeSet = keyof typeof SIZE_SETS;
 
+/** Typical child height (cm) for each age size, as a starting point; brands differ, so each listing can change them. */
+export const TYPICAL_HEIGHTS: Record<string, string> = {
+  "0–6 M": "50–68", "6–12 M": "68–76", "12–18 M": "76–82", "18–24 M": "82–88",
+  "2–4 Y": "88–104", "4–6 Y": "104–116", "6–8 Y": "116–128", "8–10 Y": "128–140", "10–12 Y": "140–152", "12–14 Y": "152–164",
+};
+
 export type Audience = { tag: string; label: string; sizes: SizeSet };
 export type CategoryPreset = {
   kind: "kids" | "men" | "women" | "other";

@@ -23,9 +23,9 @@ export default async function Settings() {
   ]);
   const demand = { total: Number(total), top: top.map((t) => ({ ...t, n: Number(t.n) })), recent: recent.map((r) => ({ pincode: r.pincode, contact: r.email ?? r.phone ?? "", at: r.createdAt })) };
   const conn = [
-    { name: "Razorpay payments", on: razorpayConfigured(), keys: "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" },
-    { name: "Email via Resend", on: emailConfigured(), keys: "RESEND_API_KEY, EMAIL_FROM" },
-    { name: "WhatsApp Cloud API", on: whatsappConfigured(), keys: "WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID" },
+    { name: "Online payments (UPI, cards)", on: razorpayConfigured(), what: "Customers can pay online through Razorpay.", off: "Until this is on, customers can only pay cash on delivery. Needs your Razorpay account to be approved.", keys: "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" },
+    { name: "Order emails", on: emailConfigured(), what: "Customers get emails when they order and when it ships.", off: "Customers won't get order emails yet.", keys: "RESEND_API_KEY, EMAIL_FROM" },
+    { name: "Automatic WhatsApp messages", on: whatsappConfigured(), what: "Order updates go out on WhatsApp by themselves.", off: "You can still send each update with one tap from the order page.", keys: "WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID" },
   ];
   return (
     <>
@@ -33,14 +33,18 @@ export default async function Settings() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3 [&>*]:min-w-0">
         <div className="xl:col-span-2"><SettingsForm initial={s} isOwner={me.role === "owner"} demand={demand} /></div>
         <div className="space-y-5">
-          <Panel title="Connections">
-            <ul className="space-y-2.5 text-sm">
+          <Panel title="Services">
+            <ul className="space-y-3 text-sm">
               {conn.map((c) => (
-                <li key={c.name}><span className="flex items-center justify-between gap-2 font-medium">{c.name}<span className={`rounded-full px-2 py-0.5 text-xs ${c.on ? "bg-pine-soft" : "bg-line"}`}>{c.on ? "Connected" : "Not connected"}</span></span>
-                  {!c.on && <span className="block text-xs break-words text-ink-soft">Set {c.keys} in your server&apos;s environment.</span>}</li>
+                <li key={c.name}><span className="flex items-center justify-between gap-2 font-medium">{c.name}<span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${c.on ? "bg-pine-soft" : "bg-line"}`}>{c.on ? "On" : "Not set up"}</span></span>
+                  <span className="block text-xs text-ink-soft">{c.on ? c.what : c.off}</span></li>
               ))}
             </ul>
-            <p className="mt-3 text-xs break-all text-ink-soft">Razorpay webhook URL: {siteUrl()}/api/webhooks/razorpay</p>
+            <p className="mt-3 text-xs text-ink-soft">Setting these up needs your developer.</p>
+            <details className="mt-2 text-xs text-ink-soft"><summary className="cursor-pointer">Details for your developer</summary>
+              <ul className="mt-1 space-y-1 break-words">{conn.filter((c) => !c.on).map((c) => <li key={c.name}>{c.name}: {c.keys}</li>)}</ul>
+              <p className="mt-1 break-all">Razorpay webhook URL: {siteUrl()}/api/webhooks/razorpay</p>
+            </details>
           </Panel>
           <Panel title="Team">
             <ul className="space-y-1.5 text-sm">

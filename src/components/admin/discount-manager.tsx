@@ -82,7 +82,7 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
               <F id="omin" label="When cart is at least ₹"><input id="omin" className="input" type="number" min="0" required value={String(offer.min)} onChange={(e) => setOffer({ ...offer, min: e.target.value })} /></F>
               <F id="ot" label="Reward"><select id="ot" className="input" value={String(offer.type)} onChange={(e) => setOffer({ ...offer, type: e.target.value })}><option value="free_shipping">Free delivery</option><option value="percent">% off cart</option><option value="flat">₹ off cart</option></select></F>
               {offer.type !== "free_shipping" && <F id="ov" label={offer.type === "percent" ? "Percent off" : "₹ off"}><input id="ov" className="input" type="number" min="1" required value={String(offer.value)} onChange={(e) => setOffer({ ...offer, value: e.target.value })} /></F>}
-              {offer.type === "percent" && <F id="omax" label="Max discount ₹ (optional)"><input id="omax" className="input" type="number" min="1" value={String(offer.max)} onChange={(e) => setOffer({ ...offer, max: e.target.value })} /></F>}
+              {offer.type === "percent" && <F id="omax" label="Biggest discount allowed ₹ (optional)"><input id="omax" className="input" type="number" min="1" value={String(offer.max)} onChange={(e) => setOffer({ ...offer, max: e.target.value })} /></F>}
               <F id="os" label="Starts (optional)"><input id="os" className="input" type="datetime-local" value={String(offer.starts)} onChange={(e) => setOffer({ ...offer, starts: e.target.value })} /></F>
               <F id="oe" label="Ends (optional)"><input id="oe" className="input" type="datetime-local" value={String(offer.ends)} onChange={(e) => setOffer({ ...offer, ends: e.target.value })} /></F>
               <label className="flex items-center gap-2 text-sm sm:col-span-3"><input type="checkbox" className="size-4 accent-ink" checked={Boolean(offer.combines)} onChange={(e) => setOffer({ ...offer, combines: e.target.checked })} /> Can be used together with coupons</label>
@@ -91,7 +91,7 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
             </form>
           )}
           {offers.length ? <ul>{offers.map((o) => (
-            <Row key={o.id} title={o.name} badge={<Badge r={o} />} sub={`Cart ≥ ${money(o.minSubtotal)} → ${o.type === "free_shipping" ? "free delivery" : o.type === "percent" ? `${o.value}% off${o.maxDiscount ? ` (max ${money(o.maxDiscount)})` : ""}` : `${money(o.value)} off`}${o.endsAt ? ` · until ${formatDateTime(o.endsAt)}` : ""}`}
+            <Row key={o.id} title={o.name} badge={<Badge r={o} />} sub={`${o.minSubtotal ? `When the cart is ${money(o.minSubtotal)} or more` : "On every order"}: ${o.type === "free_shipping" ? "free delivery" : o.type === "percent" ? `${o.value}% off${o.maxDiscount ? ` (up to ${money(o.maxDiscount)})` : ""}` : `${money(o.value)} off`}${o.endsAt ? ` · ends ${formatDateTime(o.endsAt)}` : ""}`}
               onEdit={() => setOffer({ id: o.id, name: o.name, type: o.type, value: o.type === "percent" ? String(o.value) : rup(o.value), min: rup(o.minSubtotal), max: rup(o.maxDiscount), combines: o.combinesWithCoupons, starts: toLocal(o.startsAt), ends: toLocal(o.endsAt), active: o.active })} onDelete={() => del("offer", o.id)} />
           ))}</ul> : <Empty>No cart offers yet.</Empty>}
         </Panel>
@@ -137,7 +137,7 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
 
       {tab === "coupons" && (
         <Panel title="Coupons" actions={!coupon && <button className="btn btn-primary btn-sm" onClick={() => setCoupon({ code: "", description: "", type: "percent", value: "", min: "", max: "", starts: "", ends: "", limit: "", perCustomer: "", first: false, excludeSale: false, active: true })}><Plus size={14} aria-hidden /> New coupon</button>}>
-          <p className="mb-3 text-sm text-ink-soft">Coupons with a description appear on the Offers page. Copy a coupon&apos;s link and the code auto-applies for whoever opens it.</p>
+          <p className="mb-3 text-sm text-ink-soft">A code customers type at checkout, like WELCOME10. Tap “Copy link” to share it on Instagram or WhatsApp: whoever opens the link gets the code applied for them.</p>
           {coupon && (
             <form className="mb-4 grid gap-3 rounded-sm bg-ivory p-3 sm:grid-cols-3" onSubmit={async (e) => {
               e.preventDefault();
@@ -149,13 +149,13 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
               <F id="cc" label="Code"><input id="cc" className="input font-mono uppercase" required value={String(coupon.code)} onChange={(e) => setCoupon({ ...coupon, code: e.target.value.toUpperCase() })} /></F>
               <F id="ct" label="Type"><select id="ct" className="input" value={String(coupon.type)} onChange={(e) => setCoupon({ ...coupon, type: e.target.value })}><option value="percent">% off</option><option value="flat">₹ off</option><option value="free_shipping">Free delivery</option></select></F>
               {coupon.type !== "free_shipping" && <F id="cv" label={coupon.type === "percent" ? "Percent off" : "₹ off"}><input id="cv" className="input" type="number" min="1" required value={String(coupon.value)} onChange={(e) => setCoupon({ ...coupon, value: e.target.value })} /></F>}
-              <F id="cd" label="Description (public)"><input id="cd" className="input" value={String(coupon.description)} onChange={(e) => setCoupon({ ...coupon, description: e.target.value })} /></F>
+              <F id="cd" label="Short line for the Offers page (optional)"><input id="cd" className="input" value={String(coupon.description)} onChange={(e) => setCoupon({ ...coupon, description: e.target.value })} /></F>
               <F id="cm" label="Minimum cart ₹"><input id="cm" className="input" type="number" min="0" value={String(coupon.min)} onChange={(e) => setCoupon({ ...coupon, min: e.target.value })} /></F>
-              {coupon.type === "percent" && <F id="cx" label="Max discount ₹"><input id="cx" className="input" type="number" min="1" value={String(coupon.max)} onChange={(e) => setCoupon({ ...coupon, max: e.target.value })} /></F>}
+              {coupon.type === "percent" && <F id="cx" label="Biggest discount allowed ₹ (optional)"><input id="cx" className="input" type="number" min="1" value={String(coupon.max)} onChange={(e) => setCoupon({ ...coupon, max: e.target.value })} /></F>}
               <F id="cs" label="Starts (optional)"><input id="cs" className="input" type="datetime-local" value={String(coupon.starts)} onChange={(e) => setCoupon({ ...coupon, starts: e.target.value })} /></F>
               <F id="ce" label="Ends (optional)"><input id="ce" className="input" type="datetime-local" value={String(coupon.ends)} onChange={(e) => setCoupon({ ...coupon, ends: e.target.value })} /></F>
-              <F id="cl" label="Total uses (optional)"><input id="cl" className="input" type="number" min="1" value={String(coupon.limit)} onChange={(e) => setCoupon({ ...coupon, limit: e.target.value })} /></F>
-              <F id="cp" label="Uses per customer"><input id="cp" className="input" type="number" min="1" value={String(coupon.perCustomer)} onChange={(e) => setCoupon({ ...coupon, perCustomer: e.target.value })} /></F>
+              <F id="cl" label="How many times in total (optional)"><input id="cl" className="input" type="number" min="1" value={String(coupon.limit)} onChange={(e) => setCoupon({ ...coupon, limit: e.target.value })} /></F>
+              <F id="cp" label="Times each customer can use it (optional)"><input id="cp" className="input" type="number" min="1" value={String(coupon.perCustomer)} onChange={(e) => setCoupon({ ...coupon, perCustomer: e.target.value })} /></F>
               <div className="space-y-1 sm:col-span-3">
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-ink" checked={Boolean(coupon.first)} onChange={(e) => setCoupon({ ...coupon, first: e.target.checked })} /> First order only</label>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-ink" checked={Boolean(coupon.excludeSale)} onChange={(e) => setCoupon({ ...coupon, excludeSale: e.target.checked })} /> Don&apos;t apply to items already on sale</label>

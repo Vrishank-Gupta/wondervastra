@@ -63,6 +63,8 @@ export const products = sqliteTable(
     material: text("material"),
     care: text("care"),
     sizeGuide: text("size_guide"),
+    /** Body height for each size, shown next to it: { "4–6 Y": "104–116" } (cm). */
+    sizeHeights: text("size_heights", { mode: "json" }).$type<Record<string, string>>().notNull().default({}),
     option1Label: text("option1_label").notNull().default("Size"),
     option2Label: text("option2_label").notNull().default("Colour"),
     deliveryMode: text("delivery_mode", { enum: ["free", "flat"] }).notNull().default("flat"),

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Camera, Check, ChevronDown, Circle, Loader2, Plus, Star, Trash2, Upload, X } from "lucide-react";
 import { saveProduct } from "@/app/admin/actions";
-import { COLOURS, SIZE_SETS, autoShortDescription, colourHex, presetFor, type SizeSet } from "@/lib/listing-presets";
+import { COLOURS, SIZE_SETS, TYPICAL_HEIGHTS, autoShortDescription, colourHex, presetFor, type SizeSet } from "@/lib/listing-presets";
 import { Panel } from "./ui";
 
 type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; stock: string; active: boolean };
@@ -14,6 +14,8 @@ export type ProductFormData = {
   option1Label: string; option2Label: string; deliveryMode: "free" | "flat"; deliveryCharge: string; codAllowed: boolean; returnable: boolean;
   forceOutOfStock: boolean; comingSoon: boolean; launchNote: string; showStockCount: boolean; maxPerOrder: string; maxPerCustomer: string; lowStockThreshold: string; hsnCode: string; seoTitle: string; seoDescription: string;
   images: { url: string; alt: string }[]; variants: Variant[];
+  /** Height in cm per size, e.g. { "4–6 Y": "104–116" }. */
+  sizeHeights: Record<string, string>;
 };
 const paise = (s: string) => Math.round(Number(s) * 100);
 const optInt = (s: string) => (s.trim() ? Math.floor(Number(s)) : null);
@@ -74,6 +76,9 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
   const [customSize, setCustomSize] = useState("");
   const [customColour, setCustomColour] = useState("");
   const [fillAll, setFillAll] = useState("");
+  // Kids' sizes carry a height in cm too. New listings start from typical heights; the seller corrects them to the brand's chart.
+  const [heights, setHeights] = useState<Record<string, string>>(() => ({ ...(initial.sizeHeights ?? {}) }));
+  const heightOf = (s: string) => heights[s] ?? (initial.id ? "" : TYPICAL_HEIGHTS[s] ?? "");
 
   const category = categories.find((c) => c.id === f.categoryId);
   const preset = useMemo(() => presetFor(category?.name ?? ""), [category?.name]);
@@ -141,6 +146,8 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
 
   async function submit(status?: ProductFormData["status"]) {
     if (status === "active" && missing.length) return setMsg({ ok: false, text: `To publish, add ${missing.join(", ").replace(/, ([^,]*)$/, " and $1")}.` });
+    const badHeight = S.find((sz) => heightOf(sz).trim() && !/^\d{2,3}(\s*[-–]\s*\d{2,3})?$/.test(heightOf(sz).trim()));
+    if (badHeight) { document.querySelector<HTMLInputElement>(`[aria-label="Height for ${badHeight} (cm)"]`)?.focus(); return setMsg({ ok: false, text: `The height for ${badHeight} should be a number in cm, like 104 or 104–116.` }); }
     setBusy(true); setMsg(null);
     const variants = C.flatMap((c) => S.map((s) => {
       const m = meta[key(s, c)];
@@ -155,6 +162,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
       deliveryMode: f.deliveryMode, deliveryCharge: paise(f.deliveryCharge || "0"), codAllowed: f.codAllowed, returnable: f.returnable, forceOutOfStock: f.forceOutOfStock, comingSoon: f.comingSoon, launchNote: f.launchNote || null, showStockCount: f.showStockCount,
       maxPerOrder: optInt(f.maxPerOrder), maxPerCustomer: optInt(f.maxPerCustomer), lowStockThreshold: Number(f.lowStockThreshold || 0), hsnCode: f.hsnCode || null, seoTitle: f.seoTitle || null, seoDescription: f.seoDescription || null,
       images: f.images, variants,
+      sizeHeights: Object.fromEntries(S.map((s) => [s, heightOf(s).trim()]).filter(([, h]) => h)),
     });
     setBusy(false);
     if (r.error) return setMsg({ ok: false, text: r.error });
@@ -264,6 +272,22 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               </span>
             </div>
           </fieldset>
+          {sizes.length > 0 && (preset.kind === "kids" || sizes.some((s) => heightOf(s))) && (
+            <fieldset className="mt-4">
+              <legend className="label">Child&apos;s height for each size (cm)</legend>
+              <p className="mb-2 text-xs text-ink-soft">Shown under each size, so parents can pick by height as well as age. Use the brand&apos;s size chart, e.g. 104–116. Leave blank to show age only.</p>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((s) => (
+                  <label key={s} className="flex items-center gap-1.5 rounded-sm border border-line px-2 py-1 text-sm">
+                    <span className="font-medium whitespace-nowrap">{s}</span>
+                    <input aria-label={`Height for ${s} (cm)`} className="input w-24 px-2 py-1 text-sm" inputMode="numeric" placeholder={TYPICAL_HEIGHTS[s] ?? "cm"} value={heightOf(s)} onChange={(e) => setHeights((h) => ({ ...h, [s]: e.target.value.replace(/[^\d–-]/g, "") }))} />
+                    <span className="text-xs text-ink-soft">cm</span>
+                  </label>
+                ))}
+              </div>
+              {sizes.some((s) => !heightOf(s) && TYPICAL_HEIGHTS[s]) && <button type="button" className="mt-2 text-sm font-medium underline" onClick={() => setHeights((h) => ({ ...h, ...Object.fromEntries(sizes.filter((s) => !heightOf(s) && TYPICAL_HEIGHTS[s]).map((s) => [s, TYPICAL_HEIGHTS[s]])) }))}>Fill typical heights for the empty ones</button>}
+            </fieldset>
+          )}
           <fieldset className="mt-4">
             <legend className="label">{f.option2Label}s</legend>
             <div className="flex flex-wrap gap-2">
@@ -311,12 +335,12 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
             <div><label className="label" htmlFor="desc">Full description</label><textarea id="desc" className="input" rows={4} value={f.description} onChange={(e) => set("description", e.target.value)} /></div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className="label" htmlFor="mat">Material</label><input id="mat" className="input" value={f.material} onChange={(e) => set("material", e.target.value)} /></div>
-              <div><label className="label" htmlFor="hsn">HSN code</label><input id="hsn" className="input" value={f.hsnCode} onChange={(e) => set("hsnCode", e.target.value)} /></div>
+              <div><label className="label" htmlFor="hsn">HSN code <span className="font-normal text-ink-soft">(for GST bills, already filled in)</span></label><input id="hsn" className="input" value={f.hsnCode} onChange={(e) => set("hsnCode", e.target.value)} /></div>
             </div>
             <div><label className="label" htmlFor="care">Care instructions</label><textarea id="care" className="input" rows={2} value={f.care} onChange={(e) => set("care", e.target.value)} /></div>
             <div><label className="label" htmlFor="sg">Size guide</label><textarea id="sg" className="input" rows={2} value={f.sizeGuide} onChange={(e) => set("sizeGuide", e.target.value)} /></div>
             <div>
-              <label className="label" htmlFor="tags">Tags <span className="font-normal text-ink-soft">(comma separated)</span></label>
+              <label className="label" htmlFor="tags">Extra search words <span className="font-normal text-ink-soft">(separate with commas)</span></label>
               <input id="tags" className="input" placeholder="winter, value, new" value={f.tags} onChange={(e) => set("tags", e.target.value)} />
               <p className="mt-1 text-xs text-ink-soft">“new” and “bestseller” add badges and feed the homepage rails.</p>
               <Toggle label="Feature on homepage" checked={f.featured} onChange={(v) => set("featured", v)} />
@@ -330,9 +354,9 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               <Toggle label="Show pieces available" hint="e.g. “12 pieces available”" checked={f.showStockCount} onChange={(v) => set("showStockCount", v)} />
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div><label className="label text-xs" htmlFor="mpo">Max per order</label><input id="mpo" className="input" type="number" min="1" placeholder="No limit" value={f.maxPerOrder} onChange={(e) => set("maxPerOrder", e.target.value)} /></div>
-              <div><label className="label text-xs" htmlFor="mpc">Max per customer</label><input id="mpc" className="input" type="number" min="1" placeholder="No limit" value={f.maxPerCustomer} onChange={(e) => set("maxPerCustomer", e.target.value)} /></div>
-              <div><label className="label text-xs" htmlFor="lst">“Only few left” under</label><input id="lst" className="input" type="number" min="0" value={f.lowStockThreshold} onChange={(e) => set("lowStockThreshold", e.target.value)} /></div>
+              <div><label className="label text-xs" htmlFor="mpo">Most pieces in one order</label><input id="mpo" className="input" type="number" min="1" placeholder="No limit" value={f.maxPerOrder} onChange={(e) => set("maxPerOrder", e.target.value)} /></div>
+              <div><label className="label text-xs" htmlFor="mpc">Most pieces one customer can buy, ever</label><input id="mpc" className="input" type="number" min="1" placeholder="No limit" value={f.maxPerCustomer} onChange={(e) => set("maxPerCustomer", e.target.value)} /></div>
+              <div><label className="label text-xs" htmlFor="lst">Say “only a few left” below</label><input id="lst" className="input" type="number" min="0" value={f.lowStockThreshold} onChange={(e) => set("lowStockThreshold", e.target.value)} /></div>
             </div>
             <div>
               <p className="label">Different price or SKU for one size or colour <span className="font-normal text-ink-soft">(optional; SKUs are made for you)</span></p>
@@ -360,10 +384,10 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               </div>
             </div>
             <div className="space-y-3">
-              <div><label className="label" htmlFor="slug">Link</label><div className="flex items-center gap-1 text-sm"><span className="text-ink-soft">/p/</span><input id="slug" className="input" value={f.slug} onChange={(e) => set("slug", e.target.value)} placeholder="made from the name" /></div>
+              <div><label className="label" htmlFor="slug">Web address of this listing</label><div className="flex items-center gap-1 text-sm"><span className="text-ink-soft">/p/</span><input id="slug" className="input" value={f.slug} onChange={(e) => set("slug", e.target.value)} placeholder="made from the name" /></div>
                 {f.id && <p className="mt-1 text-xs font-medium text-clay">Changing this breaks links already shared on Instagram or WhatsApp.</p>}</div>
-              <div><label className="label" htmlFor="st">Preview title</label><input id="st" className="input" maxLength={70} value={f.seoTitle} onChange={(e) => set("seoTitle", e.target.value)} placeholder={f.name} /></div>
-              <div><label className="label" htmlFor="sd">Preview description</label><textarea id="sd" className="input" rows={2} maxLength={170} value={f.seoDescription} onChange={(e) => set("seoDescription", e.target.value)} placeholder={f.shortDescription} /></div>
+              <div><label className="label" htmlFor="st">Title on Google and WhatsApp previews <span className="font-normal text-ink-soft">(optional)</span></label><input id="st" className="input" maxLength={70} value={f.seoTitle} onChange={(e) => set("seoTitle", e.target.value)} placeholder={f.name} /></div>
+              <div><label className="label" htmlFor="sd">Description on Google and WhatsApp previews <span className="font-normal text-ink-soft">(optional)</span></label><textarea id="sd" className="input" rows={2} maxLength={170} value={f.seoDescription} onChange={(e) => set("seoDescription", e.target.value)} placeholder={f.shortDescription} /></div>
             </div>
           </div>
         </details>

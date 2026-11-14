@@ -36,9 +36,9 @@ export default async function Dashboard() {
   const [{ n: productCount }] = await db.select({ n: sql<number>`count(*)` }).from(schema.products).where(eq(schema.products.status, "active"));
 
   const checklist = [
-    { done: razorpayConfigured(), label: "Connect Razorpay to accept real payments", href: "/admin/settings" },
-    { done: emailConfigured(), label: "Connect email (Resend) for order updates", href: "/admin/settings" },
-    { done: whatsappConfigured(), label: "Connect WhatsApp Cloud API (or use one-tap send on each order)", href: "/admin/settings" },
+    { done: razorpayConfigured(), label: "Turn on online payments (Razorpay, needs your developer)", href: "/admin/settings" },
+    { done: emailConfigured(), label: "Turn on order emails (needs your developer)", href: "/admin/settings" },
+    { done: whatsappConfigured(), label: "Optional: automatic WhatsApp messages (until then, send each with one tap)", href: "/admin/settings" },
     { done: Boolean(settings.legalName && settings.businessAddress), label: "Add your legal business name and address", href: "/admin/settings" },
     { done: Boolean(settings.supportEmail && settings.whatsappNumber), label: "Add support email and WhatsApp number", href: "/admin/settings" },
     { done: Boolean(settings.whatsappGroupUrl), label: "Add your WhatsApp group link so buyers can join", href: "/admin/settings" },

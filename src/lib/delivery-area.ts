@@ -5,14 +5,31 @@
  * A blank list means "all of India".
  */
 
+/** Delhi NCR towns as tick-boxes for the owner; each stands for its pincodes. */
+export const NCR_TOWNS: { name: string; pincodes: string }[] = [
+  { name: "Delhi", pincodes: "110001-110099" },
+  { name: "Gurugram", pincodes: "122001-122018, 122050-122052, 122101-122103" },
+  { name: "Noida & Greater Noida", pincodes: "201301-201318" },
+  { name: "Ghaziabad", pincodes: "201001-201019, 201102" },
+  { name: "Faridabad", pincodes: "121001-121015" },
+];
 /** Delhi NCR: Delhi, Gurugram, Faridabad, Noida, Greater Noida and Ghaziabad. */
-export const NCR_PINCODES = [
-  "110001-110099", // Delhi
-  "121001-121015", // Faridabad
-  "122001-122018, 122050-122052, 122101-122103", // Gurugram, Manesar, Sohna
-  "201001-201019, 201102", // Ghaziabad, Indirapuram, Loni
-  "201301-201318", // Noida, Greater Noida
-].join("\n");
+export const NCR_PINCODES = NCR_TOWNS.map((t) => t.pincodes).join("\n");
+
+const tokens = (text: string) => text.replace(/\/\/[^\n]*/g, "").split(/[\s,;]+/).map((t) => t.replace(/\s*[-–]\s*/, "-")).filter(Boolean);
+/** Splits the stored list into ticked towns and any other pincodes, for the Settings screen. */
+export function splitArea(text: string): { towns: string[]; extra: string } {
+  let left = tokens(text);
+  const towns: string[] = [];
+  for (const t of NCR_TOWNS) {
+    const need = tokens(t.pincodes);
+    if (need.every((x) => left.includes(x))) { towns.push(t.name); left = left.filter((x) => !need.includes(x)); }
+  }
+  return { towns, extra: left.join(", ") };
+}
+export function joinArea(towns: string[], extra: string) {
+  return [...NCR_TOWNS.filter((t) => towns.includes(t.name)).map((t) => t.pincodes), extra.trim()].filter(Boolean).join("\n");
+}
 
 type Rule = { from: number; to: number };
 
