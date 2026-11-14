@@ -62,7 +62,7 @@ const PAGES: Record<string, Page> = {
     <h2>Return window</h2><p>You can request a return within {s.returnWindowDays} days of delivery from your order page. Items marked as non-returnable on the product page can&apos;t be returned. For hygiene reasons this usually includes briefs, trunks and women&apos;s innerwear, unless they arrive damaged or wrong.</p>
     <h2>Condition</h2><p>For hygiene reasons, items must be unused, unwashed and in their original packaging.</p>
     <h2>Damaged or wrong item</h2><p>If you received something damaged or incorrect, contact us {contactLine(s)} within 48 hours of delivery, with photos if possible.</p>
-    <h2>Refunds</h2><p>After we receive and check the return, refunds go to your original payment method. Banks usually take 5–7 working days to show the amount. For cash on delivery orders, we&apos;ll ask for your UPI or bank details.</p>
+    <h2>Refunds</h2><p>After we receive and check the return, refunds go to your original payment method. Banks usually take 5–7 working days to show the amount.{s.codEnabled ? " For cash on delivery orders, we'll ask for your UPI or bank details." : ""}</p>
     <h2>Cancellations</h2><p>You can cancel from your order page until it has been packed. Prepaid cancellations are refunded in full.</p>
   </> },
   "privacy-policy": { title: "Privacy policy", body: (s) => <>

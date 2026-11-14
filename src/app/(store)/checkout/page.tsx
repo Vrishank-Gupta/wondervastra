@@ -24,6 +24,7 @@ export default async function CheckoutPage() {
       live={razorpayConfigured()}
       testMode={razorpayTestMode()}
       codFee={settings.codFee}
+      codEnabled={settings.codEnabled}
       deliveryArea={areaLabel(settings)}
     />
   );

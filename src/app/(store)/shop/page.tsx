@@ -5,7 +5,7 @@ import { getActiveCategories, getAllCards } from "@/lib/catalog";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }): Promise<Metadata> {
   const sp = await searchParams;
-  const base: Metadata = { title: "Shop all thermals", description: "Shop 100% original kids' and men's thermals online in India from top brands at the lowest prices. Cash on delivery available.", alternates: { canonical: "/shop" } };
+  const base: Metadata = { title: "Shop all thermals", description: "Shop 100% original kids' and men's thermals online in India from top brands at the lowest prices. Secure UPI and card payments.", alternates: { canonical: "/shop" } };
   // Search results and filter combinations aren't indexed: endless near-duplicates. Links on them still count.
   return Object.keys(sp).length ? { ...base, robots: { index: false, follow: true } } : base;
 }

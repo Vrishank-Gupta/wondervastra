@@ -15,12 +15,12 @@ import { AreaWaitlist, lookupPin, rememberPin, savedPin, type PinResult } from "
 type Addr = { id: string; name: string; phone: string; line1: string; line2: string | null; city: string; state: string; pincode: string };
 type Props = {
   customer: { name: string | null; email: string | null; phone: string | null } | null;
-  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; deliveryArea: string; testMode?: boolean;
+  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; codEnabled: boolean; deliveryArea: string; testMode?: boolean;
 };
 declare global { interface Window { Razorpay?: new (o: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void } } }
 
 
-export function CheckoutClient({ customer, addresses, online, simulated, codFee, deliveryArea, testMode = false }: Props) {
+export function CheckoutClient({ customer, addresses, online, simulated, codFee, codEnabled, deliveryArea, testMode = false }: Props) {
   const { items, ready, coupon, clear, setCoupon, attribution } = useCart();
   const [email, setEmail] = useState(customer?.email ?? "");
   const [name, setName] = useState(customer?.name ?? addresses[0]?.name ?? "");
@@ -33,7 +33,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
   const [note, setNote] = useState("");
   const [optIn, setOptIn] = useState(true);
   const [saveAddr, setSaveAddr] = useState(true);
-  const [method, setMethod] = useState<"razorpay" | "cod">(online ? "razorpay" : "cod");
+  const [method, setMethod] = useState<"razorpay" | "cod">(online || !codEnabled ? "razorpay" : "cod");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pinNote, setPinNote] = useState("");
@@ -222,11 +222,11 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
                   <CreditCard size={20} aria-hidden /><span><b>Pay online</b><span className="block text-xs text-ink-soft">UPI, cards, netbanking, wallets via Razorpay</span></span>
                 </label>
               )}
-              <label className={`flex items-center gap-3 rounded-sm border p-3 ${quote && !quote.codAvailable ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${method === "cod" ? "border-ink bg-sand-soft" : "border-line"}`}>
+              {codEnabled && <label className={`flex items-center gap-3 rounded-sm border p-3 ${quote && !quote.codAvailable ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${method === "cod" ? "border-ink bg-sand-soft" : "border-line"}`}>
                 <input type="radio" name="pay" className="size-4 accent-ink" disabled={Boolean(quote && !quote.codAvailable)} checked={method === "cod"} onChange={() => setMethod("cod")} />
                 <Banknote size={20} aria-hidden /><span><b>Cash on delivery</b><span className="block text-xs text-ink-soft">{quote && !quote.codAvailable ? quote.codReason : codFee ? `${money(codFee)} handling fee` : "Pay when it arrives"}</span></span>
-              </label>
-              {!online && quote && !quote.codAvailable && <p className="text-sm font-medium text-clay" role="alert">Online payment isn&apos;t available right now. Please contact us to order.</p>}
+              </label>}
+              {!online && (!codEnabled || (quote && !quote.codAvailable)) && <p className="text-sm font-medium text-clay" role="alert">Online payment isn&apos;t available right now. Please contact us to order.</p>}
             </div>
           </section>
         </div>
