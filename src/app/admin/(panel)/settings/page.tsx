@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { emailConfigured, whatsappConfigured } from "@/lib/notifications";
 import { razorpayConfigured, razorpayTestMode } from "@/lib/razorpay";
+import { googleConfigured } from "@/lib/customer-auth";
 import { getSettingsFresh } from "@/lib/settings";
 import { siteUrl } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export default async function Settings() {
   const conn = [
     { name: "Online payments (UPI, cards)", on: razorpayConfigured(), test: razorpayTestMode(), what: "Customers can pay online through Razorpay.", off: "Until this is on, customers can only pay cash on delivery. Needs your Razorpay account to be approved.", keys: "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" },
     { name: "Order emails", on: emailConfigured(), what: "Customers get emails when they order and when it ships.", off: "Customers won't get order emails yet.", keys: "RESEND_API_KEY, EMAIL_FROM" },
+    { name: "Log in with Google", on: googleConfigured(), what: "Customers can log in with one tap using their Google account.", off: "Customers log in with an email code or a password. Google login needs a free Google Cloud setup.", keys: "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (redirect URL: /api/auth/google/callback)" },
     { name: "Automatic WhatsApp messages", on: whatsappConfigured(), what: "Order updates go out on WhatsApp by themselves.", off: "You can still send each update with one tap from the order page.", keys: "WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID" },
   ];
   return (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart, LogOut, MapPin, Package } from "lucide-react";
+import { Heart, KeyRound, LogOut, MapPin, Package } from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import { logout } from "../login/actions";
 
@@ -14,6 +14,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
         <Link className={link} href="/account"><Package size={15} aria-hidden /> Orders</Link>
         <Link className={link} href="/account/wishlist"><Heart size={15} aria-hidden /> Wishlist</Link>
         <Link className={link} href="/account/addresses"><MapPin size={15} aria-hidden /> Addresses</Link>
+        <Link className={link} href="/account/security"><KeyRound size={15} aria-hidden /> Login &amp; security</Link>
         <form action={logout}><button className={link}><LogOut size={15} aria-hidden /> Log out</button></form>
       </nav>
       {children}

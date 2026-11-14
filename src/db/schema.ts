@@ -159,6 +159,10 @@ export const customers = sqliteTable("customers", {
   name: text("name"),
   email: text("email").unique(),
   phone: text("phone").unique(),
+  /** Set only after the customer proved the email with a code; null = code or Google login only. */
+  passwordHash: text("password_hash"),
+  /** Google account id ("sub"), linked automatically when Google confirms the same email. */
+  googleSub: text("google_sub").unique(),
   whatsappOptIn: bool("whatsapp_opt_in").notNull().default(true),
   blocked: bool("blocked").notNull().default(false),
   adminNote: text("admin_note"),

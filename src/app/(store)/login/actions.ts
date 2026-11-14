@@ -1,9 +1,11 @@
 "use server";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { checkOtp, clientIp, createSession, destroySession, issueOtp, rateLimit } from "@/lib/auth";
+import { checkOtp, clientIp, destroySession, getCustomer, issueOtp, rateLimit } from "@/lib/auth";
+import { customerByEmail, findOrCreateByEmail, finishLogin, passwordProblem } from "@/lib/customer-auth";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
 import { emailConfigured, sendOtpMessage, whatsappConfigured } from "@/lib/notifications";
-import { devConveniences, newId, normalizeEmail, normalizePhone, safeNext } from "@/lib/utils";
+import { devConveniences, newId, normalizeEmail, normalizePhone } from "@/lib/utils";
 import { redirect } from "next/navigation";
 
 function parse(input: string) {
@@ -34,27 +36,82 @@ export async function verifyOtp(identifier: string, code: string, next: string):
   if (!(await rateLimit(`verify:${ip}`, 30, 15 * 60_000))) return { error: "Too many attempts. Please wait a few minutes." };
   if (!(await checkOtp(identifier, code))) return { error: "That code isn't right, or it has expired." };
   const isEmail = identifier.includes("@");
-  const col = isEmail ? schema.customers.email : schema.customers.phone;
-  let [c] = await db.select().from(schema.customers).where(eq(col, identifier));
-  if (!c) {
-    const id = newId();
-    await db.insert(schema.customers).values({ id, email: isEmail ? identifier : null, phone: isEmail ? null : identifier });
-    [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, id));
+  let c;
+  if (isEmail) c = await findOrCreateByEmail(identifier);
+  else {
+    [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, identifier));
+    if (!c) {
+      const id = newId();
+      await db.insert(schema.customers).values({ id, phone: identifier });
+      [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, id));
+    }
   }
-  if (c.blocked) return { error: "This account has been disabled. Please contact us." };
-  await db.update(schema.customers).set({ lastLoginAt: Date.now() }).where(eq(schema.customers.id, c.id));
-  await createSession("customer", c.id);
-  // A wishlist tap that sent them here is completed now, then they land back where they were.
-  let dest = safeNext(next);
-  const u = new URL(dest, "https://x.invalid");
-  const wish = u.searchParams.get("wish");
-  if (wish) {
-    const [p] = await db.select({ id: schema.products.id }).from(schema.products).where(and(eq(schema.products.id, wish), eq(schema.products.status, "active")));
-    if (p) await db.insert(schema.wishlist).values({ customerId: c.id, productId: p.id }).onConflictDoNothing();
-    u.searchParams.delete("wish");
-    dest = u.pathname + (u.search || "");
+  const r = await finishLogin(c, next);
+  if (r.error) return r;
+  redirect(r.dest!);
+}
+
+/* ---------- email + password ---------- */
+
+const WRONG = "That email and password don't match. Try again, or log in with a code.";
+export async function passwordLogin(emailInput: string, password: string, next: string): Promise<{ error?: string }> {
+  const email = normalizeEmail(emailInput);
+  if (!email || !password) return { error: "Enter your email and password." };
+  const ip = await clientIp();
+  if (!(await rateLimit(`pw:ip:${ip}`, 20, 15 * 60_000)) || !(await rateLimit(`pw:id:${email}`, 10, 15 * 60_000))) {
+    return { error: "Too many tries. Please wait 15 minutes, or log in with an email code." };
   }
-  redirect(dest);
+  const c = await customerByEmail(email);
+  if (!c?.passwordHash) {
+    // Same wording either way, so the form can't be used to find out who has an account.
+    return { error: c ? "This account doesn't have a password yet. Log in with an email code, or use “Forgot password?” to set one." : WRONG };
+  }
+  if (!(await verifyPassword(password, c.passwordHash))) return { error: WRONG };
+  const r = await finishLogin(c, next);
+  if (r.error) return r;
+  redirect(r.dest!);
+}
+
+/** Sign-up and "forgot password" both start by emailing a code: only the owner of the email can set its password. */
+export async function sendEmailCode(emailInput: string, purpose: "signup" | "reset"): Promise<{ error?: string; email?: string; devCode?: string }> {
+  const email = normalizeEmail(emailInput);
+  if (!email) return { error: "Enter a valid email address." };
+  if (purpose === "signup") {
+    const c = await customerByEmail(email);
+    if (c?.passwordHash) return { error: "You already have an account with this email. Log in, or use “Forgot password?”." };
+  }
+  const r = await requestOtp(email);
+  return r.error ? { error: r.error } : { email, devCode: r.devCode };
+}
+
+export async function completeEmailCode(input: { email: string; code: string; password: string; name?: string; next: string }): Promise<{ error?: string }> {
+  const email = normalizeEmail(input.email);
+  if (!email) return { error: "Enter a valid email address." };
+  const problem = passwordProblem(input.password);
+  if (problem) return { error: problem };
+  const ip = await clientIp();
+  if (!(await rateLimit(`verify:${ip}`, 30, 15 * 60_000))) return { error: "Too many attempts. Please wait a few minutes." };
+  if (!(await checkOtp(email, input.code))) return { error: "That code isn't right, or it has expired." };
+  const name = input.name?.trim().slice(0, 80) || null;
+  const c = await findOrCreateByEmail(email, { name });
+  await db.update(schema.customers).set({ passwordHash: await hashPassword(input.password), name: c.name ?? name }).where(eq(schema.customers.id, c.id));
+  // A new password signs out every other device.
+  await db.delete(schema.sessions).where(and(eq(schema.sessions.subjectType, "customer"), eq(schema.sessions.subjectId, c.id)));
+  const r = await finishLogin(c, input.next);
+  if (r.error) return r;
+  redirect(r.dest!);
+}
+
+/** From the account page: add a password, or change it (the current one is needed if there is one). */
+export async function setAccountPassword(current: string, next: string): Promise<{ error?: string; ok?: boolean }> {
+  const c = await getCustomer();
+  if (!c) return { error: "Please log in again." };
+  const problem = passwordProblem(next);
+  if (problem) return { error: problem };
+  if (!(await rateLimit(`pwset:${c.id}`, 10, 15 * 60_000))) return { error: "Too many tries. Please wait a few minutes." };
+  if (c.passwordHash && !(await verifyPassword(current, c.passwordHash))) return { error: "Your current password isn't right." };
+  await db.update(schema.customers).set({ passwordHash: await hashPassword(next) }).where(eq(schema.customers.id, c.id));
+  return { ok: true };
 }
 
 export async function logout() {
@@ -63,7 +120,6 @@ export async function logout() {
 }
 
 export async function updateName(name: string) {
-  const { getCustomer } = await import("@/lib/auth");
   const c = await getCustomer();
   if (c) await db.update(schema.customers).set({ name: name.slice(0, 80) }).where(eq(schema.customers.id, c.id));
 }

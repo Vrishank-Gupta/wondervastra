@@ -43,6 +43,13 @@
       "when": 1794663558008,
       "tag": "0005_size_heights",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794668307182,
+      "tag": "0006_customer_logins",
+      "breakpoints": true
     }
   ]
 }

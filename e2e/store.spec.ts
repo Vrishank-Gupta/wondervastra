@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { createServer } from "node:http";
 import { createClient } from "@libsql/client";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import sharp from "sharp";
@@ -275,7 +276,7 @@ test("buyer logs in with an OTP and sees past orders, can't see anyone else's", 
 
   await page.goto("/account");
   await page.waitForURL("**/login**");
-  await page.getByLabel("Mobile number or email").fill(b.email);
+  await page.getByLabel("Email or mobile number").fill(b.email);
   await page.getByRole("button", { name: "Send login code" }).click();
   await page.getByLabel("6-digit code").fill("000000");
   await page.getByRole("button", { name: "Log in" }).click();
@@ -570,7 +571,7 @@ test("listings: drafts are flagged and several can be published at once", async 
 test("security: login can't redirect off-site; coupon guessing and alerts for hidden items are refused", async ({ page, request }) => {
   // Open redirect: a crafted "next" lands on the account page, never another site.
   await page.goto("/login?next=" + encodeURIComponent("/\\example.com"));
-  await page.getByLabel("Mobile number or email").fill("redirect@example.com");
+  await page.getByLabel("Email or mobile number").fill("redirect@example.com");
   await page.getByRole("button", { name: "Send login code" }).click();
   const code = (await page.getByText(/your code is/).textContent())!.match(/\d{6}/)![0];
   await page.getByLabel("6-digit code").fill(code);
@@ -734,7 +735,7 @@ test("round 2: wishlist survives login, real states only, discount typos refused
   await page.goto("/p/rupa-girls-thermal-top");
   await page.getByRole("button", { name: /wishlist/i }).first().click();
   await page.waitForURL(/\/login\?next=/);
-  await page.getByLabel("Mobile number or email").fill("wish.qa@example.com");
+  await page.getByLabel("Email or mobile number").fill("wish.qa@example.com");
   await page.getByRole("button", { name: "Send login code" }).click();
   const code = (await page.getByText(/your code is/).textContent())!.match(/\d{6}/)![0];
   await page.getByLabel("6-digit code").fill(code);
@@ -921,4 +922,126 @@ test("kids' sizes show age and height together, set per listing", async ({ page 
   await page.getByText("Size guide").click();
   await expect(page.getByRole("cell", { name: "92–104 cm" })).toBeVisible();
   await db.execute({ sql: "update products set size_heights='{}' where id=?", args: [prod.id] });
+});
+
+test("one account per email: email code, password sign-up, password login, forgot password and Google", async ({ page, browser }) => {
+  const email = "same.person@example.com";
+  const accountsFor = async (e: string) => rows("select * from customers where email=?", [e]);
+  const codeOnPage = async () => (await page.getByText(/your code is/).textContent())!.match(/\d{6}/)![0];
+  const logout = async () => { await page.goto("/account"); await page.getByRole("button", { name: "Log out" }).click(); await page.waitForURL((u) => u.pathname === "/"); };
+
+  // 1. Email code: creates the account.
+  await page.goto("/login");
+  await page.getByLabel("Email or mobile number").fill(email);
+  await page.getByRole("button", { name: "Send login code" }).click();
+  await page.getByLabel("6-digit code").fill(await codeOnPage());
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.waitForURL("**/account");
+  const [first] = await accountsFor(email);
+  expect(first.password_hash).toBeNull();
+  await logout();
+
+  // 2. Password sign-up with the same email: proves the email with a code, then adds a password to the SAME account.
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Same Person");
+  await page.getByLabel("Email").fill(email.toUpperCase());
+  await page.getByLabel("Choose a password").fill("short");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText("Use at least 8 characters for your password.")).toBeVisible();
+  await page.getByLabel("Choose a password").fill("warm-thermals-1");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("6-digit code").fill("000000");
+  await page.getByRole("button", { name: "Confirm and create account" }).click();
+  await expect(page.getByText(/isn't right/)).toBeVisible();
+  await page.getByLabel("6-digit code").fill(await codeOnPage());
+  await page.getByRole("button", { name: "Confirm and create account" }).click();
+  await page.waitForURL("**/account");
+  await expect(page.getByRole("heading", { name: "Hello, Same" })).toBeVisible();
+  let accounts = await accountsFor(email);
+  expect(accounts).toHaveLength(1);
+  expect(accounts[0].id).toBe(first.id);
+  expect(accounts[0].password_hash).toBeTruthy();
+  await logout();
+
+  // Signing up again with that email is refused politely.
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Someone");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Choose a password").fill("another-pass-1");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(/already have an account with this email/)).toBeVisible();
+
+  // 3. Email + password login.
+  await page.goto("/login?next=/account/security");
+  await page.getByRole("button", { name: "Log in with a password instead" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill("wrong-password");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page.getByText(/email and password don't match/)).toBeVisible();
+  await page.getByLabel("Password", { exact: true }).fill("warm-thermals-1");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.waitForURL("**/account/security");
+  await expect(page.getByText("Log in with your email and password.")).toBeVisible();
+  await logout();
+
+  // 4. Forgot password: a code plus a new password, then logged straight in.
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Log in with a password instead" }).click();
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("6-digit code").fill(await codeOnPage());
+  await page.getByLabel("New password").fill("new-thermals-2");
+  await page.getByRole("button", { name: "Save password and log in" }).click();
+  await page.waitForURL("**/account");
+  await logout();
+
+  // 5. Google with the same (verified) email links to the same account. A fake Google stands in for the real one.
+  let claims: Record<string, unknown> = {};
+  const fake = createServer((req, res) => {
+    const u = new URL(req.url!, "http://127.0.0.1:3199");
+    if (u.pathname === "/auth") {
+      expect(u.searchParams.get("client_id")).toBe("e2e-google-client");
+      expect(u.searchParams.get("code_challenge_method")).toBe("S256");
+      res.writeHead(302, { Location: `${u.searchParams.get("redirect_uri")}?code=fake-code&state=${u.searchParams.get("state")}` }).end();
+    } else if (u.pathname === "/token") {
+      const part = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+      const idToken = `${part({ alg: "none" })}.${part({ iss: "https://accounts.google.com", aud: "e2e-google-client", exp: Math.floor(Date.now() / 1000) + 600, ...claims })}.sig`;
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ id_token: idToken }));
+    } else res.writeHead(404).end();
+  });
+  await new Promise<void>((r) => fake.listen(3199, "127.0.0.1", () => r()));
+  try {
+    claims = { sub: "google-123", email, email_verified: true, name: "Same Person G" };
+    await page.goto("/login?next=/account/security");
+    await page.getByRole("link", { name: "Continue with Google" }).click();
+    await page.waitForURL("**/account/security");
+    await expect(page.getByText(/Linked\. “Continue with Google” opens this account\./)).toBeVisible();
+    accounts = await accountsFor(email);
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0].id).toBe(first.id);
+    expect(accounts[0].google_sub).toBe("google-123");
+    await logout();
+
+    // A new Google user gets a new account with their name; an unverified Google email is refused.
+    claims = { sub: "google-456", email: "new.google@example.com", email_verified: true, name: "Nita Google" };
+    await page.goto("/signup");
+    await page.getByRole("link", { name: "Sign up with Google" }).click();
+    await page.waitForURL("**/account");
+    await expect(page.getByRole("heading", { name: "Hello, Nita" })).toBeVisible();
+    await logout();
+    claims = { sub: "google-789", email: "unverified@example.com", email_verified: false };
+    await page.goto("/login");
+    await page.getByRole("link", { name: "Continue with Google" }).click();
+    await expect(page.getByText(/Google email isn't verified/)).toBeVisible();
+    expect(await accountsFor("unverified@example.com")).toHaveLength(0);
+
+    // A forged return from "Google" without the matching one-time state is refused.
+    const other = await browser.newPage();
+    await other.goto("http://localhost:3100/api/auth/google/callback?code=fake-code&state=forged");
+    await expect(other.getByText("Google sign-in expired. Please try again.")).toBeVisible();
+    await other.close();
+  } finally {
+    fake.close();
+  }
 });
