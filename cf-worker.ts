@@ -8,11 +8,13 @@ import handler from "./.open-next/worker.js";
 type Env = { CRON_SECRET?: string; NEXT_PUBLIC_SITE_URL?: string };
 
 export default {
-  // One address for the shop: www.wondervastra.in → wondervastra.in, keeping the path.
+  // One secure address for the shop: http:// → https://, and www.wondervastra.in → wondervastra.in, keeping the path.
   fetch(req: Request, env: Env, ctx: unknown) {
     const url = new URL(req.url);
-    if (url.hostname.startsWith("www.")) {
-      url.hostname = url.hostname.slice(4);
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (!local && (url.protocol === "http:" || url.hostname.startsWith("www."))) {
+      url.protocol = "https:";
+      if (url.hostname.startsWith("www.")) url.hostname = url.hostname.slice(4);
       return Response.redirect(url.toString(), 301);
     }
     return handler.fetch(req, env, ctx);
