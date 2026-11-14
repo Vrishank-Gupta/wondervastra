@@ -2,6 +2,7 @@ node_modules
 .next
 .env
 .env.local
+.env*.local
 data/
 *.db
 *.db-*
@@ -13,3 +14,6 @@ next-env.d.ts
 .next-e2e-prod
 .next-preview
 preview/
+.open-next/
+.wrangler/
+.dev.vars
