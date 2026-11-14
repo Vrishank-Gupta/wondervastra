@@ -1,0 +1,34 @@
+import { CartProvider } from "@/components/store/cart-context";
+import { CartDrawer } from "@/components/store/cart-drawer";
+import { Footer, WhatsAppFab } from "@/components/store/footer";
+import { Header, MobileTabBar } from "@/components/store/header";
+import { getCustomer } from "@/lib/auth";
+import { getActiveCategories, getLiveOffers, getLiveSales } from "@/lib/catalog";
+import { money } from "@/lib/format";
+import { getSettings } from "@/lib/settings";
+import { PREVIEW_MESSAGE, previewMode } from "@/lib/preview";
+
+export default async function StoreLayout({ children }: { children: React.ReactNode }) {
+  const [settings, categories, customer, offers, sales] = await Promise.all([getSettings(), getActiveCategories(), getCustomer(), getLiveOffers(), getLiveSales()]);
+  // The seller's own message leads; live sales and cart offers fill the scrolling bar.
+  const announcements = [
+    settings.announcement,
+    "100% original brands at the lowest prices",
+    ...sales.map((s) => `${s.name}: ${s.type === "percent" ? `${s.value}% off` : `${money(s.value)} off`} selected styles`),
+    ...[...offers].sort((a, b) => a.minSubtotal - b.minSubtotal).map((o) => o.type === "free_shipping" ? `Free delivery above ${money(o.minSubtotal)}` : o.name),
+    settings.codEnabled ? "Cash on delivery available" : null,
+    "Order updates on WhatsApp",
+  ].filter(Boolean) as string[];
+  const nav = categories.map((c) => ({ name: c.name, slug: c.slug, comingSoon: c.comingSoon }));
+  return (
+    <CartProvider>
+      {previewMode() && <div className="bg-madder px-4 py-2 text-center text-xs font-bold tracking-[0.08em] text-white uppercase">{PREVIEW_MESSAGE}</div>}
+      <Header categories={nav} announcements={announcements} loggedIn={Boolean(customer)} />
+      <main>{children}</main>
+      <Footer categories={nav} settings={settings} />
+      <MobileTabBar loggedIn={Boolean(customer)} />
+      <WhatsAppFab number={settings.whatsappNumber} />
+      <CartDrawer />
+    </CartProvider>
+  );
+}
