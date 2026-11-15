@@ -29,10 +29,11 @@ export function facetsFrom(cards: ProductCard[]): FacetData {
   // Sizes in natural order: baby months, then kids' years, then adult sizes; anything custom at the end.
   const order = [...SIZE_SETS.baby, ...SIZE_SETS.kids, ...SIZE_SETS.men, ...SIZE_SETS.women, ...SIZE_SETS.free] as string[];
   const ADULT = ["XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL", "4XL"];
+  // Kids' ages youngest first (months before years), then adult sizes S → XXL, then anything else.
   const rank = (s: string) => {
-    const i = order.indexOf(s); if (i >= 0) return i;
-    const age = s.match(/^(\d+)/); if (age) return 1000 + Number(age[1]) * (/\bM\b/.test(s) ? 1 : 12);
-    const a = ADULT.indexOf(s); return a >= 0 ? 5000 + a : 9000;
+    const age = s.match(/^(\d+)/); if (age) return 1000 + Number(age[1]) * (/\bM\b/.test(s) ? 1 : 12) + (s.match(/[–-](\d+)/) ? Number(s.match(/[–-](\d+)/)![1]) / 100 : 0);
+    const a = ADULT.indexOf(s); if (a >= 0) return 5000 + a;
+    const i = order.indexOf(s); return i >= 0 ? 8000 + i : 9000;
   };
   return { brands: [...brands].map(([slug, name]) => ({ slug, name })).sort((a, b) => a.name.localeCompare(b.name)), colors: [...colors].map(([name, hex]) => ({ name, hex })), sizes: [...sizes].sort((a, b) => rank(a) - rank(b)), maxPrice: Math.max(0, ...cards.map((c) => c.price)) };
 }
