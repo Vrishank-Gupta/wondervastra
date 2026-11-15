@@ -1,7 +1,7 @@
 "use server";
 import { headers } from "next/headers";
 import { rateLimit } from "@/lib/auth";
-import { dispatch, renderEmail } from "@/lib/notifications";
+import { contactEmail, dispatch } from "@/lib/notifications";
 import { escapeHtml } from "@/lib/utils";
 import { getSettings } from "@/lib/settings";
 
@@ -24,15 +24,8 @@ export async function sendContactMessage(input: { name: string; email: string; p
     event: "contact_message",
     email: {
       to, replyTo: f.email,
-      subject: `Message from ${f.name}${f.order ? ` about ${f.order}` : ""}`,
-      html: renderEmail({
-        heading: "New message from the website",
-        lines: [
-          `<b>${escapeHtml(f.name)}</b> · ${escapeHtml(f.email)}${f.phone ? ` · ${escapeHtml(f.phone)}` : ""}${f.order ? `<br>Order: <b>${escapeHtml(f.order)}</b>` : ""}`,
-          `<div style="white-space:pre-wrap;border-left:3px solid #ddd;padding-left:10px">${escapeHtml(f.message)}</div>`,
-          "Reply to this email to answer the customer.",
-        ],
-      }, "Contact form"),
+      subject: contactEmail(f).subject,
+      html: contactEmail(f).html,
     },
   });
   return { ok: true };

@@ -34,7 +34,12 @@ export async function processStockAlerts(productId: string, launch = false): Pro
       .where(and(eq(stockAlerts.id, a.id), eq(stockAlerts.status, "waiting")));
     if (!res.rowsAffected) continue;
     if (manual) out.manual++;
-    else { out.sent++; await sendBackInStock(a, p.name, p.slug, launch); }
+    else {
+      out.sent++;
+      const img = (await db.select({ url: schema.productImages.url }).from(schema.productImages).where(eq(schema.productImages.productId, p.id)).orderBy(schema.productImages.sortOrder).limit(1))[0]?.url ?? null;
+      const cheapest = vars.filter((v) => v.stock > 0).sort((x, y) => (x.price ?? p.price) - (y.price ?? p.price))[0];
+      await sendBackInStock(a, p.name, p.slug, launch, { image: img, price: cheapest?.price ?? p.price, mrp: cheapest?.mrp ?? p.compareAtPrice });
+    }
   }
   return out;
 }

@@ -36,6 +36,8 @@ export const DEFAULT_SETTINGS = {
   adminAlertEmail: "",
   /** A 9 am email to adminAlertEmail: orders to pack, pickups, returns, stock, yesterday, Delhivery wallet. */
   dailySummary: true,
+  /** A second inbox that also gets every new-order email (after payment succeeds). */
+  orderCopyEmail: "",
   /** Delhivery: the pickup address name exactly as saved in Delhivery One, its pincode, and parcel defaults. */
   /** Seasonal look: light snowfall on the home banner and snowflakes in the top banner. */
   winterLook: true,

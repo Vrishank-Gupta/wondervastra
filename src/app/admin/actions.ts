@@ -588,7 +588,7 @@ const SettingsInput = z.object({
   gstin: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, "That doesn't look like a GSTIN (15 characters)")]),
   shippingCombine: z.enum(["highest", "sum"]), defaultDeliveryCharge: money, codEnabled: z.boolean(), codFee: money, codMaxOrder: money,
   dispatchDays: days, deliveryDaysMin: days, deliveryDaysMax: days, returnWindowDays: days,
-  orderFeedbackEnabled: z.boolean(), deliveryFeedbackEnabled: z.boolean(), adminAlertEmail: email, dailySummary: z.boolean(),
+  orderFeedbackEnabled: z.boolean(), deliveryFeedbackEnabled: z.boolean(), adminAlertEmail: email, dailySummary: z.boolean(), orderCopyEmail: email,
   whatsappGroupUrl: z.union([z.literal(""), z.string().trim().max(200).regex(/^https:\/\/(chat\.whatsapp\.com\/[A-Za-z0-9]+|(www\.)?whatsapp\.com\/channel\/[A-Za-z0-9]+)\/?$/, "Paste the invite link from WhatsApp (it starts with https://chat.whatsapp.com/ or https://whatsapp.com/channel/)")]),
   supportHours: text(60), deliveryAreaName: text(40), winterLook: z.boolean(),
   delhiveryPickupName: text(100), delhiveryPickupPin: z.union([z.literal(""), z.string().trim().regex(/^[1-9]\d{5}$/, "Enter the 6-digit pincode of your pickup address")]),
