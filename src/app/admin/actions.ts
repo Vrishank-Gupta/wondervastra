@@ -362,6 +362,11 @@ export async function setOrderStatus(orderId: string, next: OrderStatus, opts: {
   try {
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     if (!o) return { error: "Order not found" };
+    // A booked Delhivery shipment is cancelled with the order, so no courier turns up for it.
+    if (next === "cancelled" && o.courier === "Delhivery" && o.awb && ["confirmed", "packed"].includes(o.status)) {
+      const { cancelDelhivery } = await import("@/lib/shipping");
+      await cancelDelhivery(orderId, a.name).catch((e) => { throw new Error(`Couldn't cancel the Delhivery shipment first: ${(e as Error).message}`); });
+    }
     await changeOrderStatus(orderId, next, { actor: a.name, note: opts.note, restock: opts.restock });
     await audit(a, "status", "order", orderId, `${o.number}: ${o.status} → ${next}`, { status: o.status }, { status: next, ...opts });
     revalidatePath(`/admin/orders/${orderId}`);

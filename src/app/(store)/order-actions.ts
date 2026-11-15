@@ -45,7 +45,8 @@ export async function requestReturnAction(token: string, input: { reason: string
   if (!picked.length) return { error: "Choose the items you want to return." };
   if (!reason) return { error: "Please pick a reason." };
   // Only photos uploaded through our return form: our image host or local media.
-  const ok = (u: unknown) => typeof u === "string" && (/^https:\/\/res\.cloudinary\.com\//.test(u) || /^\/media\/[\w-]+\.jpg$/.test(u));
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  const ok = (u: unknown) => typeof u === "string" && ((cloud && u.startsWith(`https://res.cloudinary.com/${cloud}/`)) || /^\/media\/[\w-]+\.jpg$/.test(u));
   const photos = (Array.isArray(input.photos) ? input.photos : []).filter(ok).slice(0, 5) as string[];
   if (!photos.length) return { error: "Add at least one photo of the items you're returning." };
   if (input.confirmed !== true) return { error: "Please confirm the items are unused, unwashed, undamaged and in their original packaging." };

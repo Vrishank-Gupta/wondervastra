@@ -211,7 +211,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               <Camera aria-hidden />Take photo
             </button>
           </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden aria-label="Add photos" onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = ""; }} />
           <input ref={camRef} type="file" accept="image/*" capture="environment" hidden aria-label="Take a photo" onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = ""; }} />
           <p className="mt-2 text-xs text-ink-soft">Pick several at once. JPG, PNG, WebP or HEIC, up to 10 MB each. Photos are resized and location data is removed automatically. {f.images.some((i) => i.url.startsWith("/seed/")) && <b className="text-ink">Photos marked “Sample” are placeholders: replace them with your own.</b>}</p>
         </Step>
