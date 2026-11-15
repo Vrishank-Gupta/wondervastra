@@ -23,7 +23,7 @@ function faqItems(s: StoreSettings): { q: string; a: string }[] {
       ? { q: "Where do you deliver?", a: `We deliver across ${areaPhrase(s)} for now. Enter your pincode on any product page to check. If we don't reach you yet, leave your number there and we'll tell you as soon as we do.` }
       : { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners, and delivery is free on every order." },
     { q: "When will my order arrive?", a: `We dispatch within ${s.dispatchDays} working days, and delivery usually takes ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after that depending on your location.` },
-    { q: "What sizes do kids' thermals come in?", a: "Kids' warmers come in sizes from 6–18 months (45 cm) to 10–11 years (75 cm). The number is the chest of the top in cm, and each listing has a size guide with ages for tops and bottoms. Kids' wear is sold in twos: mix any sizes, tops and trousers." },
+    { q: "What sizes do kids' thermals come in?", a: "Kids' warmers fit ages 2 to 11 years, in sizes 45 to 75 cm. Each listing shows the age with every size and has the brand's size guide. Kids' wear is sold in twos: mix any sizes, tops and trousers." },
     { q: "Is delivery free?", a: "Yes, on every order, with no minimum." },
     { q: "How do I track my order?", a: `We'll send you a tracking link by ${channels()} when it ships. You can also use the Track Order page anytime.` },
     { q: "Can I cancel my order?", a: "Yes, from your order page, until it has been packed." },
