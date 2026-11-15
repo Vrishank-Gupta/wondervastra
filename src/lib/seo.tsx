@@ -4,7 +4,7 @@
  * and common questions (FAQPage). Keep it truthful: it must match what the page shows.
  */
 import type { StoreSettings } from "./settings";
-import { siteUrl } from "./utils";
+import { siteUrl, withBrand } from "./utils";
 import { areaLabel, parsePincodes, splitArea } from "./delivery-area";
 
 export function JsonLd({ data }: { data: object | object[] }) {
@@ -111,7 +111,7 @@ export function itemList(name: string, products: { name: string; slug: string; b
     "@type": "ItemList",
     name,
     numberOfItems: products.length,
-    itemListElement: products.slice(0, 50).map((p, i) => ({ "@type": "ListItem", position: i + 1, url: abs(`/p/${p.slug}`), name: p.brandName ? `${p.brandName} ${p.name}` : p.name })),
+    itemListElement: products.slice(0, 50).map((p, i) => ({ "@type": "ListItem", position: i + 1, url: abs(`/p/${p.slug}`), name: withBrand(p.name, p.brandName) })),
   };
 }
 

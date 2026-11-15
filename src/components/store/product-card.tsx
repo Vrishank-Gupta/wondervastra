@@ -1,4 +1,5 @@
 "use client";
+import { withBrand } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -31,7 +32,7 @@ export function ProductCard({ p, priority = false, wished = false }: { p: Card; 
   return (
     <article className="group relative flex min-w-0 flex-col">
       <div className="relative aspect-[4/5] overflow-hidden bg-sand-soft">
-        <Link href={`/p/${p.slug}`} aria-label={p.brandName ? `${p.brandName} ${p.name}` : p.name} className="absolute inset-0 block">
+        <Link href={`/p/${p.slug}`} aria-label={withBrand(p.name, p.brandName)} className="absolute inset-0 block">
           {img && <Image src={img.url} alt={img.alt ?? p.name} fill priority={priority} sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className={`object-cover transition duration-500 group-hover:scale-[1.03] ${hoverImg ? "group-hover:opacity-0" : ""} ${p.inStock ? "" : "opacity-70"}`} />}
           {hoverImg && <Image src={hoverImg.url} alt="" fill sizes="25vw" className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100" />}
         </Link>

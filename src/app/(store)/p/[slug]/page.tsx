@@ -13,7 +13,7 @@ import { areaLabel } from "@/lib/delivery-area";
 import { offerTiers } from "@/lib/pricing";
 import { formatDate, money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
-import { siteUrl } from "@/lib/utils";
+import { siteUrl, withBrand } from "@/lib/utils";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!d) return { title: "Not found" };
   const { product: p, images, variants, brand } = d;
   const price = variants.length ? Math.min(...variants.map((v) => v.price)) : p.price;
-  const fullName = brand ? `${brand.name} ${p.name}` : p.name;
+  const fullName = withBrand(p.name, brand?.name);
   const title = p.seoTitle || `${fullName} · ${money(price)}`;
   const description = p.seoDescription || p.shortDescription || `Shop ${fullName} at WonderVastra.`;
   return {
@@ -46,7 +46,7 @@ export default async function ProductPage({ params }: Props) {
   const minPrice = variants.length ? Math.min(...variants.map((v) => v.price)) : p.price;
 
   const maxPrice = variants.length ? Math.max(...variants.map((v) => v.price)) : p.price;
-  const fullName = brand ? `${brand.name} ${p.name}` : p.name;
+  const fullName = withBrand(p.name, brand?.name);
   const url = `${siteUrl()}/p/${p.slug}`;
   const inStock = !p.comingSoon && !p.forceOutOfStock && variants.some((v) => v.stock > 0);
   const saleEnds = variants.find((v) => v.saleEndsAt)?.saleEndsAt;

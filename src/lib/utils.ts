@@ -54,3 +54,8 @@ export function waLink(number: string, text?: string) {
   const n = number.replace(/\D/g, "").replace(/^0(?=[6-9]\d{9}$)/, "").replace(/^(?=[6-9]\d{9}$)/, "91");
   return `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 }
+
+/** "Comfy Kids' Warmer" → "Amul Comfy Kids' Warmer", without doubling a brand the name already starts with. */
+export function withBrand(name: string, brand?: string | null) {
+  return brand && !name.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${name}` : name;
+}

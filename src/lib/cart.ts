@@ -23,9 +23,8 @@ export function belowMinimum(p: SetListing, pieces: number, cartValue: number) {
 }
 
 /** Cart lines, orders and invoices carry the brand, so "Lux Cozi Cotton Vest" is clear long after purchase. */
-export function withBrand(name: string, brand?: string | null) {
-  return brand && !name.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${name}` : name;
-}
+import { withBrand } from "./utils";
+export { withBrand };
 
 export function variantLabel(p: { option1Label: string; option2Label: string }, v: { option1: string; option2: string }) {
   const parts: string[] = [];
