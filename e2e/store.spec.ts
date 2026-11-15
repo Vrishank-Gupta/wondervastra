@@ -1082,6 +1082,17 @@ test("thermal warmers: MRP per size, and Top / Bottom / Set where a set takes on
     expect(q.mrpTotal).toBe(71000);
 
     await page.keyboard.press("Escape");
+
+    // Two top styles with one bottom: a set for each, each taking its own top.
+    await db.execute({ sql: "insert into variants (id, product_id, option1, option2, price, mrp, stock, active, sort_order) values ('e2e-w-v55', ?, '2–3 Y (55 cm)', 'V-neck top', 26000, 36000, 3, 1, 9)", args: [pid] });
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Set (V-neck top + Bottom)" })).toBeVisible();
+    await page.getByRole("button", { name: "Set (V-neck top + Bottom)" }).click();
+    await page.locator("#size-picker").getByRole("button", { name: "2–3 Y (55 cm)" }).click();
+    await expect(page.getByTestId("price")).toHaveText("₹510");
+    await db.execute("delete from variants where id='e2e-w-v55'");
+    await page.reload();
+
     await page.getByRole("button", { name: "Top", exact: true }).click();
     await page.locator("#size-picker").getByRole("button", { name: "4–5 Y (60 cm)" }).click();
     await expect(page.getByText("Only 3 pieces left")).toBeVisible();

@@ -81,36 +81,45 @@ function NotifyForm({ product, variant, soon = false, inStock = [], otherColors 
 
 /** A listing sold as separate Top and Bottom pieces also offers both together. A set has no stock of its own: it takes one of each piece. */
 export const SET = "Set (Top + Bottom)";
+/** Piece names that are a lower half; any name ending in "top" is an upper half ("Top", "V-neck top"). */
+const BOTTOM = /^(bottom|trousers?|lower)$/i;
+const TOP = /top$/i;
 
 export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [] }: Props) {
   const router = useRouter();
   const { add } = useCart();
   const sizes = useMemo(() => [...new Set(variants.map((v) => v.option1))], [variants]);
-  const colors = useMemo(() => {
+  // A listing sold as tops and a bottom also offers each top with the bottom as a set: "Set (Top + Bottom)".
+  const { colors, sets } = useMemo(() => {
     const m = new Map<string, string | null>();
     variants.forEach((v) => { if (v.option2 !== "Default") m.set(v.option2, v.colorHex); });
     const list = [...m].map(([name, hex]) => ({ name, hex }));
-    return m.has("Top") && m.has("Bottom") ? [{ name: SET, hex: null }, ...list] : list;
+    const bottom = list.find((c) => BOTTOM.test(c.name))?.name;
+    const sets = new Map<string, [string, string]>();
+    if (bottom) for (const c of list) if (TOP.test(c.name)) sets.set(`Set (${c.name} + ${bottom})`, [c.name, bottom]);
+    return { colors: [...[...sets.keys()].map((name) => ({ name, hex: null })), ...list], sets };
   }, [variants]);
-  const hasSet = colors[0]?.name === SET;
+  const isSet = (c: string) => sets.has(c);
+  const hasSet = sets.size > 0;
   // Text choices (Top / Bottom / Set) are shown as buttons, real colours as swatches.
   const asText = colors.length > 0 && colors.every((c) => !c.hex);
   /** The variant for a size and choice; for a set, a combined view of its top and bottom. */
   const pick = (s: string, c: string): Variant | null => {
-    if (c !== SET) return variants.find((v) => v.option1 === s && v.option2 === c) ?? null;
-    const t = variants.find((v) => v.option1 === s && v.option2 === "Top"), b = variants.find((v) => v.option1 === s && v.option2 === "Bottom");
+    const parts = sets.get(c);
+    if (!parts) return variants.find((v) => v.option1 === s && v.option2 === c) ?? null;
+    const t = variants.find((v) => v.option1 === s && v.option2 === parts[0]), b = variants.find((v) => v.option1 === s && v.option2 === parts[1]);
     if (!t || !b) return null;
-    return { ...t, id: `${t.id}+${b.id}`, option2: SET, stock: Math.min(t.stock, b.stock), price: t.price + b.price, mrp: t.mrp + b.mrp, saleEndsAt: t.saleEndsAt ?? b.saleEndsAt, saleName: t.saleName ?? b.saleName };
+    return { ...t, id: `${t.id}+${b.id}`, option2: c, stock: Math.min(t.stock, b.stock), price: t.price + b.price, mrp: t.mrp + b.mrp, saleEndsAt: t.saleEndsAt ?? b.saleEndsAt, saleName: t.saleName ?? b.saleName };
   };
   const first = variants.find((v) => v.stock > 0) ?? variants[0];
-  const [color, setColor] = useState(hasSet ? SET : first?.option2 ?? "Default");
+  const [color, setColor] = useState(hasSet ? colors[0].name : first?.option2 ?? "Default");
   /** Listings sold in twos start at two single pieces; a set is already two. */
-  const qtyFor = (c: string) => (c === SET ? 1 : Math.max(1, p.minPieces ?? 1));
+  const qtyFor = (c: string) => (isSet(c) ? 1 : Math.max(1, p.minPieces ?? 1));
   // Clothing: the buyer must choose a size themselves; guessing one leads to wrong-size orders and returns.
   const needsSize = sizes.length > 1;
   const [size, setSize] = useState(needsSize ? "" : first?.option1 ?? "Free size");
   const [sizeError, setSizeError] = useState(false);
-  const [qty, setQty] = useState(() => qtyFor(hasSet ? SET : first?.option2 ?? "Default"));
+  const [qty, setQty] = useState(() => qtyFor(hasSet ? colors[0].name : first?.option2 ?? "Default"));
   const [imgIdx, setImgIdx] = useState(0);
   const [heart, setHeart] = useState(wished);
   const [copied, setCopied] = useState(false);
@@ -143,7 +152,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   const buyNow = () => { if (choosing) return askSize(); if (variant) { addVariant(false); router.push("/checkout"); } };
   const addCart = () => { if (choosing) return askSize(); if (variant) { addVariant(true); setQty(qtyFor(color)); } };
   /** For "notify me" on a sold-out set: the piece that ran out. */
-  const alertVariant = variant && color === SET ? variants.find((v) => variant.id.split("+").includes(v.id) && v.stock === 0) ?? null : variant;
+  const alertVariant = variant && isSet(color) ? variants.find((v) => variant.id.split("+").includes(v.id) && v.stock === 0) ?? null : variant;
   const toggleWish = async () => {
     const next = !heart;
     setHeart(next);
@@ -191,7 +200,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
 
         {(p.minPieces ?? 1) > 1 && (
           <div className="mt-3 border border-dashed border-ink/40 bg-sand-soft p-3 text-sm" data-testid="combo">
-            <p><b>Sold in {p.minPieces}s.</b> Mix any sizes, tops and trousers{color === SET ? ", or take a set" : ""}.</p>
+            <p><b>Sold in {p.minPieces}s.</b> Mix any sizes, tops and trousers{isSet(color) ? ", or take a set" : ""}.</p>
             {p.comboAbove != null && <p className="mt-1 text-xs text-ink-soft">Cart over {money(p.comboAbove)}? Single pieces are fine too.</p>}
           </div>
         )}
@@ -249,7 +258,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
               {!choosing && p.showStockCount && (
                 <p className={`mb-3 flex items-center gap-2 text-sm ${low ? "text-clay" : "text-pine"}`}>
                   <span className={`size-1.5 rounded-full ${low ? "bg-clay" : "bg-pine"}`} aria-hidden />
-                  {color === SET
+                  {isSet(color)
                     ? low ? `Only ${variant!.stock} ${variant!.stock === 1 ? "set" : "sets"} left` : `${variant!.stock} sets available`
                     : low ? `Only ${variant!.stock} ${variant!.stock === 1 ? "piece" : "pieces"} left` : `${variant!.stock} pieces available`}
                 </p>
