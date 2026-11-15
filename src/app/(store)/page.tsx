@@ -49,7 +49,7 @@ export default async function Home() {
 
   const saleScope = sale ? (sale.scope === "all" ? "everything" : sale.scope === "category" ? categories.filter((c) => sale.targetIds.includes(c.id)).map((c) => c.name.toLowerCase()).join(" and ") || "selected styles" : sale.scope === "brand" ? brands.filter((b) => sale.targetIds.includes(b.id)).map((b) => b.name).join(" and ") || "selected brands" : "selected styles") : "";
   const slides: Slide[] = [
-    ...(categories.some((c) => c.slug === "kids-thermals" && !c.comingSoon) ? [{ key: "kids", eyebrow: "Baby (0+), boys & girls", title: "Kids' thermals",
+    ...(categories.some((c) => c.slug === "kids-thermals" && !c.comingSoon) ? [{ key: "kids", eyebrow: "Ages 2 to 11 · Amul, Dollar", title: "Kids' thermals",
       text: "Soft, warm layers for little ones. 100% original brands at the lowest prices.", cta: "Shop kids'", href: "/c/kids-thermals",
       ...bannerSrc("kids"), alt: "Baby in a white long-sleeve top and red beanie" }] : []),
     ...(sale ? [{
@@ -85,10 +85,16 @@ export default async function Home() {
       {(offers.length > 0 || shownCoupons.length > 0) && (
         <section aria-label="Offers" className="border-b border-line">
           <div className="container-x py-3"><div className="rail lg:grid lg:grid-flow-col lg:auto-cols-fr">
+            {offerTiers(offers).length > 0 && (
+              <div className="flex min-w-[12rem] shrink-0 flex-col justify-center pr-2 lg:min-w-0">
+                <p className="text-[13px] font-bold tracking-[0.1em] uppercase">Extra savings</p>
+                <p className="text-xs text-ink-soft">On top of prices already below MRP. Applied in your cart.</p>
+              </div>
+            )}
             {offerTiers(offers).map((t) => (
               <div key={`${t.minPieces}-${t.minSubtotal}-${t.reward}`} className="flex min-w-[13rem] shrink-0 items-center gap-3 border border-dashed border-ink/40 px-4 py-3">
-                <span className="font-display text-3xl leading-none text-madder">{t.reward.replace(/ off.*$/, "").replace("Free delivery", "Free")}</span>
-                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{t.reward.startsWith("Free") ? "Delivery" : "Off your cart"}</b>{t.label.toLowerCase().startsWith("pick") ? `${t.label}: mix any styles` : `${t.label} or more`}</span>
+                <span className="leading-none"><span className="block text-[11px] font-bold tracking-[0.1em] text-madder uppercase">Extra</span><span className="font-display text-3xl text-madder">{t.reward.replace(/ off.*$/, "").replace("Free delivery", "Free")}</span></span>
+                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{t.reward.startsWith("Free") ? "Delivery" : "Off on top"}</b>{t.label.toLowerCase().startsWith("pick") ? `${t.label} pieces, mix any styles` : `${t.label} or more`}</span>
               </div>
             ))}
             {shownCoupons.map((c) => (

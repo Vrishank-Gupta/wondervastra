@@ -13,7 +13,7 @@ export function OfferProgress({ quote }: { quote: Quote }) {
   const { setDrawerOpen } = useCart();
   const n = quote.nextOffer;
   const tiers = quote.tiers ?? [];
-  const nextReward = n ? (n.type === "free_shipping" ? "free delivery" : n.type === "percent" ? `${n.value}% off` : `${money(n.value)} off`) : "";
+  const nextReward = n ? (n.type === "free_shipping" ? "free delivery" : n.type === "percent" ? `an extra ${n.value}% off` : `an extra ${money(n.value)} off`) : "";
   const unlocked = quote.offer ? `${quote.offer.name}: you save ${money(quote.offer.discount)}` : null;
 
   if (!n && !tiers.length) {

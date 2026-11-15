@@ -27,7 +27,7 @@ export async function GET() {
   const out = [
     `# ${s.storeName}`,
     "",
-    `> ${s.storeName} (${base}) is an online store selling 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals${brandNames.length ? `, from ${brandPhrase(brandNames)}` : ""}. It delivers across ${areaPhrase(s)}${s.deliveryPincodes.trim() ? " for now; buyers can check their pincode on any product page" : ""}.`,
+    `> ${s.storeName} (${base}) is an online store selling 100% original branded thermal wear at the lowest prices: kids' thermals for ages 2 to 11 and men's thermals${brandNames.length ? `, from ${brandPhrase(brandNames)}` : ""}. It delivers across ${areaPhrase(s)}${s.deliveryPincodes.trim() ? " for now; buyers can check their pincode on any product page" : ""}.`,
     "",
     "## Key facts",
     `- Products: ${cats.filter((c) => !c.comingSoon).map((c) => c.name).join(", ") || "thermal wear"}`,
@@ -45,7 +45,7 @@ export async function GET() {
     "## Shop",
     `- [All products](${base}/shop)`,
     ...cats.filter((c) => !c.comingSoon).map((c) => `- [${c.name}](${base}/c/${c.slug})${c.tagline ? `: ${c.tagline}` : ""}`),
-    ...([["baby", "Baby thermals (0–24 months)"], ["boys", "Boys' thermals"], ["girls", "Girls' thermals"]] as const).flatMap(([tag, label]) => {
+    ...([["boys", "Boys' thermals"], ["girls", "Girls' thermals"]] as const).flatMap(([tag, label]) => {
       const c = cards.find((x) => x.tags.includes(tag));
       const cat = c && cats.find((k) => k.id === c.categoryId);
       return cat ? [`- [${label}](${base}/c/${cat.slug}?collection=${tag})`] : [];

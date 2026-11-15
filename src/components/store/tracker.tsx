@@ -58,7 +58,7 @@ export function Tracker() {
     const end = (final: boolean) => {
       if (ended) return;
       const dur = spent + (visible ? Date.now() - visible : 0);
-      send({ k: "end", id, dur, scroll });
+      send({ k: "end", id, dur, scroll, path, pid });
       if (final) ended = true;
     };
     const onClick = (e: MouseEvent) => {

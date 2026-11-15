@@ -10,7 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const [cats, brands, cards] = await Promise.all([getActiveCategories(), getActiveBrands(), getAllCards()]);
   const newest = cards.reduce((a, c) => Math.max(a, c.updatedAt), 0) || Date.now();
-  const kidsTags = ["baby", "boys", "girls"];
+  const kidsTags = ["boys", "girls"];
   return [
     { url: base, priority: 1, changeFrequency: "daily", lastModified: new Date(newest) },
     { url: `${base}/shop`, priority: 0.9, changeFrequency: "daily", lastModified: new Date(newest) },

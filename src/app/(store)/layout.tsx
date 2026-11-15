@@ -22,7 +22,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     areaLabel(settings) !== "India" ? `Now delivering across ${areaLabel(settings)}` : null,
     "100% original brands at the lowest prices",
     ...sales.map((s) => `${s.name}: ${saleLabel(s).replace("Lowest prices", "lowest prices on")} selected styles`),
-    ...offerTiers(offers).map((t) => `${t.label}, get ${t.reward}`),
+    ...offerTiers(offers).map((t) => `${t.label}, get an extra ${t.reward}`),
     "Free delivery on every order",
     settings.codEnabled ? "Cash on delivery available" : null,
     capabilities().whatsapp ? "Order updates on WhatsApp" : null,

@@ -539,10 +539,11 @@ test("only thermals are on the site: kids' lead, other ranges are hidden and can
   await expect(page.getByRole("heading", { name: "Kids' thermals" }).first()).toBeVisible();
   await expect(page.getByText("Coming soon")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Categories" }).getByRole("link").nth(2)).toHaveText("Kids' Thermals");
-  await page.locator('a[href="/c/kids-thermals?collection=baby"]').first().click();
-  await page.waitForURL("**/c/kids-thermals?collection=baby");
-  const babies = Number((await one("select count(*) n from products where status='active' and tags like '%\"baby\"%'")).n);
-  await expect(page.getByText(`${babies} items`)).toBeVisible();
+  await expect(page.locator('a[href="/c/kids-thermals?collection=baby"]')).toHaveCount(0); // We sell ages 2+.
+  await page.locator('a[href="/c/kids-thermals?collection=boys"]').first().click();
+  await page.waitForURL("**/c/kids-thermals?collection=boys");
+  const boys = Number((await one("select count(*) n from products where status='active' and tags like '%\"boys\"%'")).n);
+  await expect(page.getByText(`${boys} items`)).toBeVisible();
 
   // Hidden ranges are gone from the site and refused at checkout.
   expect((await page.goto("/c/mens-vests"))?.status()).toBe(404);
@@ -696,7 +697,7 @@ test("search engines and AI assistants: structured data, sitemap, robots, llms.t
   // Search results pages aren't indexed; category pages are.
   await page.goto("/shop?q=thermal");
   expect(await page.locator('meta[name="robots"]').getAttribute("content")).toContain("noindex");
-  await page.goto("/c/kids-thermals?collection=baby");
+  await page.goto("/c/kids-thermals?collection=boys");
   expect(await page.locator('meta[name="robots"]').count()).toBe(0);
 
   const robots = await (await request.get("/robots.txt")).text();
@@ -707,7 +708,7 @@ test("search engines and AI assistants: structured data, sitemap, robots, llms.t
   const sitemap = await (await request.get("/sitemap.xml")).text();
   expect(sitemap).toContain("/p/rupa-boys-thermal-top");
   expect(sitemap).toContain("<image:loc>");
-  expect(sitemap).toContain("collection=baby");
+  expect(sitemap).toContain("collection=boys");
   const llms = await request.get("/llms.txt");
   expect(llms.headers()["content-type"]).toContain("text/markdown");
   const text = await llms.text();
@@ -1428,4 +1429,36 @@ test("visitors: page views, time on page, product views, add to cart and searche
   await admin.goto("/");
   await admin.waitForTimeout(1500);
   expect(Number((await one("select count(*) n from page_views")).n)).toBe(before);
+});
+
+test("photos and size guide open above everything, close with X, Esc, Back; size guide link never covers sizes", async ({ page }) => {
+  for (const vp of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(vp);
+    await page.goto("/p/rupa-boys-thermal-top");
+    await page.getByTestId("gallery").locator("button").first().click();
+    const box = page.getByTestId("lightbox");
+    await expect(box).toBeVisible();
+    // Nothing from the page (header, logo, sizes) sits on top of the viewer.
+    const close = page.getByRole("button", { name: "Close photos" });
+    const b = (await close.boundingBox())!;
+    expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("[data-testid=lightbox]") != null, [b.x + b.width / 2, b.y + b.height / 2])).toBe(true);
+    expect(await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest("[data-testid=lightbox]") != null)).toBe(true);
+    await close.click();
+    await expect(box).toBeHidden();
+    await page.getByTestId("gallery").locator("button").first().click();
+    await page.keyboard.press("Escape");
+    await expect(box).toBeHidden();
+    await page.getByTestId("gallery").locator("button").first().click();
+    await page.goBack();
+    await expect(box).toBeHidden();
+    await expect(page).toHaveURL(/\/p\/rupa-boys-thermal-top/);
+
+    // The size guide link sits in the label row, clear of every size button.
+    const link = (await page.getByTestId("size-guide-open").boundingBox())!;
+    for (const btn of await page.locator("#size-picker button:not([data-testid=size-guide-open])").all()) {
+      const s = (await btn.boundingBox())!;
+      const overlap = link.x < s.x + s.width && s.x < link.x + link.width && link.y < s.y + s.height && s.y < link.y + link.height;
+      expect(overlap).toBe(false);
+    }
+  }
 });

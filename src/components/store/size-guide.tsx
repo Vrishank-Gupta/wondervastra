@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Ruler, X } from "lucide-react";
 import { track } from "./tracker";
 
@@ -54,9 +55,9 @@ export function SizeGuideButton({ tables, note, charts, selected, name }: { tabl
   if (!tables.length && !note && !charts.length) return null;
   return (
     <>
-      <button type="button" onClick={() => { setOpen(true); track("size_guide", name); }} className="-my-3 inline-flex min-h-11 items-center gap-1 text-xs font-semibold underline underline-offset-2" data-testid="size-guide-open"><Ruler size={14} aria-hidden /> Size guide</button>
-      {open && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-6" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+      <button type="button" onClick={() => { setOpen(true); track("size_guide", name); }} className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold underline underline-offset-2" data-testid="size-guide-open"><Ruler size={14} aria-hidden /> Size guide</button>
+      {open && createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-end justify-center bg-black/50 sm:items-center sm:p-6" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
           <div role="dialog" aria-modal="true" aria-label={`Size guide for ${name}`} className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-lg bg-white sm:max-w-2xl sm:rounded-lg" data-testid="size-guide">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <p className="flex items-center gap-2 font-display text-2xl"><Ruler size={20} aria-hidden /> Size guide</p>
@@ -76,7 +77,7 @@ export function SizeGuideButton({ tables, note, charts, selected, name }: { tabl
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

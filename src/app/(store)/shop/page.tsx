@@ -9,7 +9,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
   // Search results and filter combinations aren't indexed: endless near-duplicates. Links on them still count.
   return Object.keys(sp).length ? { ...base, robots: { index: false, follow: true } } : base;
 }
-const TITLES: Record<string, string> = { kids: "Kids' thermals", baby: "Baby thermals (0–24 months)", boys: "Boys' thermals", girls: "Girls' thermals", winter: "Winter warmers", everyday: "Everyday essentials", new: "New in", value: "Value packs", sport: "Sport & active", bestseller: "Bestsellers" };
+const TITLES: Record<string, string> = { kids: "Kids' thermals", boys: "Boys' thermals", girls: "Girls' thermals", winter: "Winter warmers", everyday: "Everyday essentials", new: "New in", value: "Value packs", sport: "Sport & active", bestseller: "Bestsellers" };
 
 export default async function Shop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const filters = filtersFromParams(await searchParams);

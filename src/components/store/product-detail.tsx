@@ -229,11 +229,11 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
           </fieldset>
         )}
         {(sizes.length > 1 || sizes[0] !== "Free size") && (
-          <fieldset id="size-picker" className={`relative mt-5 ${sizeError && choosing ? "-m-2 border border-clay p-2" : ""}`}>
-            <legend className="mb-2 text-xs font-bold tracking-[0.08em] uppercase">{choosing ? `Select ${p.option1Label.toLowerCase()}` : p.option1Label}</legend>
-            <div className="absolute top-0 right-0">
-              <SizeGuideButton tables={p.sizeChart ?? []} note={p.sizeChart?.length ? null : p.sizeGuide} charts={images.filter((im) => /size chart|size guide/i.test(im.alt ?? ""))} selected={size || undefined} name={p.name} />
-            </div>
+          <fieldset id="size-picker" className={`mt-5 ${sizeError && choosing ? "-m-2 border border-clay p-2" : ""}`}>
+            <legend className="mb-2 flex w-full items-center justify-between gap-3 text-xs font-bold tracking-[0.08em] uppercase">
+              <span>{choosing ? `Select ${p.option1Label.toLowerCase()}` : p.option1Label}</span>
+              <span className="tracking-normal normal-case"><SizeGuideButton tables={p.sizeChart ?? []} note={p.sizeChart?.length ? null : p.sizeGuide} charts={images.filter((im) => /size chart|size guide/i.test(im.alt ?? ""))} selected={size || undefined} name={p.name} /></span>
+            </legend>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const v = pick(s, color);
@@ -286,11 +286,11 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
               {tiers.map((t) => (
                 <li key={`${t.minPieces}-${t.minSubtotal}`} className="border border-dashed border-ink/40 bg-white px-2.5 py-2 text-center">
                   <span className="block text-xs font-semibold">{t.label}</span>
-                  <b className="block text-lg leading-tight text-madder">{t.reward}</b>
+                  <b className="block text-lg leading-tight text-madder">Extra {t.reward}</b>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-ink-soft">{tiers.some((t) => t.minPieces) ? "Mix any styles, sizes and brands. " : "Mix any items. "}The discount is applied automatically in your cart.</p>
+            <p className="mt-2 text-xs text-ink-soft">Extra, on top of the prices you see. {tiers.some((t) => t.minPieces) ? "Mix any styles, sizes and brands. " : "Mix any items. "}Applied automatically in your cart.</p>
           </div>
         )}
 

@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 
 type Img = { url: string; alt: string | null };
@@ -62,7 +63,7 @@ export function ProductGallery({ images, name, index, onIndex, badge }: { images
           ))}
         </div>
       )}
-      {open && <Lightbox images={images} name={name} index={index} onIndex={onIndex} onClose={() => setOpen(false)} />}
+      {open && createPortal(<Lightbox images={images} name={name} index={index} onIndex={onIndex} onClose={() => setOpen(false)} />, document.body)}
     </>
   );
 }
@@ -70,33 +71,49 @@ export function ProductGallery({ images, name, index, onIndex, badge }: { images
 function Lightbox({ images, name, index, onIndex, onClose }: { images: Img[]; name: string; index: number; onIndex: (i: number) => void; onClose: () => void }) {
   const strip = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
+  // The phone's Back button closes the photos instead of leaving the page. Opening adds one history step;
+  // every way of closing goes back through it, so they all behave the same.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const pushed = useRef(false);
+  useEffect(() => {
+    if (!pushed.current) { history.pushState({ ...(history.state ?? {}), wvPhotos: true }, ""); pushed.current = true; }
+    const onPop = () => { if (!history.state?.wvPhotos) closeRef.current(); };
+    addEventListener("popstate", onPop);
+    return () => removeEventListener("popstate", onPop);
+  }, []);
+  const close = () => { if (history.state?.wvPhotos) history.back(); else closeRef.current(); };
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeBtn.current?.focus();
     strip.current?.scrollTo({ left: index * (strip.current?.clientWidth ?? 0) });
+    return () => { document.body.style.overflow = prev; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") close();
       if (e.key === "ArrowRight") onIndex(Math.min(images.length - 1, index + 1));
       if (e.key === "ArrowLeft") onIndex(Math.max(0, index - 1));
     };
     window.addEventListener("keydown", key);
-    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", key); };
-  }, [images.length, index, onClose, onIndex]);
+    return () => window.removeEventListener("keydown", key);
+  }, [images.length, index, onIndex]);
   useEffect(() => {
     const el = strip.current;
     if (el && Math.abs(el.scrollLeft - index * el.clientWidth) > 4) el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
   }, [index]);
   return (
-    <div role="dialog" aria-modal="true" aria-label={`${name} photos`} className="fixed inset-0 z-[60] flex flex-col bg-white" data-testid="lightbox">
+    <div role="dialog" aria-modal="true" aria-label={`${name} photos`} className="fixed inset-0 z-[1000] flex flex-col bg-white" data-testid="lightbox">
       <div className="flex items-center justify-between px-3 pt-[max(.5rem,env(safe-area-inset-top))] pb-2">
         <span className="text-sm font-medium tabular-nums">{index + 1} / {images.length}</span>
-        <button ref={closeBtn} type="button" onClick={onClose} aria-label="Close photos" className="grid size-11 place-items-center"><X size={24} /></button>
+        <button ref={closeBtn} type="button" onClick={close} aria-label="Close photos" className="grid size-12 place-items-center rounded-full bg-ink text-white shadow-md"><X size={24} /></button>
       </div>
       <div ref={strip} onScroll={(e) => { const el = e.currentTarget; const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)); if (i !== index) onIndex(i); }}
         className="scrollbar-none flex flex-1 snap-x snap-mandatory overflow-x-auto [touch-action:pan-x_pan-y_pinch-zoom]">
         {images.map((im) => (
-          <div key={im.url} className="relative h-full w-full shrink-0 snap-center">
+          <div key={im.url} className="relative h-full w-full shrink-0 snap-center" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
             <Image src={im.url} alt={im.alt ?? name} fill sizes="100vw" className="object-contain" />
           </div>
         ))}

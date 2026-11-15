@@ -27,7 +27,7 @@ export function areaPhrase(s: Pick<StoreSettings, "deliveryAreaName" | "delivery
   return towns.length ? `${a} (${brandPhrase(towns)})` : a;
 }
 export function seoDescription(brandNames: string[], s: Pick<StoreSettings, "deliveryAreaName" | "deliveryPincodes">) {
-  return `WonderVastra is an online store for 100% original branded thermal wear at the lowest prices: kids' thermals for babies (0–24 months), boys and girls, and men's thermals, from ${brandPhrase(brandNames)}. Delivering across ${areaPhrase(s)}.`;
+  return `WonderVastra is an online store for 100% original branded thermal wear at the lowest prices: kids' thermals for ages 2 to 11 and men's thermals, from ${brandPhrase(brandNames)}. Delivering across ${areaPhrase(s)}.`;
 }
 /** Where we deliver, as schema.org understands it. */
 function served(s: StoreSettings) {
