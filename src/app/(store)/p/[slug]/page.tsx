@@ -87,7 +87,7 @@ export default async function ProductPage({ params }: Props) {
         <Link href="/shop" className="-my-2 inline-block py-2 hover:underline">Shop</Link>{brand && <> / <Link href={`/brands/${brand.slug}`} className="hover:underline">{brand.name}</Link></>}{category && <> / <Link href={`/c/${category.slug}`} className="hover:underline">{category.name}</Link></>} / <span>{p.name}</span>
       </nav>
       <ProductDetail
-        brand={brand ? { name: brand.name, slug: brand.slug, isHouse: brand.isHouse } : null}
+        brand={brand ? { name: brand.name, slug: brand.slug, isHouse: brand.isHouse, logo: brand.logo } : null}
         product={{
           id: p.id, name: p.name, slug: p.slug, shortDescription: p.shortDescription, description: p.description, material: p.material, care: p.care, sizeGuide: p.sizeGuide, sizeHeights: p.sizeHeights ?? {},
           option1Label: p.option1Label, option2Label: p.option2Label, deliveryMode: p.deliveryMode, deliveryCharge: p.deliveryCharge, codAllowed: p.codAllowed, returnable: p.returnable,

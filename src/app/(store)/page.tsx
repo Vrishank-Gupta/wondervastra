@@ -66,11 +66,13 @@ export default async function Home() {
   ];
 
   const promos = [
-    { slug: "kids-thermals", title: "Kids' thermals", text: "Baby (0+), boys and girls" },
+    { slug: "kids-thermals", title: "Kids' thermals", text: "Warmers for ages 2 to 11" },
     { slug: "mens-thermals", title: "Men's thermals", text: "Warm base layers for winter" },
   ].filter((p) => catImage(p.slug) && categories.some((c) => c.slug === p.slug && !c.comingSoon));
   const kidsCat = categories.find((c) => c.slug === "kids-thermals" && !c.comingSoon);
   const kidsItems = kidsCat ? buyable.filter((c) => c.categoryId === kidsCat.id).slice(0, 10) : [];
+  const mensCat = categories.find((c) => c.slug === "mens-thermals" && !c.comingSoon);
+  const mensItems = mensCat ? buyable.filter((c) => c.categoryId === mensCat.id).slice(0, 10) : [];
   const audiences = AUDIENCES.filter((a) => cards.some((c) => c.categoryId === kidsCat?.id && c.tags.includes(a.tag)));
   const launching = categories.filter((c) => c.comingSoon && !houseItems.some((h) => h.categoryId === c.id));
 
@@ -80,9 +82,39 @@ export default async function Home() {
       <h1 className="sr-only">WonderVastra: 100% original branded kids' and men's thermals at the lowest prices</h1>
       <HeroCarousel slides={slides} />
 
+      {(offers.length > 0 || shownCoupons.length > 0) && (
+        <section aria-label="Offers" className="border-b border-line">
+          <div className="container-x py-3"><div className="rail lg:grid lg:grid-flow-col lg:auto-cols-fr">
+            {offerTiers(offers).map((t) => (
+              <div key={`${t.minPieces}-${t.minSubtotal}-${t.reward}`} className="flex min-w-[13rem] shrink-0 items-center gap-3 border border-dashed border-ink/40 px-4 py-3">
+                <span className="font-display text-3xl leading-none text-madder">{t.reward.replace(/ off.*$/, "").replace("Free delivery", "Free")}</span>
+                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{t.reward.startsWith("Free") ? "Delivery" : "Off your cart"}</b>{t.label.toLowerCase().startsWith("pick") ? `${t.label}: mix any styles` : `${t.label} or more`}</span>
+              </div>
+            ))}
+            {shownCoupons.map((c) => (
+              <div key={c.id} className="flex min-w-[17rem] shrink-0 items-center justify-between gap-3 border border-dashed border-ink/40 px-4 py-3">
+                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{c.description}</b>Use code at checkout</span>
+                <CopyCode code={c.code} />
+              </div>
+            ))}
+          </div></div>
+        </section>
+      )}
+
+      {partners.length > 0 && (
+        <section className="container-x pt-8 sm:pt-12" aria-label="Shop by brand">
+          <SectionTitle title="Shop by brand" href="/brands" cta="All brands" />
+          <div className="rail lg:grid lg:grid-cols-[repeat(var(--n),minmax(0,1fr))] lg:gap-3" style={{ "--n": Math.min(5, partners.length + (house ? 1 : 0)) } as React.CSSProperties}>
+            {[...(house ? [house] : []), ...partners].slice(0, 10).map((b) => (
+              <div key={b.id} className="w-[40%] shrink-0 sm:w-[28%] lg:w-auto"><BrandTile brand={b} /></div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {kidsCat && audiences.length > 0 && (
         <section aria-label="Kids' thermals" className="container-x pt-8 sm:pt-12">
-          <p className="eyebrow text-madder">Our hero range · Baby (0+), boys &amp; girls</p>
+          <p className="eyebrow text-madder">Our hero range · Ages 2 to 11</p>
           <SectionTitle title="Kids' thermals" href="/c/kids-thermals" cta="Shop all kids'" />
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {audiences.map((a) => (
@@ -98,7 +130,8 @@ export default async function Home() {
           </div>
         </section>
       )}
-      {kidsItems.length > 0 && <ProductRail title="Kids' favourites" href="/c/kids-thermals" products={kidsItems} wished={wished} />}
+      {kidsItems.length > 0 && <ProductRail title="Kids' thermals" href="/c/kids-thermals" products={kidsItems} wished={wished} />}
+      {mensItems.length > 0 && <ProductRail title="Men's thermals" href="/c/mens-thermals" products={mensItems} wished={wished} />}
 
 
 
@@ -122,24 +155,6 @@ export default async function Home() {
         </div>
       </section>
 
-      {(offers.length > 0 || shownCoupons.length > 0) && (
-        <section aria-label="Offers" className="border-b border-line">
-          <div className="container-x py-3"><div className="rail lg:grid lg:grid-flow-col lg:auto-cols-fr">
-            {offerTiers(offers).map((t) => (
-              <div key={`${t.minPieces}-${t.minSubtotal}-${t.reward}`} className="flex min-w-[13rem] shrink-0 items-center gap-3 border border-dashed border-ink/40 px-4 py-3">
-                <span className="font-display text-3xl leading-none text-madder">{t.reward.replace(/ off.*$/, "").replace("Free delivery", "Free")}</span>
-                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{t.reward.startsWith("Free") ? "Delivery" : "Off your cart"}</b>{t.label.toLowerCase().startsWith("pick") ? `${t.label}: mix any styles` : `${t.label} or more`}</span>
-              </div>
-            ))}
-            {shownCoupons.map((c) => (
-              <div key={c.id} className="flex min-w-[17rem] shrink-0 items-center justify-between gap-3 border border-dashed border-ink/40 px-4 py-3">
-                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{c.description}</b>Use code at checkout</span>
-                <CopyCode code={c.code} />
-              </div>
-            ))}
-          </div></div>
-        </section>
-      )}
 
       {promos.length > 0 && (
         <section className="container-x grid gap-3 pt-12 sm:grid-cols-2 sm:pt-16">
@@ -157,16 +172,6 @@ export default async function Home() {
         </section>
       )}
 
-      {partners.length > 0 && (
-        <section className="container-x pt-12 sm:pt-16">
-          <SectionTitle title="Shop by brand" href="/brands" cta="All brands" />
-          <div className="rail lg:grid lg:grid-cols-[repeat(var(--n),minmax(0,1fr))] lg:gap-3" style={{ "--n": Math.min(5, partners.length + (house ? 1 : 0)) } as React.CSSProperties}>
-            {[...(house ? [house] : []), ...partners].slice(0, 10).map((b) => (
-              <div key={b.id} className="w-[40%] shrink-0 sm:w-[28%] lg:w-auto"><BrandTile brand={b} /></div>
-            ))}
-          </div>
-        </section>
-      )}
 
       <ProductRail title="Bestsellers" href="/shop" products={bestsellers} wished={wished} />
 

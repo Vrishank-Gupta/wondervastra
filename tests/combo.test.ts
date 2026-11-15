@@ -66,3 +66,12 @@ describe("Delhivery", () => {
     expect(orderStatusFor({ status: "RTO In Transit", type: "RT" }, "shipped")).toBeNull();
   });
 });
+
+describe("kids' 2s rule with a pick-any discount", () => {
+  it("allows a single kids' piece when the cart reaches the smallest pick-any step", () => {
+    const kids = { minPieces: 2, comboAbove: 150000 };
+    expect(belowMinimum(kids, 1, 60000, { pieces: 2, offerPieces: 3 })).toBe(true);
+    expect(belowMinimum(kids, 1, 60000, { pieces: 3, offerPieces: 3 })).toBe(false);
+    expect(belowMinimum(kids, 1, 60000, { pieces: 5, offerPieces: null })).toBe(true);
+  });
+});

@@ -17,9 +17,14 @@ export type QuoteLineView = {
 export type CartQuote = Quote & { views: QuoteLineView[]; codAvailable: boolean; codReason: string | null; blockingIssues: boolean; minimumIssue: string | null };
 
 type SetListing = { minPieces: number; comboAbove: number | null };
-/** "Sold in 2s": too few pieces of this listing, unless the whole cart (at normal prices) is above `comboAbove`. */
-export function belowMinimum(p: SetListing, pieces: number, cartValue: number) {
-  return pieces > 0 && pieces < p.minPieces && !(p.comboAbove != null && cartValue > p.comboAbove);
+/**
+ * "Sold in 2s": too few pieces of this listing. Waived when the whole cart (at normal prices) is above
+ * `comboAbove`, or when the cart has enough pieces for a "pick any N" discount (`offerPieces`).
+ */
+export function belowMinimum(p: SetListing, pieces: number, cartValue: number, cart: { pieces: number; offerPieces: number | null } = { pieces, offerPieces: null }) {
+  if (pieces === 0 || pieces >= p.minPieces) return false;
+  if (p.comboAbove != null && cartValue > p.comboAbove) return false;
+  return !(cart.offerPieces != null && cart.pieces >= cart.offerPieces);
 }
 
 /** Cart lines, orders and invoices carry the brand, so "Lux Cozi Cotton Vest" is clear long after purchase. */
@@ -150,13 +155,17 @@ export async function quoteCart(
 
   // "Sold in 2s": counted per listing across sizes, against the cart's value at normal prices.
   const cartValue = priceLines.reduce((a, l) => a + l.basePrice * l.qty, 0);
+  const cartPieces = priceLines.reduce((a, l) => a + l.qty, 0);
+  const pieceOffers = liveOffers.map((o) => o.minPieces ?? 0).filter((n) => n > 0);
+  const offerPieces = pieceOffers.length ? Math.min(...pieceOffers) : null;
+  const offerPct = offerPieces ? liveOffers.find((o) => o.minPieces === offerPieces)?.value : null;
   let minimumIssue: string | null = null;
   for (const p of prods) {
     const own = priceLines.filter((l) => l.productId === p.id);
     const pieces = own.reduce((a, l) => a + l.qty, 0);
-    if (belowMinimum(p, pieces, cartValue) && !minimumIssue) {
+    if (belowMinimum(p, pieces, cartValue, { pieces: cartPieces, offerPieces }) && !minimumIssue) {
       const name = withBrand(p.name, brandRows.find((b) => b.id === p.brandId)?.name);
-      minimumIssue = `${name} is sold in ${p.minPieces}s: add ${p.minPieces - pieces} more (any size, top or trouser)${p.comboAbove ? `, or shop for over ₹${Math.round(p.comboAbove / 100).toLocaleString("en-IN")} in all` : ""}.`;
+      minimumIssue = `${name} is sold in ${p.minPieces}s: add ${p.minPieces - pieces} more (any size, top or trouser)${offerPieces ? `, or make it ${offerPieces} pieces in your cart${offerPct ? ` for ${offerPct}% off` : ""}` : p.comboAbove ? `, or shop for over ₹${Math.round(p.comboAbove / 100).toLocaleString("en-IN")} in all` : ""}.`;
       for (const l of own) { const m = meta.get(l.key); if (m && !m.issue) m.issue = `Add ${p.minPieces - pieces} more to buy this`; }
     }
   }

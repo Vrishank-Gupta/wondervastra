@@ -1,11 +1,12 @@
 "use client";
 import { paymentLine } from "@/lib/payment-copy";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bell, Check, ChevronDown, Heart, Link2, MessageCircle, RotateCcw, Ruler, ShieldCheck, Star, Truck, Wallet } from "lucide-react";
 import { money } from "@/lib/format";
+import { ProductGallery } from "./product-gallery";
+import NextImage from "next/image";
 import { useCart } from "./cart-context";
 import { QtyStepper } from "./cart-drawer";
 import { Countdown } from "./countdown";
@@ -22,7 +23,7 @@ type Product = {
   minPieces?: number; comboAbove?: number | null;
 };
 type Props = {
-  brand?: { name: string; slug: string; isHouse: boolean } | null;
+  brand?: { name: string; slug: string; isHouse: boolean; logo?: string | null } | null;
   product: Product; images: { url: string; alt: string | null }[]; variants: Variant[];
   rating: { avg: number; count: number }; wished: boolean;
   settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number; deliveryArea: string; areaRestricted: boolean };
@@ -159,30 +160,19 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     const res = await fetch("/api/wishlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: p.id, on: next }) });
     if (res.status === 401) window.location.href = `/login?next=${encodeURIComponent(`/p/${p.slug}?wish=${p.id}`)}`;
   };
-  const current = images[imgIdx] ?? images[0];
 
   return (
     <div className="grid gap-6 pb-24 md:grid-cols-2 md:gap-10 md:pb-0">
-      <div className="md:sticky md:top-32 md:self-start">
-        <div className="relative aspect-[4/5] overflow-hidden bg-sand-soft">
-          {current && <Image key={current.url} src={current.url} alt={current.alt ?? p.name} fill priority sizes="(max-width:768px) 100vw, 50vw" className="pop-in object-cover" />}
-          {soon ? <span className="sticker absolute top-3 left-3 bg-slate text-white">Coming soon</span> : pct > 0 && <span className="sticker absolute top-3 left-3 bg-madder text-white">{pct}% off</span>}
-        </div>
-        {images.length > 1 && (
-          <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto p-0.5">
-            {images.map((im, i) => (
-              <button key={im.url} onClick={() => setImgIdx(i)} aria-label={`Show image ${i + 1}`} aria-current={i === imgIdx} className={`relative h-20 w-16 shrink-0 overflow-hidden border ${i === imgIdx ? "border-ink" : "border-transparent"}`}>
-                <Image src={im.url} alt="" fill sizes="64px" className="object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="-mx-4 min-w-0 sm:mx-0 md:sticky md:top-32 md:self-start">
+        <ProductGallery images={images} name={p.name} index={imgIdx} onIndex={setImgIdx}
+          badge={soon ? <span className="sticker absolute top-3 left-3 bg-slate text-white">Coming soon</span> : pct > 0 && <span className="sticker absolute top-3 left-3 bg-madder text-white">{pct}% off</span>} />
       </div>
 
       <div>
         {brand && (
-          <Link href={`/brands/${brand.slug}`} className="mb-1 inline-flex items-center gap-2 text-xs font-extrabold tracking-[0.12em] uppercase hover:text-madder">
-            {brand.name}{brand.isHouse && <span className="bg-ink px-1.5 py-0.5 text-[10px] text-white">Our label</span>}
+          <Link href={`/brands/${brand.slug}`} className="mb-2 inline-flex items-center gap-2.5 text-xs font-extrabold tracking-[0.12em] uppercase hover:text-madder" data-testid="brand-link">
+            {brand.logo && <span className="relative h-10 w-24 shrink-0 overflow-hidden rounded-sm border border-line bg-white"><NextImage src={brand.logo} alt="" fill sizes="96px" className="object-contain p-0.5" /></span>}
+            <span>{brand.name}</span>{brand.isHouse && <span className="bg-ink px-1.5 py-0.5 text-[10px] text-white">Our label</span>}
           </Link>
         )}
         <h1 className="text-[2.4rem] sm:text-5xl">{p.name}</h1>
@@ -201,7 +191,12 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         {(p.minPieces ?? 1) > 1 && (
           <div className="mt-3 border border-dashed border-ink/40 bg-sand-soft p-3 text-sm" data-testid="combo">
             <p><b>Sold in {p.minPieces}s.</b> Mix any sizes, tops and trousers{isSet(color) ? ", or take a set" : ""}.</p>
-            {p.comboAbove != null && <p className="mt-1 text-xs text-ink-soft">Cart over {money(p.comboAbove)}? Single pieces are fine too.</p>}
+            {(() => {
+              const first = tiers.filter((t) => t.minPieces > 0).sort((x, y) => x.minPieces - y.minPieces)[0];
+              return first
+                ? <p className="mt-1 text-xs text-ink-soft">Going for {first.reward}? A single piece is fine in a cart of {first.minPieces} or more pieces.</p>
+                : p.comboAbove != null && <p className="mt-1 text-xs text-ink-soft">Cart over {money(p.comboAbove)}? Single pieces are fine too.</p>;
+            })()}
           </div>
         )}
 

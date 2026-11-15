@@ -1,12 +1,16 @@
-import { Check, PartyPopper, ShoppingBag } from "lucide-react";
+"use client";
+import Link from "next/link";
+import { ArrowRight, Check, PartyPopper, ShoppingBag } from "lucide-react";
 import type { Quote } from "@/lib/pricing";
 import { money } from "@/lib/format";
+import { useCart } from "./cart-context";
 
 /**
  * "Add ₹120 more to get 10% off", over a stepped bar with every reward on it, so a buyer can see the
  * whole ladder (₹500 → 5%, ₹1,000 → 8% …) and how close the next step is.
  */
 export function OfferProgress({ quote }: { quote: Quote }) {
+  const { setDrawerOpen } = useCart();
   const n = quote.nextOffer;
   const tiers = quote.tiers ?? [];
   const nextReward = n ? (n.type === "free_shipping" ? "free delivery" : n.type === "percent" ? `${n.value}% off` : `${money(n.value)} off`) : "";
@@ -27,6 +31,9 @@ export function OfferProgress({ quote }: { quote: Quote }) {
         <p className="flex items-center gap-2 text-sm"><ShoppingBag size={16} aria-hidden className="shrink-0" /><span>{n.piecesLeft > 0
           ? <>Add <b>{n.piecesLeft} more {n.piecesLeft === 1 ? "piece" : "pieces"}</b> to get <b>{nextReward}</b></>
           : <>Add <b>{money(n.remaining)}</b> more to get <b>{nextReward}</b></>}</span></p>
+      ) : null}
+      {n ? (
+        <Link href="/shop" onClick={() => setDrawerOpen(false)} className="btn btn-white btn-sm w-full" data-testid="add-more">Add more items <ArrowRight size={15} aria-hidden /></Link>
       ) : !unlocked && quote.shippingNote ? (
         <p className="flex items-center gap-2 text-sm font-semibold text-pine"><PartyPopper size={16} aria-hidden /> {quote.shippingNote}</p>
       ) : !unlocked ? null : <p className="text-xs text-ink-soft">You&apos;ve unlocked the best cart offer.</p>}
