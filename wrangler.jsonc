@@ -18,5 +18,7 @@
   "placement": { "mode": "targeted", "region": "aws:ap-south-1" },
   // Expires unpaid orders and releases their stock (see src/app/api/cron/route.ts).
   "triggers": { "crons": ["*/15 * * * *"] },
+  // The deployed version id: store pages cached at the edge are keyed by it (see cf-worker.ts).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "observability": { "enabled": true }
 }
