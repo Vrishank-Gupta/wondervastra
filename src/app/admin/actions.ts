@@ -693,6 +693,13 @@ export async function refreshTracking(): Promise<Result & { updated?: number }> 
     return { ok: true, updated: r.updated };
   } catch (e) { return fail(e); }
 }
+/** Fresh Delhivery wallet balance, in paise. */
+export async function walletAction(): Promise<Result & { balance?: number }> {
+  await requireAdmin();
+  const { walletBalance } = await import("@/lib/delhivery-wallet");
+  const w = await walletBalance({ fresh: true });
+  return w ? { ok: true, balance: w.balance } : { error: "Couldn't read the Delhivery wallet right now." };
+}
 export async function bookPickup(input: { date: string; time: string; count: number }): Promise<Result & { pickupId?: string }> {
   const a = await requireAdmin();
   try {

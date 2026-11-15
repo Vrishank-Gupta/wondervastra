@@ -12,6 +12,7 @@ import { ReturnPanel } from "@/components/admin/return-panel";
 import { returnValue } from "@/lib/returns";
 import { nextStep } from "@/lib/next-step";
 import { delhiveryConfigured } from "@/lib/delhivery";
+import { walletBalance, walletConfigured } from "@/lib/delhivery-wallet";
 import { DELHIVERY, quoteShipment, shippingReady } from "@/lib/shipping";
 import { Panel, PayBadge, StatusBadge } from "@/components/admin/ui";
 import { formatDateTime, money, PAYMENT_LABEL } from "@/lib/format";
@@ -84,6 +85,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
               quote={!o.awb && shippingReady(s) && ["confirmed", "packed"].includes(o.status) ? await quoteShipment(o.id).catch(() => null) : null}
               shipTo={`${o.name}, ${o.city} ${o.pincode}${o.paymentMethod === "cod" && o.paymentStatus !== "paid" ? ` (collect ${money(o.total)} cash)` : " (prepaid)"}`}
               setup={{ name: s.storeName || "WonderVastra", phone: s.whatsappNumber, state: s.businessState }}
+              wallet={walletConfigured() && !o.awb ? (await walletBalance())?.balance ?? null : undefined}
             />
           )}</div>
           <OrderManager

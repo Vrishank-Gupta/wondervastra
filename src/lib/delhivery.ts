@@ -118,7 +118,13 @@ export async function createShipment(s: ShipmentInput): Promise<string> {
   const pkg = json.packages?.[0];
   if (pkg?.waybill && pkg.status !== "Fail") return pkg.waybill;
   const why = [pkg?.remarks, json.rmk].flat().filter(Boolean).join(" ");
-  throw new Error(`Delhivery didn't book this shipment${why ? `: ${why}` : "."}`);
+  throw new Error(bookingError(why));
+}
+
+/** Delhivery's booking errors in plain words. Low wallet balance is the common one. */
+export function bookingError(why: string) {
+  if (/insufficient balance|wallet/i.test(why)) return "Your Delhivery wallet doesn't have enough money for this shipment. Add money in Delhivery One (Wallet, at the top of the page), then tap Ship with Delhivery again. Nothing was booked.";
+  return `Delhivery didn't book this shipment${why ? `: ${why}` : "."}`;
 }
 
 /**
@@ -139,7 +145,7 @@ export async function createReturnPickup(s: Omit<ShipmentInput, "cod" | "total">
   const pkg = json.packages?.[0];
   if (pkg?.waybill && pkg.status !== "Fail") return pkg.waybill;
   const why = [pkg?.remarks, json.rmk].flat().filter(Boolean).join(" ");
-  throw new Error(`Delhivery didn't book the return pickup${why ? `: ${why}` : "."}`);
+  throw new Error(/insufficient balance|wallet/i.test(why) ? "Your Delhivery wallet doesn't have enough money for the return pickup. Add money in Delhivery One (Wallet, at the top of the page), then approve again. Nothing was booked." : `Delhivery didn't book the return pickup${why ? `: ${why}` : "."}`);
 }
 
 /** A link to the printable shipping label (PDF). */

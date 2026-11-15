@@ -5,6 +5,7 @@ import { ExternalLink, Printer, Truck, XCircle } from "lucide-react";
 import { cancelShipmentAction, refreshTracking, setupPickupAction, shipNowAction, shippingLabel } from "@/app/admin/actions";
 import { money } from "@/lib/format";
 import { Panel } from "./ui";
+import { WalletBalance } from "./wallet-balance";
 
 type Props = {
   orderId: string;
@@ -14,11 +15,13 @@ type Props = {
   quote: { grams: number; pieces: number; cost: number | null; transit: number | null } | null;
   shipTo?: string;
   setup?: { name: string; phone: string; state: string };
+  /** Delhivery wallet balance in paise; undefined when the wallet login isn't set up. */
+  wallet?: number | null;
 };
 const day = (t: number) => new Date(t).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
 /** Book, label, cancel and track a Delhivery shipment for one order, in plain words. */
-export function DelhiveryPanel({ orderId, status, ready, booked, quote, shipTo, setup }: Props) {
+export function DelhiveryPanel({ orderId, status, ready, booked, quote, shipTo, setup, wallet }: Props) {
   const router = useRouter();
   const [grams, setGrams] = useState(String(quote?.grams ?? 500));
   const [busy, setBusy] = useState(false);
@@ -65,6 +68,7 @@ export function DelhiveryPanel({ orderId, status, ready, booked, quote, shipTo, 
           </>
         ) : canBook ? (
           <>
+            {wallet !== undefined && <WalletBalance balance={wallet} need={quote?.cost} compact />}
             <button disabled={busy} className="btn btn-primary w-full text-base sm:w-auto" data-testid="ship-now" onClick={() => run(() => shipNowAction(orderId, Number(grams)), (r) => `Booked. AWB ${r.awb}. ${r.pickup ?? ""} Print the label and stick it on the parcel.`)}>
               <Truck size={18} aria-hidden /> {busy ? "Booking…" : "Ship with Delhivery"}
             </button>

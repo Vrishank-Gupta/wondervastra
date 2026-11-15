@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { Truck } from "lucide-react";
 import { bookPickup, refreshTracking } from "@/app/admin/actions";
+import { WalletBalance } from "./wallet-balance";
 
 /** "Ask Delhivery to collect today's parcels": date, time and how many, with the booked parcels counted for you. */
-export function PickupRequest({ waiting }: { waiting: number }) {
+export function PickupRequest({ waiting, wallet }: { waiting: number; wallet?: number | null }) {
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 86400_000);
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -23,6 +24,7 @@ export function PickupRequest({ waiting }: { waiting: number }) {
           {!open && <button className="btn btn-primary btn-sm" onClick={() => setOpen(true)}>Request a pickup</button>}
         </div>
       </div>
+      {wallet !== undefined && <div className="mt-2"><WalletBalance balance={wallet} compact /></div>}
       {open && (
         <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={async (e) => {
           e.preventDefault(); setBusy(true); setMsg(null);
