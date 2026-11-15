@@ -1,4 +1,5 @@
 "use client";
+import { track } from "./tracker";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -38,6 +39,7 @@ function SearchBox({ autoFocus, onDone }: { autoFocus?: boolean; onDone?: () => 
       e.preventDefault();
       if (!q.trim()) return;
       setOpen(false); onDone?.();
+      track("search", q.trim());
       router.push(`/shop?q=${encodeURIComponent(q.trim())}`);
     }}>
       <Search size={18} aria-hidden className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-soft" />
@@ -87,14 +89,14 @@ export function Header({ categories, announcements, loggedIn }: { categories: Na
   const pathname = usePathname();
   useEffect(() => { setMenu(false); setSearchOpen(false); }, [pathname]);
   const navLink = (active: boolean) => `whitespace-nowrap border-b-2 py-3 text-[12px] font-bold tracking-[0.08em] uppercase transition-colors hover:border-ink ${active ? "border-ink" : "border-transparent"}`;
-  const badge = ready && count > 0 && <span className="absolute -top-0.5 -right-0.5 grid min-w-[18px] place-items-center rounded-full bg-madder px-1 text-[10px] leading-[18px] font-bold text-white">{count}</span>;
+  const badge = ready && count > 0 && <span className="absolute -top-0.5 -right-0.5 grid min-w-[18px] place-items-center rounded-full bg-madder px-1 text-[11px] leading-[18px] font-bold text-white">{count}</span>;
 
   return (
     <>
       <AnnouncementBar items={announcements} />
       <header className="sticky top-0 z-30 border-b border-line bg-white no-print">
         <div className="container-x flex items-center gap-3 py-3 lg:gap-8">
-          <button aria-label="Open menu" className="-ml-2 grid size-10 place-items-center lg:hidden" onClick={() => setMenu(true)}><Menu size={24} /></button>
+          <button aria-label="Open menu" className="-ml-2 grid size-11 place-items-center lg:hidden" onClick={() => setMenu(true)}><Menu size={24} /></button>
           <Link href="/" aria-label="WonderVastra home" className="shrink-0"><Logo className="max-[380px]:[&_svg]:h-7 max-[380px]:[&>span:last-child]:text-[1.05rem]" /></Link>
           <nav aria-label="Categories" className="hidden min-w-0 flex-1 items-center gap-5 overflow-x-auto lg:flex scrollbar-none">
             <Link href="/shop" className={navLink(pathname === "/shop")}>Shop all</Link>
@@ -104,10 +106,10 @@ export function Header({ categories, announcements, loggedIn }: { categories: Na
           </nav>
           <div className="ml-auto hidden w-full max-w-xs md:block lg:hidden xl:block xl:max-w-[16rem] 2xl:max-w-sm"><SearchBox /></div>
           <div className="ml-auto flex items-center md:ml-0 lg:ml-auto xl:ml-0">
-            <button aria-label="Search" className="grid size-10 place-items-center md:hidden lg:grid xl:hidden" onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
+            <button aria-label="Search" className="grid size-11 place-items-center md:hidden lg:grid xl:hidden" onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
             <Link href={loggedIn ? "/account" : "/login"} aria-label={loggedIn ? "My account" : "Log in"} className="hidden size-10 place-items-center md:grid"><User size={22} /></Link>
             <Link href={loggedIn ? "/account/wishlist" : "/login?next=/account/wishlist"} aria-label="Wishlist" className="hidden size-10 place-items-center md:grid"><Heart size={22} /></Link>
-            <button aria-label={`Cart, ${count} items`} className="relative -mr-2 grid size-10 place-items-center" onClick={() => setDrawerOpen(true)}>
+            <button aria-label={`Cart, ${count} items`} className="relative -mr-2 grid size-11 place-items-center" onClick={() => setDrawerOpen(true)}>
               <ShoppingBag size={22} />{badge}
             </button>
           </div>
@@ -121,12 +123,12 @@ export function Header({ categories, announcements, loggedIn }: { categories: Na
           <div className="slide-in absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col overflow-y-auto bg-white [animation-direction:normal]">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <Logo />
-              <button aria-label="Close menu" className="-mr-2 grid size-10 place-items-center" onClick={() => setMenu(false)}><X size={22} /></button>
+              <button aria-label="Close menu" className="-mr-2 grid size-11 place-items-center" onClick={() => setMenu(false)}><X size={22} /></button>
             </div>
             <nav className="flex flex-col">
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/shop">Shop all<ChevronRight size={18} aria-hidden /></Link>
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/brands">Shop by brand<ChevronRight size={18} aria-hidden /></Link>
-              {categories.map((c) => <Link key={c.slug} className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href={`/c/${c.slug}`}><span>{c.name}{c.comingSoon && <span className="ml-2 bg-slate px-1.5 py-0.5 align-middle text-[9px] text-white">Soon</span>}</span><ChevronRight size={18} aria-hidden /></Link>)}
+              {categories.map((c) => <Link key={c.slug} className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href={`/c/${c.slug}`}><span>{c.name}{c.comingSoon && <span className="ml-2 bg-slate px-1.5 py-0.5 align-middle text-[11px] text-white">Soon</span>}</span><ChevronRight size={18} aria-hidden /></Link>)}
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] text-madder uppercase" href="/sale">Sale & offers<ChevronRight size={18} aria-hidden /></Link>
               <div className="flex flex-col gap-1 bg-sand-soft px-4 py-4 text-sm">
                 <Link className="py-1.5" href="/track">Track order</Link>
@@ -147,7 +149,7 @@ export function MobileTabBar({ loggedIn }: { loggedIn: boolean }) {
   const pathname = usePathname();
   // Product and checkout pages have their own sticky action bar.
   if (pathname.startsWith("/p/") || pathname.startsWith("/checkout")) return null;
-  const item = "flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-bold tracking-[0.06em] uppercase text-ink-soft";
+  const item = "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-bold tracking-[0.06em] uppercase text-ink-soft";
   const on = (p: string) => (pathname === p ? "text-ink" : "");
   return (
     <>
@@ -157,7 +159,7 @@ export function MobileTabBar({ loggedIn }: { loggedIn: boolean }) {
         <Link className={`${item} ${on("/shop")}`} href="/shop"><LayoutGrid size={21} aria-hidden />Shop</Link>
         <button className={`${item} relative`} onClick={() => setDrawerOpen(true)}>
           <span className="relative"><ShoppingBag size={21} aria-hidden />
-            {ready && count > 0 && <span className="absolute -top-1.5 -right-2.5 grid min-w-4 place-items-center rounded-full bg-madder px-1 text-[10px] leading-4 text-white">{count}</span>}
+            {ready && count > 0 && <span className="absolute -top-1.5 -right-2.5 grid min-w-4 place-items-center rounded-full bg-madder px-1 text-[11px] leading-4 text-white">{count}</span>}
           </span>Cart
         </button>
         <Link className={`${item} ${on("/account")}`} href={loggedIn ? "/account" : "/login"}><User size={21} aria-hidden />{loggedIn ? "Account" : "Log in"}</Link>

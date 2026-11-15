@@ -131,7 +131,7 @@ export default async function ProductPage({ params }: Props) {
         <section className="mt-12">
           <div className="mb-4 flex items-end justify-between gap-3">
             <h2 className="text-3xl">More from {brand.name}</h2>
-            <Link href={`/brands/${brand.slug}`} className="text-xs font-bold tracking-[0.1em] uppercase underline underline-offset-4">View all</Link>
+            <Link href={`/brands/${brand.slug}`} className="-my-3 inline-flex min-h-11 items-center text-xs font-bold tracking-[0.1em] uppercase underline underline-offset-4">View all</Link>
           </div>
           <ProductGrid products={sameBrand} wished={wished} />
         </section>

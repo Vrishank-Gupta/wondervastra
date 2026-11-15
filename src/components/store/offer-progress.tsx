@@ -51,7 +51,7 @@ export function OfferProgress({ quote }: { quote: Quote }) {
                   <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"><span className="block h-full bg-madder transition-all" style={{ width: `${fill * 100}%` }} /></span>
                   <span className={`-ml-0.5 grid size-4 shrink-0 place-items-center rounded-full ${t.reached ? "bg-madder text-white" : "border-2 border-line bg-white"}`}>{t.reached && <Check size={10} strokeWidth={3} aria-hidden />}</span>
                 </div>
-                <span className={`mt-1 w-full text-right text-[10px] leading-tight break-words ${t.reached ? "font-bold text-madder" : "text-ink-soft"}`} title={`${t.label}: ${t.reward}`}>
+                <span className={`mt-1 w-full text-right text-[11px] leading-tight break-words ${t.reached ? "font-bold text-madder" : "text-ink-soft"}`} title={`${t.label}: ${t.reward}`}>
                   <span className="sr-only">{t.reached ? "Unlocked: " : ""}</span>{t.reward.replace(/ \(up to .*\)$/, "")}<span className="block font-normal">{t.minPieces ? `${t.minPieces} pieces` : money(t.minSubtotal)}</span>
                 </span>
               </li>

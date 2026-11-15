@@ -29,7 +29,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const fb = closed ? null : order.deliveredAt && settings.deliveryFeedbackEnabled ? "delivery" : order.placedAt && settings.orderFeedbackEnabled ? "order" : null;
   return (
     <div className="container-x py-6">
-      {placed && <CartResetOnPlaced />}
+      {placed && <CartResetOnPlaced orderNumber={order.number} />}
       {placed && order.status !== "pending_payment" && (
         <div className="pop-in mb-5 flex items-start gap-3 rounded-sm border border-line bg-pine-soft p-4">
           <PartyPopper aria-hidden className="shrink-0" />

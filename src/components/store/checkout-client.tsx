@@ -10,6 +10,7 @@ import { useCart } from "./cart-context";
 import { OfferProgress } from "./offer-progress";
 import { CouponBox, PriceSummary } from "./price-summary";
 import { useQuote } from "./use-quote";
+import { track } from "./tracker";
 import { AreaWaitlist, etaLabel, lookupPin, rememberPin, savedPin, type PinResult } from "./delivery-check";
 
 type Addr = { id: string; name: string; phone: string; line1: string; line2: string | null; city: string; state: string; pincode: string };
@@ -41,6 +42,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
 
   const { quote } = useQuote(items, { coupon, paymentMethod: method, email, phone, enabled: ready });
 
+  useEffect(() => { track("checkout_start"); }, []);
   useEffect(() => {
     if (quote && !quote.codAvailable && method === "cod" && online) setMethod("razorpay");
   }, [quote, method, online]);

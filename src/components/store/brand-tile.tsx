@@ -14,7 +14,7 @@ export function BrandTile({ brand }: { brand: Brand }) {
     <Link href={`/brands/${brand.slug}`} className="group flex flex-col">
       <span className={`relative grid aspect-[3/2] place-items-center border p-4 transition-colors ${brand.isHouse ? "border-ink bg-ink text-white group-hover:bg-madder group-hover:border-madder" : "border-line bg-white group-hover:border-ink"}`}>
         <BrandMark brand={brand} className="h-full w-full text-[clamp(1.1rem,3.6vw,1.7rem)]" />
-        {brand.isHouse && <span className="absolute top-1.5 left-1.5 bg-madder px-1.5 py-0.5 text-[9px] font-bold tracking-[0.1em] text-white uppercase group-hover:bg-white group-hover:text-madder">Our label</span>}
+        {brand.isHouse && <span className="absolute top-1.5 left-1.5 bg-madder px-1.5 py-0.5 text-[11px] font-bold tracking-[0.1em] text-white uppercase group-hover:bg-white group-hover:text-madder">Our label</span>}
       </span>
       {brand.productCount != null && <span className="mt-1.5 text-center text-[11px] font-semibold text-ink-soft">{brand.productCount} {brand.productCount === 1 ? "style" : "styles"}</span>}
     </Link>

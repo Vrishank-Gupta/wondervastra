@@ -72,7 +72,7 @@ export function LoginForm({ next, google, initialError = "" }: { next: string; g
           <div><label className="label" htmlFor="id">Email or mobile number</label><input id="id" className="input" required autoComplete="username" value={input} onChange={(e) => setInput(e.target.value)} /></div>
           <Err text={error} />
           <button className="btn btn-primary w-full" disabled={busy}><Spin on={busy} />Send login code</button>
-          <button type="button" className="w-full text-sm font-medium underline" onClick={() => go("password")}>Log in with a password instead</button>
+          <button type="button" className="min-h-11 w-full text-sm font-medium underline" onClick={() => go("password")}>Log in with a password instead</button>
         </form>
       )}
       {mode === "code" && sentTo && (
@@ -82,7 +82,7 @@ export function LoginForm({ next, google, initialError = "" }: { next: string; g
           <CodeInput value={code} onChange={setCode} />
           <Err text={error} />
           <button className="btn btn-primary w-full" disabled={busy}><Spin on={busy} />Log in</button>
-          <button type="button" className="w-full text-sm font-medium underline" onClick={() => go("code")}>Use a different number or email</button>
+          <button type="button" className="min-h-11 w-full text-sm font-medium underline" onClick={() => go("code")}>Use a different number or email</button>
         </form>
       )}
 
@@ -105,7 +105,7 @@ export function LoginForm({ next, google, initialError = "" }: { next: string; g
           <div><label className="label" htmlFor="email">Email</label><input id="email" className="input" type="email" required autoComplete="email" value={input} onChange={(e) => setInput(e.target.value)} /></div>
           <Err text={error} />
           <button className="btn btn-primary w-full" disabled={busy}><Spin on={busy} />Email me a code</button>
-          <button type="button" className="w-full text-sm font-medium underline" onClick={() => go("password")}>Back to log in</button>
+          <button type="button" className="min-h-11 w-full text-sm font-medium underline" onClick={() => go("password")}>Back to log in</button>
         </form>
       )}
       {mode === "forgot" && sentTo && (
@@ -160,7 +160,7 @@ export function SignupForm({ next, google }: { next: string; google: boolean }) 
           <CodeInput value={code} onChange={setCode} />
           <Err text={error} />
           <button className="btn btn-primary w-full" disabled={busy}><Spin on={busy} />Confirm and create account</button>
-          <button type="button" className="w-full text-sm font-medium underline" onClick={() => { setSentTo(null); setCode(""); setError(""); }}>Change email</button>
+          <button type="button" className="min-h-11 w-full text-sm font-medium underline" onClick={() => { setSentTo(null); setCode(""); setError(""); }}>Change email</button>
         </form>
       )}
       <p className="mt-5 border-t border-line pt-4 text-center text-sm">Already have an account? <Link className="font-semibold underline" href={`/login?next=${encodeURIComponent(next)}`}>Log in</Link></p>

@@ -531,3 +531,38 @@ export const returnRequests = sqliteTable(
   (t) => [index("returns_order").on(t.orderId)],
 );
 
+
+/** First-party analytics: one row per page view (with time spent), no personal data. */
+export const pageViews = sqliteTable(
+  "page_views",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    path: text("path").notNull(),
+    productId: text("product_id"),
+    referrer: text("referrer"),
+    source: text("source"),
+    device: text("device"),
+    city: text("city"),
+    /** Time the page was visible, and how far down it was scrolled (0–100). */
+    durationMs: integer("duration_ms").notNull().default(0),
+    scrollPct: integer("scroll_pct").notNull().default(0),
+    createdAt: created(),
+  },
+  (t) => [index("pv_created").on(t.createdAt), index("pv_session").on(t.sessionId), index("pv_product").on(t.productId)],
+);
+
+/** Clicks and shopping steps: add to cart, search, size guide, checkout, purchase. */
+export const siteEvents = sqliteTable(
+  "site_events",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    type: text("type").notNull(),
+    path: text("path"),
+    label: text("label"),
+    productId: text("product_id"),
+    createdAt: created(),
+  },
+  (t) => [index("ev_created").on(t.createdAt), index("ev_type").on(t.type)],
+);

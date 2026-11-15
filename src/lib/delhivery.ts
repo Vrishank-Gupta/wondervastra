@@ -67,6 +67,35 @@ export function etaDate(now: Date, dispatchDays: number, transit: number) {
   return d;
 }
 
+/**
+ * Registers our pickup address ("warehouse") with Delhivery, so shipments can be booked without
+ * visiting Delhivery One. An address already registered under the same name counts as done.
+ */
+export async function registerPickup(w: { name: string; address: string; city: string; state: string; pin: string; phone: string; email: string }) {
+  const body = {
+    name: w.name, registered_name: w.name, address: w.address, city: w.city, pin: w.pin, country: "India", phone: w.phone.replace(/\D/g, "").slice(-10), email: w.email,
+    return_address: w.address, return_city: w.city, return_state: w.state, return_pin: w.pin, return_country: "India",
+  };
+  let json: Record<string, unknown>;
+  try { json = await call("/api/backend/clientwarehouse/create/", { method: "POST", body: JSON.stringify(body) }) as unknown as Record<string, unknown>; }
+  catch (e) { throw new Error(`Delhivery didn't save the pickup address. ${(e as Error).message}`); }
+  const text = JSON.stringify(json).toLowerCase();
+  if (json.success === true || /already exist/.test(text)) return;
+  const why = typeof json.error === "string" ? json.error : Array.isArray(json.error) ? json.error.join(" ") : typeof json.message === "string" ? json.message : "";
+  throw new Error(`Delhivery didn't save the pickup address${why ? `: ${why}` : "."}`);
+}
+
+/** Next pickup slot: today from 2 pm if it's before 1 pm, otherwise tomorrow from 11 am (Sundays skipped). */
+export function nextPickupSlot(now = new Date()) {
+  const ist = new Date(now.getTime() + (330 + now.getTimezoneOffset()) * 60_000);
+  const d = new Date(ist);
+  let time = "14:00";
+  if (ist.getHours() >= 13) { d.setDate(d.getDate() + 1); time = "11:00"; }
+  if (d.getDay() === 0) { d.setDate(d.getDate() + 1); time = "11:00"; }
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { date, time };
+}
+
 /* ---------- Shipments ---------- */
 
 export type ShipmentInput = {

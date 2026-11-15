@@ -770,3 +770,49 @@ export async function bulkLabels(orderIds: string[]): Promise<Result & { labels?
     return { ok: true, labels };
   } catch (e) { return fail(e); }
 }
+export async function setupPickupAction(input: { name: string; address: string; city: string; state: string; pin: string; phone: string; existing: boolean }): Promise<Result> {
+  const a = await requireAdmin();
+  try {
+    const str = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(0, n) : "");
+    const w = { name: str(input.name, 60), address: str(input.address, 200), city: str(input.city, 60), state: str(input.state, 60), pin: str(input.pin, 6), phone: str(input.phone, 20) };
+    if (w.name.length < 3) return { error: "Give the pickup address a name, like WonderVastra Warehouse." };
+    if (!/^[1-9]\d{5}$/.test(w.pin)) return { error: "Enter the 6-digit pincode of your pickup address." };
+    const { getSettingsFresh, saveSettings } = await import("@/lib/settings");
+    const s = await getSettingsFresh();
+    if (!input.existing) {
+      if (w.address.length < 8 || w.city.length < 2 || w.state.length < 2) return { error: "Enter the full pickup address: house/shop, street, city and state." };
+      if (w.phone.replace(/\D/g, "").length < 10) return { error: "Enter a 10-digit phone number for the courier." };
+      const { registerPickup } = await import("@/lib/delhivery");
+      await registerPickup({ ...w, email: s.supportEmail || s.adminAlertEmail || "support@wondervastra.in" });
+    }
+    await saveSettings({ delhiveryPickupName: w.name, delhiveryPickupPin: w.pin, ...(!s.businessAddress && w.address ? { businessAddress: `${w.address}, ${w.city}, ${w.state} ${w.pin}` } : {}) });
+    await audit(a, "settings", "settings", null, `Delhivery pickup address set: ${w.name} (${w.pin})${input.existing ? "" : ", registered with Delhivery"}`);
+    revalidatePath("/admin/orders", "layout");
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+export async function shipNowAction(orderId: string, grams: number): Promise<Result & { awb?: string; pickup?: string }> {
+  const a = await requireAdmin();
+  try {
+    if (!(grams >= 50 && grams <= 30000)) return { error: "Enter the parcel weight in grams, like 500." };
+    const { bookDelhivery } = await import("@/lib/shipping");
+    const r = await bookDelhivery(orderId, Math.round(grams), a.name);
+    // Book the courier visit too. One pickup per day collects every parcel, so an existing booking is fine.
+    const dl = await import("@/lib/delhivery");
+    const { getSettingsFresh } = await import("@/lib/settings");
+    const s = await getSettingsFresh();
+    const slot = dl.nextPickupSlot();
+    const day = new Date(`${slot.date}T00:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    const when = `${day} from ${slot.time === "14:00" ? "2 pm" : "11 am"}`;
+    const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(schema.orders).where(and(eq(schema.orders.courier, "Delhivery"), inArray(schema.orders.status, ["confirmed", "packed"])));
+    let pickup = `Pickup booked for ${when}.`;
+    try { await dl.requestPickup(s.delhiveryPickupName.trim(), slot.date, slot.time, Math.max(1, Number(n))); }
+    catch (e) { pickup = /already booked/i.test((e as Error).message) ? `Pickup already booked for ${when}; this parcel goes with it.` : `Shipment booked, but the pickup wasn't: ${(e as Error).message} Use "Request a pickup" on the Orders page.`; }
+    await db.update(schema.orders).set({ courierStatus: pickup.startsWith("Shipment booked") ? "Booked, waiting for pickup" : `Booked. ${pickup}` }).where(eq(schema.orders.id, orderId));
+    const { addEvent } = await import("@/lib/orders");
+    await addEvent(db, orderId, "shipment", pickup, { actor: a.name });
+    await audit(a, "shipment", "order", orderId, `Shipped with Delhivery ${r.awb}. ${pickup}`);
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true, awb: r.awb, pickup };
+  } catch (e) { return fail(e); }
+}

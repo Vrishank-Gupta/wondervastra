@@ -276,21 +276,30 @@ export async function notifyOrder(orderId: string, event: OrderEventName) {
       });
     }
     if (event === "order_placed" && s.adminAlertEmail) {
+      // Everything needed to pack and ship, without opening admin.
+      const rows = items.map((i) => `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee"><b>${escapeHtml(i.name)}</b>${i.variantLabel ? `<br><span style="color:#666">${escapeHtml(i.variantLabel)}</span>` : ""}${i.sku ? `<br><span style="color:#999;font-family:monospace">${escapeHtml(i.sku)}</span>` : ""}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center"><b>${i.qty}</b></td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${money(i.unitPrice * i.qty)}</td></tr>`).join("");
+      const pieces = items.reduce((a, i) => a + i.qty, 0);
       await dispatch({
         orderId,
         event: "admin_new_order",
         email: {
           to: s.adminAlertEmail,
-          subject: `New order ${o.number} · ${money(o.total)}`,
+          subject: `Pack order ${o.number}: ${pieces} ${pieces === 1 ? "piece" : "pieces"} · ${money(o.total)} ${o.paymentMethod === "cod" ? "COD" : "prepaid"}`,
           html: renderEmail({
-            heading: "You have a new order",
-            lines: [`<b>${escapeHtml(o.name)}</b> ordered <b>${money(o.total)}</b> (${o.paymentMethod === "cod" ? "COD" : "prepaid"}).`],
+            heading: `New order ${escapeHtml(o.number)}`,
+            lines: [
+              `<b>${escapeHtml(o.name)}</b> · ${escapeHtml(o.phone)} · ${escapeHtml(o.email)}`,
+              `<b>Ship to:</b> ${escapeHtml([o.line1, o.line2, `${o.city}, ${o.state} ${o.pincode}`].filter(Boolean).join(", "))}`,
+              `<table style="width:100%;border-collapse:collapse;font-size:14px;margin:8px 0"><tr style="background:#f6f1ec"><th style="padding:6px 8px;text-align:left">Item</th><th style="padding:6px 8px">Qty</th><th style="padding:6px 8px;text-align:right">Amount</th></tr>${rows}</table>`,
+              `<b>Total ${money(o.total)}</b> · ${o.paymentMethod === "cod" ? "Cash on delivery: collect on delivery" : `Paid online (${escapeHtml(o.paymentStatus)})`}${o.offerName ? ` · ${escapeHtml(o.offerName)}` : ""}${o.couponCode ? ` · coupon ${escapeHtml(o.couponCode)}` : ""}`,
+              ...(o.customerNote ? [`<b>Customer note:</b> ${escapeHtml(o.customerNote)}`] : []),
+              `Pack ${pieces} ${pieces === 1 ? "piece" : "pieces"}, then open the order to book Delhivery and print the label.`,
+            ],
             cta: { label: "Open order", url: `${siteUrl()}/admin/orders/${o.id}` },
           }, "Store alert"),
         },
       });
-    }
-  } catch (e) {
+    }  } catch (e) {
     console.error("notifyOrder failed", event, orderId, e);
   }
 }

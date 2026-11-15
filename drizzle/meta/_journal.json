@@ -92,6 +92,13 @@
       "when": 1794725391446,
       "tag": "0012_size_chart",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794728578332,
+      "tag": "0013_analytics",
+      "breakpoints": true
     }
   ]
 }

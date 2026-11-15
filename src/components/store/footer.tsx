@@ -45,7 +45,7 @@ export function TrustStrip({ settings }: { settings: StoreSettings }) {
 
 export function Footer({ categories, settings }: { categories: { name: string; slug: string; comingSoon?: boolean }[]; settings: StoreSettings }) {
   const h = "mb-4 text-xs font-bold tracking-[0.14em] text-white uppercase";
-  const a = "text-white/70 transition-colors hover:text-white";
+  const a = "inline-flex min-h-11 items-center text-white/70 transition-colors hover:text-white md:min-h-0";
   return (
     <footer className="mt-14 bg-wine text-white no-print">
       <div className="container-x grid grid-cols-2 gap-x-6 gap-y-10 py-12 md:grid-cols-[2fr_1fr_1fr_1fr]">
@@ -53,7 +53,7 @@ export function Footer({ categories, settings }: { categories: { name: string; s
           <p aria-label="WonderVastra"><Logo onDark size="lg" /></p>
           <p className="mt-3 max-w-xs text-sm text-white/70">{settings.tagline}</p>
           {(settings.whatsappNumber || settings.supportEmail) && (
-            <ul className="mt-5 space-y-2 text-sm" aria-label="Customer support">
+            <ul className="mt-5 space-y-0 text-sm md:space-y-2" aria-label="Customer support">
               {settings.whatsappNumber && <li><a className={`${a} inline-flex items-center gap-2`} href={waLink(settings.whatsappNumber, "Hi WonderVastra, I have a question.")} target="_blank" rel="noreferrer"><MessageCircle size={16} aria-hidden /> WhatsApp {settings.whatsappNumber}</a></li>}
               {settings.supportEmail && <li><a className={`${a} inline-flex items-center gap-2`} href={`mailto:${settings.supportEmail}`}><Mail size={16} aria-hidden /> {settings.supportEmail}</a></li>}
               {settings.supportHours && <li className="inline-flex items-center gap-2 text-white/55"><Clock size={16} aria-hidden /> {settings.supportHours}</li>}
@@ -67,7 +67,7 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         </div>
         <div>
           <h2 className={h} style={{ fontStretch: "100%" }}>Shop</h2>
-          <ul className="space-y-2.5 text-sm">
+          <ul className="space-y-0 text-sm md:space-y-2.5">
             <li><Link className={a} href="/brands">All brands</Link></li>
             {categories.slice(0, 8).map((c) => <li key={c.slug}><Link className={a} href={`/c/${c.slug}`}>{c.name}</Link>{c.comingSoon && <span className="ml-1.5 text-[11px] text-white/45">· soon</span>}</li>)}
             <li><Link className={a} href="/sale">Sale & offers</Link></li>
@@ -75,7 +75,7 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         </div>
         <div>
           <h2 className={h} style={{ fontStretch: "100%" }}>Help</h2>
-          <ul className="space-y-2.5 text-sm">
+          <ul className="space-y-0 text-sm md:space-y-2.5">
             <li><Link className={a} href="/track">Track your order</Link></li>
             <li><Link className={a} href="/info/faq">FAQs</Link></li>
             <li><Link className={a} href="/info/shipping-policy">Shipping</Link></li>
@@ -85,7 +85,7 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         </div>
         <div>
           <h2 className={h} style={{ fontStretch: "100%" }}>About</h2>
-          <ul className="space-y-2.5 text-sm">
+          <ul className="space-y-0 text-sm md:space-y-2.5">
             <li><Link className={a} href="/info/about">Our story</Link></li>
             <li><Link className={a} href="/info/privacy-policy">Privacy policy</Link></li>
             <li><Link className={a} href="/info/terms">Terms of use</Link></li>

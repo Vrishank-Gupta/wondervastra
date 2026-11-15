@@ -51,7 +51,7 @@ body { background: var(--color-ivory); color: var(--color-ink); font-family: var
   .btn-red:hover:not(:disabled) { @apply bg-ink; }
   .btn-sm { @apply px-3.5 py-1.5 text-xs tracking-[0.06em]; min-height: 38px; }
   .card, .card-pop { @apply border border-line bg-white; }
-  .sticker { @apply inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-none font-bold tracking-[0.08em] uppercase; }
+  .sticker { @apply inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-none font-bold tracking-[0.08em] uppercase; }
   .eyebrow { @apply text-xs font-bold tracking-[0.14em] uppercase; }
   .input { @apply w-full border border-[#cfcfcf] bg-white px-3.5 py-2.5 text-base transition-colors outline-none; min-height: 48px; }
   .input:focus { @apply border-ink; }
@@ -82,4 +82,12 @@ body { background: var(--color-ivory); color: var(--color-ink); font-family: var
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; }
+}
+
+/* Touch screens: every tap target at least 44px, without changing the desktop look. */
+@media (pointer: coarse) {
+  .btn-sm { min-height: 44px; }
+  .link-quiet { display: inline-flex; align-items: center; min-height: 44px; }
+  nav[aria-label="Breadcrumb"] a { padding-block: 15px; margin-block: -15px; }
+  select { min-height: 44px; }
 }

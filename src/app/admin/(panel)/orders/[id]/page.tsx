@@ -82,11 +82,14 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
               orderId={o.id} status={o.status} ready={shippingReady(s)}
               booked={o.awb && o.courier === DELHIVERY ? { awb: o.awb, trackingUrl: o.trackingUrl, courierStatus: o.courierStatus, statusAt: o.courierStatusAt, etaAt: o.etaAt, cost: o.shippingCost } : null}
               quote={!o.awb && shippingReady(s) && ["confirmed", "packed"].includes(o.status) ? await quoteShipment(o.id).catch(() => null) : null}
+              shipTo={`${o.name}, ${o.city} ${o.pincode}${o.paymentMethod === "cod" && o.paymentStatus !== "paid" ? ` (collect ${money(o.total)} cash)` : " (prepaid)"}`}
+              setup={{ name: s.storeName || "WonderVastra", phone: s.whatsappNumber, state: s.businessState }}
             />
           )}</div>
           <OrderManager
             order={{ id: o.id, status: o.status, courier: o.courier, awb: o.awb, trackingUrl: o.trackingUrl, total: o.total, refundedTotal: o.refundedTotal, paymentStatus: o.paymentStatus, paymentMethod: o.paymentMethod }}
             nextStatuses={TRANSITIONS[o.status]}
+            delhivery={delhiveryConfigured() && (!o.courier || o.courier === DELHIVERY)}
             notifyVia={[capabilities().email && "email", capabilities().whatsapp && o.whatsappOptIn && "WhatsApp"].filter(Boolean).join(" and ")}
           />
           <Panel title={`Items (${items.reduce((a, i) => a + i.qty, 0)} pcs)`}>

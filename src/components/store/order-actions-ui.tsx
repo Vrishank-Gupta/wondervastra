@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Camera, Check, Clock, MessageSquareHeart, Repeat2, RotateCcw, Star, X, XCircle } from "lucide-react";
 import { cancelOrderAction, reorderItems, requestReturnAction, submitFeedbackAction } from "@/app/(store)/order-actions";
 import { useCart } from "./cart-context";
@@ -127,6 +127,16 @@ export function ReturnPanel({ token, status, deliveredAt, closesAt, open, days, 
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  // The countdown ticks on its own, and the window closes on screen when time runs out.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!open || !closesAt) return;
+    const t = setInterval(() => {
+      setNow(Date.now());
+      if (Date.now() > closesAt) { clearInterval(t); router.refresh(); }
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [open, closesAt, router]);
   const returnable = items.filter((i) => i.returnable);
   if (["cancelled", "pending_payment"].includes(status)) return null;
   const policy = <p className="text-sm text-ink-soft">Returns are accepted within <b>{days} days of delivery</b> for <b>unused, unwashed and undamaged</b> items in their original packaging, with photos. We pick them up from your address once approved.</p>;
@@ -167,8 +177,9 @@ export function ReturnPanel({ token, status, deliveredAt, closesAt, open, days, 
     );
   }
 
-  const left = closesAt ? Math.max(0, closesAt - Date.now()) : 0;
+  const left = closesAt ? Math.max(0, closesAt - now) : 0;
   const hours = Math.floor(left / 3_600_000);
+  const mins = Math.floor((left % 3_600_000) / 60_000);
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploading(true); setError("");
@@ -184,7 +195,7 @@ export function ReturnPanel({ token, status, deliveredAt, closesAt, open, days, 
   return (
     <section className="card space-y-3 p-4 sm:p-5" data-testid="return-panel">
       <h2 className="flex items-center gap-2 text-xl"><RotateCcw size={18} aria-hidden /> Returns</h2>
-      <p className="flex items-start gap-2 rounded-sm bg-pine-soft p-3 text-sm"><Clock size={16} aria-hidden className="mt-0.5 shrink-0" /><span>Delivered {when(deliveredAt)}. <b>Return window open until {closesAt ? when(closesAt) : ""}</b> ({hours >= 24 ? `${Math.floor(hours / 24)} days ${hours % 24} hours` : `${hours} hours`} left).</span></p>
+      <p className="flex items-start gap-2 rounded-sm bg-pine-soft p-3 text-sm"><Clock size={16} aria-hidden className="mt-0.5 shrink-0" /><span>Delivered {when(deliveredAt)}. <b>Return window open until {closesAt ? when(closesAt) : ""}</b> (<span data-testid="return-left" suppressHydrationWarning>{hours >= 24 ? `${Math.floor(hours / 24)} ${Math.floor(hours / 24) === 1 ? "day" : "days"} ${hours % 24} hours` : hours >= 1 ? `${hours} ${hours === 1 ? "hour" : "hours"} ${mins} min` : `${mins} min`}</span> left).</span></p>
       {policy}
       {!form ? (
         <button className="btn btn-white btn-sm" onClick={() => setForm(true)}><RotateCcw size={15} aria-hidden /> Start a return</button>

@@ -38,7 +38,7 @@ export function CartDrawer() {
       <aside className="slide-in absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-ivory">
         <header className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="text-xl">Your cart</h2>
-          <button aria-label="Close cart" className="-mr-2 grid size-10 place-items-center" onClick={() => setDrawerOpen(false)}><X size={18} /></button>
+          <button aria-label="Close cart" className="-mr-2 grid size-11 place-items-center" onClick={() => setDrawerOpen(false)}><X size={18} /></button>
         </header>
         {!items.length ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">

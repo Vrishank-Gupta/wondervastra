@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bell, Boxes, Tags, ExternalLink, FolderTree, History, LayoutDashboard, LogOut, Menu, MessageSquareHeart, Package, Percent, Settings, ShoppingCart, Users, X } from "lucide-react";
+import { Bell, Boxes, Tags, ExternalLink, FolderTree, History, LayoutDashboard, LogOut, Menu, MessageSquareHeart, Package, Percent, Settings, ShoppingCart, Users, X, BarChart3 } from "lucide-react";
 import { adminLogout } from "@/app/admin/actions";
 import { Logo } from "../brand-logo";
 
 const LINKS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart, badge: "orders" },
+  { href: "/admin/analytics", label: "Visitors", icon: BarChart3 },
   { href: "/admin/products", label: "Listings", icon: Package },
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/brands", label: "Brands", icon: Tags },

@@ -95,9 +95,11 @@ test("seller fulfils an order: AWB, tracking link, delivered, both feedback link
   await expect(page.getByRole("link", { name: number })).toBeVisible();
   await page.getByRole("link", { name: number }).click();
 
+  // Delhivery is connected, so hand entry for another courier is one tap away.
+  await page.getByRole("button", { name: "Using a different courier? Add tracking by hand" }).click();
   const shipBtn = page.getByRole("button", { name: "Save & mark shipped" });
   await expect(shipBtn).toBeDisabled(); // No AWB yet.
-  await page.getByLabel("Courier").selectOption("Delhivery");
+  await page.getByLabel("Courier", { exact: true }).selectOption("Delhivery");
   await page.getByLabel("AWB / tracking number").fill("DL123456789");
   await shipBtn.click();
   await expect(page.getByText(/Marked shipped/)).toBeVisible();
@@ -1166,15 +1168,34 @@ test("Delhivery: delivery date, book, label, pickup, tracking to delivered, cust
     }
     if (u.pathname === "/api/p/packing_slip") return json({ packages: [{ pdf_download_link: "https://example.com/label.pdf" }] });
     if (u.pathname === "/api/p/edit") return json({ status: true });
-    if (u.pathname === "/fm/request/new/") return json({ pickup_id: 777 });
+    if (u.pathname === "/fm/request/new/") return seen.filter((p) => p === "/fm/request/new/").length > 1 ? json({ pr_exist: true }) : json({ pickup_id: 777 });
+    if (u.pathname === "/api/backend/clientwarehouse/create/") { expect(JSON.parse(body)).toMatchObject({ name: "WV Hauz Khas", pin: "110016", city: "New Delhi" }); return json({ success: true }); }
     if (u.pathname === "/api/v1/packages/json/") {
       return json({ ShipmentData: (u.searchParams.get("waybill") ?? "").split(",").map((awb) => ({ Shipment: { AWB: awb, Status: { ...scan, StatusDateTime: new Date().toISOString() }, ExpectedDeliveryDate: "2026-12-01T18:00:00" } })) });
     }
     res.writeHead(404).end();
   });
   await new Promise<void>((r) => fake.listen(3198, "127.0.0.1", () => r()));
-  await db.execute(`insert into settings (key, value, updated_at) values ('delhiveryPickupName', '"WV Hauz Khas"', 0), ('delhiveryPickupPin', '"110016"', 0) on conflict(key) do update set value=excluded.value`);
+  await db.execute("delete from settings where key in ('delhiveryPickupName','delhiveryPickupPin')");
   try {
+    // One-time setup from the order page: the pickup address is registered with Delhivery.
+    const vSetup = await variantOf("rupa-boys-thermal-top", 20);
+    const first = await (await createOrder(request, { items: [{ variantId: vSetup, qty: 1 }] }, "10.69.0.9")).json();
+    await adminLogin(page);
+    await page.goto(`/admin/orders/${first.id}`);
+    const setup = page.getByTestId("pickup-setup");
+    await setup.getByLabel("Name for this address").fill("WV Hauz Khas");
+    await setup.getByLabel("Pincode").fill("110016");
+    await setup.getByLabel(/Address \(house/).fill("12 Hauz Khas Village, Near Deer Park");
+    await setup.getByLabel("City").fill("New Delhi");
+    await setup.getByLabel("State").fill("Delhi");
+    await setup.getByLabel("Phone for the courier").fill("9876500000");
+    await setup.getByRole("button", { name: "Save pickup address" }).click();
+    await expect(page.getByTestId("ship-now")).toBeVisible();
+    expect(seen).toContain("/api/backend/clientwarehouse/create/");
+    // The hand-entry courier form stays out of the way.
+    await expect(page.getByLabel("AWB / tracking number")).toHaveCount(0);
+
     // Customers see a delivery date for their pincode.
     const pin = await request.get("/api/pincode/122002").then((r) => r.json());
     expect(pin.serviceable).toBe(true);
@@ -1184,14 +1205,15 @@ test("Delhivery: delivery date, book, label, pickup, tracking to delivered, cust
     const placed = await (await createOrder(request, { items: [{ variantId: v, qty: 2 }] }, "10.69.0.1")).json();
     expect((await one("select eta_at from orders where id=?", [placed.id])).eta_at).toBeTruthy();
 
-    await adminLogin(page);
     await page.goto(`/admin/orders/${placed.id}`);
     const panel = page.getByTestId("delhivery");
-    await expect(panel).toContainText("Shipping costs you about ₹42.01");
+    await expect(panel).toContainText("Costs you about ₹42.01");
     await expect(panel).toContainText("about 2 days after pickup");
-    await expect(page.getByLabel("Parcel weight")).toHaveValue("500"); // 2 pieces × 250 g
-    await panel.getByRole("button", { name: "Book Delhivery shipment" }).click();
+    await expect(panel).toContainText("Parcel: 500 g (2 pieces)");
+    await expect(panel).toContainText("Asha Test1, New Delhi 110016 (collect");
+    await panel.getByTestId("ship-now").click();
     await expect(panel).toContainText("AWB E2EAWB1");
+    await expect(panel).toContainText("Pickup booked for");
     const booked = await one("select status, courier, awb, tracking_url, shipping_cost from orders where id=?", [placed.id]);
     expect(booked).toMatchObject({ status: "packed", courier: "Delhivery", awb: "E2EAWB1", shipping_cost: 4201 });
     expect(booked.tracking_url).toContain("delhivery.com/track-v2/package/E2EAWB1");
@@ -1204,7 +1226,7 @@ test("Delhivery: delivery date, book, label, pickup, tracking to delivered, cust
     await expect(page.getByTestId("pickup")).toContainText("1 booked parcel is waiting for pickup");
     await page.getByRole("button", { name: "Request a pickup" }).click();
     await page.getByRole("button", { name: "Book pickup" }).click();
-    await expect(page.getByTestId("pickup")).toContainText("Pickup booked (request 777)");
+    await expect(page.getByTestId("pickup")).toContainText("A pickup is already booked for that date");
 
     // Tracking moves the order along and the customer sees it.
     scan = { Status: "In Transit", StatusType: "UD", StatusLocation: "Gurgaon_Hub", Instructions: "Shipment in transit" };
@@ -1226,8 +1248,9 @@ test("Delhivery: delivery date, book, label, pickup, tracking to delivered, cust
     // A booked shipment can be cancelled before pickup.
     const second = await (await createOrder(request, { items: [{ variantId: v, qty: 1 }] }, "10.69.0.2")).json();
     await page.goto(`/admin/orders/${second.id}`);
-    await page.getByTestId("delhivery").getByRole("button", { name: "Book Delhivery shipment" }).click();
+    await page.getByTestId("ship-now").click();
     await expect(page.getByTestId("delhivery")).toContainText("AWB E2EAWB2");
+    await expect(page.getByTestId("delhivery")).toContainText("this parcel goes with it");
     await page.getByRole("button", { name: "Cancel shipment" }).click();
     await page.getByRole("button", { name: "Yes, cancel it" }).click();
     await expect(page.getByTestId("delhivery")).toContainText("Shipment cancelled");
@@ -1377,4 +1400,32 @@ test("size guide: table from the admin editor, opens beside the sizes, highlight
   await page.keyboard.press("Escape");
   await expect(guide).toBeHidden();
   await db.execute({ sql: "update products set size_chart='[]' where id=?", args: [prod.id] });
+});
+
+test("visitors: page views, time on page, product views, add to cart and searches show in admin; admins aren't counted", async ({ page, browser }) => {
+  await db.execute("delete from page_views"); await db.execute("delete from site_events");
+  const views = async () => Number((await one("select count(*) n from page_views")).n);
+  await page.goto("/");
+  await expect.poll(views, { timeout: 15_000 }).toBe(1);
+  await page.goto("/p/rupa-boys-thermal-top");
+  await expect.poll(views, { timeout: 15_000 }).toBe(2);
+  await page.locator("#size-picker button:not(.line-through):not([data-testid=size-guide-open])").first().click();
+  await page.getByRole("button", { name: "Add to cart" }).first().click();
+  await page.goto("/shop?q=thermal");
+  await expect.poll(views, { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => Number((await one("select count(*) n from site_events where type='add_to_cart'")).n)).toBe(1);
+  await expect.poll(async () => Number((await one("select max(duration_ms) n from page_views")).n)).toBeGreaterThan(0);
+  const pid = (await one("select id from products where slug='rupa-boys-thermal-top'")).id;
+  expect(Number((await one("select count(*) n from page_views where product_id=?", [pid as string])).n)).toBe(1);
+
+  const admin = await (await browser.newContext()).newPage();
+  await adminLogin(admin);
+  const before = Number((await one("select count(*) n from page_views")).n);
+  await admin.goto("/admin/analytics?d=1");
+  await expect(admin.getByTestId("analytics-totals")).toContainText("Visitors1");
+  await expect(admin.getByText("Boys' Thermal Top").first()).toBeVisible();
+  await expect(admin.getByText(/1 added to cart/)).toBeVisible();
+  await admin.goto("/");
+  await admin.waitForTimeout(1500);
+  expect(Number((await one("select count(*) n from page_views")).n)).toBe(before);
 });

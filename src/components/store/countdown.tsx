@@ -24,7 +24,7 @@ export function Countdown({ endsAt, compact = false, dark = false }: { endsAt: n
       {parts.map(([k, v]) => (
         <div key={k} className={`w-14 py-1.5 text-center ${dark ? "bg-white text-ink" : "bg-ink text-white"}`}>
           <div className="font-display text-2xl leading-none tabular-nums">{pad(v)}</div>
-          <div className="mt-0.5 text-[9px] font-bold tracking-[0.1em] uppercase opacity-70">{k}</div>
+          <div className="mt-0.5 text-[11px] font-bold tracking-[0.1em] uppercase opacity-70">{k}</div>
         </div>
       ))}
     </div>

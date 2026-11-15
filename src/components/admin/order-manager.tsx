@@ -15,7 +15,8 @@ type Props = {
   notifyVia: string;
 };
 
-export function OrderManager({ order, nextStatuses, notifyVia }: Props) {
+export function OrderManager({ order, nextStatuses, notifyVia, delhivery = false }: Props & { delhivery?: boolean }) {
+  const [manual, setManual] = useState(false);
   const router = useRouter();
   const [courier, setCourier] = useState(order.courier ?? "");
   const [awb, setAwb] = useState(order.awb ?? "");
@@ -69,7 +70,10 @@ export function OrderManager({ order, nextStatuses, notifyVia }: Props) {
           )}
         </Panel>
       )}
-      {showShipment && (
+      {showShipment && delhivery && !manual && (
+        <p className="text-sm text-ink-soft"><button type="button" className="underline" onClick={() => setManual(true)}>Using a different courier? Add tracking by hand</button></p>
+      )}
+      {showShipment && (!delhivery || manual) && (
         <Panel title="Shipment">
           <div className="grid gap-3 sm:grid-cols-2">
             <div><label className="label" htmlFor="courier">Courier</label>

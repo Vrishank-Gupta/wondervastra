@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Bell, Check, ChevronDown, Heart, Link2, MessageCircle, RotateCcw, Ruler, ShieldCheck, Star, Truck, Wallet } from "lucide-react";
 import { money } from "@/lib/format";
 import { ProductGallery } from "./product-gallery";
+import { track } from "./tracker";
 import { SizeGuideButton, SizeTables, type SizeTable } from "./size-guide";
 import NextImage from "next/image";
 import { useCart } from "./cart-context";
@@ -34,8 +35,8 @@ type Props = {
 
 function Accordion({ title, children, open = false }: { title: string; children: React.ReactNode; open?: boolean }) {
   return (
-    <details open={open} className="group border-b border-line py-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between text-[13px] font-bold tracking-[0.08em] uppercase">{title}<ChevronDown size={18} className="transition-transform group-open:rotate-180" aria-hidden /></summary>
+    <details open={open} className="group border-b border-line py-1">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[13px] font-bold tracking-[0.08em] uppercase">{title}<ChevronDown size={18} className="transition-transform group-open:rotate-180" aria-hidden /></summary>
       <div className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink-soft">{children}</div>
     </details>
   );
@@ -152,7 +153,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     setSizeError(true);
     document.getElementById("size-picker")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const addVariant = (open: boolean) => { if (variant) for (const id of variant.id.split("+")) add(id, Math.min(qty, Math.max(cap, 1)), { open }); };
+  const addVariant = (open: boolean) => { if (variant) { for (const id of variant.id.split("+")) add(id, Math.min(qty, Math.max(cap, 1)), { open }); track("add_to_cart", `${p.name} · ${variant.option2} · ${variant.option1}`, p.id); } };
   const buyNow = () => { if (choosing) return askSize(); if (variant) { addVariant(false); router.push("/checkout"); } };
   const addCart = () => { if (choosing) return askSize(); if (variant) { addVariant(true); setQty(qtyFor(color)); } };
   /** For "notify me" on a sold-out set: the piece that ran out. */
@@ -165,7 +166,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   };
 
   return (
-    <div className="grid gap-6 pb-24 md:grid-cols-2 md:gap-10 md:pb-0">
+    <div className="grid gap-6 pb-24 md:grid-cols-2 md:gap-10 md:pb-0" data-product-id={p.id}>
       <div className="-mx-4 min-w-0 sm:mx-0 md:sticky md:top-32 md:self-start">
         <ProductGallery images={images} name={p.name} index={imgIdx} onIndex={setImgIdx}
           badge={soon ? <span className="sticker absolute top-3 left-3 bg-slate text-white">Coming soon</span> : pct > 0 && <span className="sticker absolute top-3 left-3 bg-madder text-white">{pct}% off</span>} />
@@ -175,7 +176,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         {brand && (
           <Link href={`/brands/${brand.slug}`} className="mb-2 inline-flex items-center gap-2.5 text-xs font-extrabold tracking-[0.12em] uppercase hover:text-madder" data-testid="brand-link">
             {brand.logo && <span className="relative h-10 w-24 shrink-0 overflow-hidden rounded-sm border border-line bg-white"><NextImage src={brand.logo} alt="" fill sizes="96px" className="object-contain p-0.5" /></span>}
-            <span>{brand.name}</span>{brand.isHouse && <span className="bg-ink px-1.5 py-0.5 text-[10px] text-white">Our label</span>}
+            <span>{brand.name}</span>{brand.isHouse && <span className="bg-ink px-1.5 py-0.5 text-[11px] text-white">Our label</span>}
           </Link>
         )}
         <h1 className="text-[2.4rem] sm:text-5xl">{p.name}</h1>
@@ -217,7 +218,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
                 const any = sizes.some((s) => (pick(s, c.name)?.stock ?? 0) > 0);
                 if (asText) return (
                   <button key={c.name} type="button" aria-pressed={c.name === color} onClick={() => pickColor(c.name)}
-                    className={`border px-3.5 py-2 text-sm font-semibold ${c.name === color ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${any ? "" : "text-ink/40 line-through"}`}>{c.name}</button>
+                    className={`min-h-11 border px-3.5 py-2 text-sm font-semibold ${c.name === color ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${any ? "" : "text-ink/40 line-through"}`}>{c.name}</button>
                 );
                 return (
                   <button key={c.name} type="button" aria-pressed={c.name === color} aria-label={`${c.name}${any ? "" : ", sold out"}`} title={c.name} onClick={() => pickColor(c.name)}
@@ -240,7 +241,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
                 const h = p.sizeHeights[s];
                 return (
                   <button key={s} type="button" aria-pressed={s === size} aria-label={h ? `${s}, ${h} cm${out ? ", sold out" : ""}` : undefined} onClick={() => { setSize(s); setQty(qtyFor(color)); setSizeError(false); }}
-                    className={`min-w-12 border px-3.5 text-sm font-semibold ${h ? "py-1.5 leading-tight" : "py-2.5"} ${s === size ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${out ? "text-ink/40 line-through" : ""}`}>
+                    className={`min-h-11 min-w-12 border px-3.5 text-sm font-semibold ${h ? "py-1.5 leading-tight" : "py-2.5"} ${s === size ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${out ? "text-ink/40 line-through" : ""}`}>
                     {s}{h && <span className={`block text-[11px] font-medium ${s === size ? "text-white/80" : "text-ink-soft"}`}>{h} cm</span>}
                   </button>
                 );

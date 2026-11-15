@@ -162,7 +162,7 @@ export function MobileFilters({ facets, count }: { facets: FacetData; count: num
           <div className="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col bg-ivory">
             <div className="flex items-center justify-between border-b border-line p-4">
               <h2 className="text-xl">Filters</h2>
-              <button aria-label="Close filters" onClick={() => setOpen(false)} className="-mr-2 grid size-10 place-items-center"><X size={18} /></button>
+              <button aria-label="Close filters" onClick={() => setOpen(false)} className="-mr-2 grid size-11 place-items-center"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4"><FilterGroups facets={facets} /></div>
             <div className="flex gap-2 border-t border-line p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">

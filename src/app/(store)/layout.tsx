@@ -1,6 +1,8 @@
 import { capabilities } from "@/lib/capabilities";
 import { CartProvider } from "@/components/store/cart-context";
 import { CartDrawer } from "@/components/store/cart-drawer";
+import { Tracker } from "@/components/store/tracker";
+import { Suspense } from "react";
 import { Footer, WhatsAppFab } from "@/components/store/footer";
 import { Header, MobileTabBar } from "@/components/store/header";
 import { getCustomer } from "@/lib/auth";
@@ -34,6 +36,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       <Footer categories={nav} settings={settings} />
       <MobileTabBar loggedIn={Boolean(customer)} />
       <WhatsAppFab number={settings.whatsappNumber} />
+      <Suspense fallback={null}><Tracker /></Suspense>
       <CartDrawer />
     </CartProvider>
   );

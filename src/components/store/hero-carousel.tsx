@@ -50,7 +50,7 @@ export function HeroCarousel({ slides }: { slides: Slide[] }) {
       {slides.length > 1 && (
         <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1">
           {slides.map((s, i) => (
-            <button key={s.key} type="button" aria-label={`Show slide ${i + 1}`} aria-current={i === active} onClick={() => go(i)} className="group grid h-8 place-items-center px-1"><span className={`block h-1 transition-all ${i === active ? "w-8 bg-white" : "w-4 bg-white/45 group-hover:bg-white/80"}`} /></button>
+            <button key={s.key} type="button" aria-label={`Show slide ${i + 1}`} aria-current={i === active} onClick={() => go(i)} className="group grid h-11 place-items-center px-1.5"><span className={`block h-1 transition-all ${i === active ? "w-8 bg-white" : "w-4 bg-white/45 group-hover:bg-white/80"}`} /></button>
           ))}
         </div>
       )}

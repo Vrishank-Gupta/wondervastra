@@ -19,7 +19,7 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
     <div className="container-x py-6">
       <h1 className="text-5xl sm:text-7xl">{title}</h1>
       <nav aria-label="Categories" className="scrollbar-none -mx-4 mt-4 mb-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        {cats.map((c) => <Link key={c.id} href={`/c/${c.slug}`} className="shrink-0 border border-[#cfcfcf] px-4 py-2 text-xs font-bold tracking-[0.06em] uppercase transition-colors hover:border-ink hover:bg-ink hover:text-white">{c.name}{c.comingSoon && <span className="ml-1.5 text-ink-soft">· Soon</span>}</Link>)}
+        {cats.map((c) => <Link key={c.id} href={`/c/${c.slug}`} className="flex min-h-11 shrink-0 items-center border border-[#cfcfcf] px-4 py-2 text-xs font-bold tracking-[0.06em] uppercase transition-colors hover:border-ink hover:bg-ink hover:text-white">{c.name}{c.comingSoon && <span className="ml-1.5 text-ink-soft">· Soon</span>}</Link>)}
       </nav>
       <Listing cards={cards} filters={filters} />
     </div>
