@@ -44,7 +44,7 @@ test("browse, search, cart nudges, coupon, simulated payment, confirmation", asy
   await expect(page.getByText("Select a size to see availability.")).toBeVisible();
   await page.getByRole("button", { name: "Add to cart" }).first().click();
   await expect(page.getByText("Please select a size first.")).toBeVisible();
-  await page.locator("#size-picker button:not(.line-through)").first().click();
+  await page.locator("#size-picker button:not(.line-through):not([data-testid=size-guide-open])").first().click();
   await expect(page.getByText(/pieces? (available|left)/)).toBeVisible();
   await page.getByRole("button", { name: "Add to cart" }).first().click();
 
@@ -192,7 +192,7 @@ test("out of stock: subscribe, seller restocks, buyer is notified exactly once",
   expect((await one("select * from stock_alerts where id=?", [a.id as unknown as string])).status).toBe("notified");
 
   await page.goto("/p/amul-girls-thermal-leggings");
-  await page.locator("#size-picker button:not(.line-through)").first().click();
+  await page.locator("#size-picker button:not(.line-through):not([data-testid=size-guide-open])").first().click();
   await expect(page.getByText(/7 pieces available/)).toBeVisible();
 });
 
@@ -801,7 +801,7 @@ test("round 3: Delhi NCR delivery area, discount ladder, open-ended sale, WhatsA
   expect((await far.json()).error).toMatch(/only in Delhi NCR/);
 
   // Checkout: the remembered pincode is filled in, and an outside pincode is explained on the spot.
-  await page.locator("#size-picker button:not(.line-through)").first().click();
+  await page.locator("#size-picker button:not(.line-through):not([data-testid=size-guide-open])").first().click();
   await page.getByRole("button", { name: "Add to cart" }).first().click();
   const drawer = page.getByRole("dialog", { name: "Your cart" });
   await expect(drawer.getByText(/Delivering to .*122002/)).toBeVisible();
@@ -919,7 +919,7 @@ test("kids' sizes show age and height together, set per listing", async ({ page 
   await page.goto("/p/rupa-boys-thermal-top");
   await expect(page.locator("#size-picker").getByRole("button", { name: /^4–6 Y, 104–116 cm/ })).toBeVisible();
   await expect(page.locator("#size-picker").getByRole("button", { name: "12–14 Y", exact: true })).toBeVisible();
-  await page.getByText("Size guide").click();
+  await page.getByRole("group").getByText("Size guide", { exact: true }).last().click().catch(() => page.locator("summary", { hasText: "Size guide" }).click());
   await expect(page.getByRole("cell", { name: "92–104 cm" })).toBeVisible();
   await db.execute({ sql: "update products set size_heights='{}' where id=?", args: [prod.id] });
 });
