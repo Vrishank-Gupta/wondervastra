@@ -117,5 +117,7 @@ export async function syncDelhivery() {
       }
     }
   }
-  return { checked: open.length, updated };
+  const { syncReturnPickups } = await import("./returns");
+  const returns = await syncReturnPickups().catch((e) => { console.error("return pickups", e); return 0; });
+  return { checked: open.length, updated: updated + returns };
 }

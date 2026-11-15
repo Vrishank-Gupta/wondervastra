@@ -1238,3 +1238,118 @@ test("Delhivery: delivery date, book, label, pickup, tracking to delivered, cust
     await db.execute("delete from settings where key in ('delhiveryPickupName','delhiveryPickupPin')");
   }
 });
+
+test("returns: 3-day window from delivery, photos and reason, admin approves with Delhivery pickup, receives, refunds; rejection; order list next steps", async ({ page, request }) => {
+  let scan = { Status: "Pickup Scheduled", StatusType: "PP", StatusLocation: "Delhi", Instructions: "" };
+  const fake = createServer(async (req, res) => {
+    const u = new URL(req.url!, "http://127.0.0.1:3198");
+    const body = await new Promise<string>((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => r(b)); });
+    const json = (o: unknown) => res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(o));
+    if (u.pathname === "/api/dc/expected_tat") return json({ success: true, data: { tat: 1 } });
+    if (u.pathname === "/api/kinko/v1/invoice/charges/.json") return json([{ total_amount: 40 }]);
+    if (u.pathname === "/api/cmu/create.json") {
+      const sh = JSON.parse(new URLSearchParams(body).get("data")!).shipments[0];
+      return json({ packages: [{ waybill: sh.payment_mode === "Pickup" ? "RETAWB1" : `FWD${sh.order}`, status: "Success" }] });
+    }
+    if (u.pathname === "/api/v1/packages/json/") return json({ ShipmentData: (u.searchParams.get("waybill") ?? "").split(",").map((awb) => ({ Shipment: { AWB: awb, Status: { ...scan, StatusDateTime: new Date().toISOString() } } })) });
+    res.writeHead(404).end();
+  });
+  await new Promise<void>((r) => fake.listen(3198, "127.0.0.1", () => r()));
+  await db.execute(`insert into settings (key, value, updated_at) values ('delhiveryPickupName', '"WV Hauz Khas"', 0), ('delhiveryPickupPin', '"110016"', 0) on conflict(key) do update set value=excluded.value`);
+  const v = await variantOf("rupa-boys-thermal-top", 20);
+  const delivered = async (ip: string, daysAgo: number) => {
+    const o = await (await createOrder(request, { items: [{ variantId: v, qty: 2 }] }, ip)).json();
+    await db.execute({ sql: "update orders set status='delivered', payment_status='paid', delivered_at=? where id=?", args: [Date.now() - daysAgo * 86400_000, o.id] });
+    return o as { id: string; accessToken: string; number: string };
+  };
+  try {
+    const old = await delivered("10.70.0.1", 4);
+    await page.goto(`/order/${old.accessToken}`);
+    await expect(page.getByTestId("return-panel")).toContainText("The return window closed");
+
+    const o = await delivered("10.70.0.2", 1);
+    await page.goto(`/order/${o.accessToken}`);
+    const panel = page.getByTestId("return-panel");
+    await expect(panel).toContainText("Return window open until");
+    await expect(panel).toContainText("unused, unwashed and undamaged");
+    await panel.getByRole("button", { name: "Start a return" }).click();
+    await panel.getByRole("button", { name: "Send return request" }).click();
+    await expect(panel.getByRole("alert")).toHaveText("Choose the items you want to return.");
+    await panel.getByRole("checkbox", { name: /^Return / }).check();
+    await panel.getByLabel("How many").selectOption("1");
+    await panel.getByLabel("2. Why are you returning it?").selectOption("Wrong size");
+    await panel.getByRole("button", { name: "Send return request" }).click();
+    await expect(panel.getByRole("alert")).toHaveText("Add at least one photo of the items you're returning.");
+    const png = await sharp({ create: { width: 40, height: 40, channels: 3, background: "#888" } }).png().toBuffer();
+    await panel.getByLabel("Add return photos").setInputFiles({ name: "item.png", mimeType: "image/png", buffer: png });
+    await expect(panel.getByRole("img", { name: "Return photo" })).toBeVisible();
+    await panel.getByRole("button", { name: "Send return request" }).click();
+    await expect(panel.getByRole("alert")).toContainText("Please confirm the items are unused");
+    await panel.getByRole("checkbox", { name: /I confirm these items are unused/ }).check();
+    await panel.getByRole("button", { name: "Send return request" }).click();
+    await expect(page.getByTestId("return-panel")).toContainText("Your return");
+    const req = await one("select id, status, items, photos, confirmed_condition from return_requests where order_id=?", [o.id]);
+    expect(req.status).toBe("requested");
+    expect(JSON.parse(req.items as string)[0].qty).toBe(1);
+    expect(JSON.parse(req.photos as string)).toHaveLength(1);
+
+    // Admin: the next step says so, approve books the pickup.
+    await adminLogin(page);
+    await page.goto("/admin/orders");
+    await expect(page.getByRole("link", { name: "Review return" }).first()).toBeVisible();
+    await page.goto(`/admin/orders/${o.id}`);
+    await expect(page.getByTestId("next-step")).toContainText("Review return");
+    const admin = page.getByTestId("admin-return");
+    await expect(admin).toContainText("Wrong size");
+    await admin.getByRole("button", { name: "Approve and book pickup" }).click();
+    await expect(admin).toContainText("RETAWB1");
+    const stockBefore = Number((await one("select stock from variants where id=?", [v])).stock);
+
+    scan = { Status: "Picked Up", StatusType: "PU", StatusLocation: "Delhi", Instructions: "" };
+    await page.goto("/admin/orders");
+    await page.getByRole("button", { name: "Check tracking now" }).click();
+    await expect.poll(async () => (await one("select status from return_requests where id=?", [req.id as string])).status).toBe("picked_up");
+
+    await page.goto(`/admin/orders/${o.id}`);
+    await page.getByTestId("admin-return").getByRole("button", { name: "Mark received" }).click();
+    await expect(page.getByTestId("admin-return")).toContainText("Received, refund due");
+    expect(Number((await one("select stock from variants where id=?", [v])).stock)).toBe(stockBefore + 1);
+    expect((await one("select status from orders where id=?", [o.id])).status).toBe("returned");
+    await page.getByTestId("admin-return").getByRole("button", { name: /^Refund ₹/ }).click();
+    await expect.poll(async () => (await one("select status from return_requests where id=?", [req.id as string])).status).toBe("completed");
+    await page.goto(`/order/${o.accessToken}`);
+    await expect(page.getByTestId("return-panel")).toContainText("Refunded");
+
+    // Rejection: the customer sees why, and the order is delivered again.
+    const o2 = await delivered("10.70.0.3", 0);
+    await page.goto(`/order/${o2.accessToken}`);
+    await page.getByRole("button", { name: "Start a return" }).click();
+    await page.getByRole("checkbox", { name: /^Return / }).check();
+    await page.getByLabel("2. Why are you returning it?").selectOption("Changed my mind");
+    await page.getByLabel("Add return photos").setInputFiles({ name: "item.png", mimeType: "image/png", buffer: png });
+    await expect(page.getByRole("img", { name: "Return photo" })).toBeVisible();
+    await page.getByRole("checkbox", { name: /I confirm these items are unused/ }).check();
+    await page.getByRole("button", { name: "Send return request" }).click();
+    await expect(page.getByTestId("return-panel")).toContainText("Your return");
+    await page.goto(`/admin/orders/${o2.id}`);
+    await page.getByTestId("admin-return").getByRole("button", { name: "Reject" }).click();
+    await page.getByLabel(/Why can't you accept it/).fill("The photos show the tags are removed");
+    await page.getByRole("button", { name: "Reject return" }).click();
+    await expect(page.getByTestId("admin-return")).toContainText("Rejected");
+    expect((await one("select status from orders where id=?", [o2.id])).status).toBe("delivered");
+    await page.goto(`/order/${o2.accessToken}`);
+    await expect(page.getByTestId("return-panel")).toContainText("The photos show the tags are removed");
+
+    // Order list: bulk booking from the Next column's "Book shipment".
+    const fresh = await (await createOrder(request, { items: [{ variantId: v, qty: 1 }] }, "10.70.0.4")).json();
+    await page.goto("/admin/orders?status=to_ship");
+    await expect(page.getByRole("row", { name: new RegExp(fresh.number) }).getByRole("link", { name: "Book shipment" })).toBeVisible();
+    await page.getByRole("checkbox", { name: `Select ${fresh.number}` }).check();
+    await page.getByRole("button", { name: "Book Delhivery" }).click();
+    await expect(page.getByText(/1 booked with Delhivery/)).toBeVisible();
+    expect((await one("select awb from orders where id=?", [fresh.id])).awb).toBe(`FWD${fresh.number}`);
+  } finally {
+    fake.close();
+    await db.execute("delete from settings where key in ('delhiveryPickupName','delhiveryPickupPin')");
+  }
+});

@@ -133,8 +133,10 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   // Prepaid-only item while online payment isn't live yet: say so instead of letting checkout fail.
   const cannotPay = !settings.onlinePayments && !(p.codAllowed && settings.codEnabled);
   const cap = variant ? Math.min(variant.stock, p.maxPerOrder ?? Infinity, p.maxPerCustomer ?? Infinity) : 0;
-  const price = variant?.price ?? first?.price ?? 0;
-  const mrp = variant?.mrp ?? first?.mrp ?? 0;
+  // Before a size is picked, show the chosen piece (or set) in its first size that's in stock.
+  const shown = variant ?? pick(sizes.find((sz) => (pick(sz, color)?.stock ?? 0) > 0) ?? sizes[0], color) ?? first;
+  const price = shown?.price ?? 0;
+  const mrp = shown?.mrp ?? 0;
   const pct = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
   const saleEnds = variant?.saleEndsAt ?? first?.saleEndsAt;
   const low = variant && variant.stock > 0 && variant.stock <= p.lowStockThreshold;

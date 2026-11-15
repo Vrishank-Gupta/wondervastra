@@ -47,10 +47,11 @@ export function Tracker({ order }: { order: Order }) {
 export function ShipmentCard({ order }: { order: Order }) {
   const live = ["confirmed", "packed", "shipped", "out_for_delivery"].includes(order.status);
   const eta = live && order.etaAt ? new Date(order.etaAt).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }) : null;
-  if (!order.awb && !order.trackingUrl && !eta) return null;
+  const delivered = order.deliveredAt && ["delivered", "return_requested", "returned"].includes(order.status) ? new Date(order.deliveredAt).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }) : null;
+  if (!order.awb && !order.trackingUrl && !eta && !delivered) return null;
   return (
     <div className="rounded-sm border border-line bg-slate-soft p-4" data-testid="shipment">
-      <p className="flex items-center gap-2 font-semibold"><Truck size={18} aria-hidden /> {eta ? <>Arriving by {eta}</> : "Shipment details"}</p>
+      <p className="flex items-center gap-2 font-semibold"><Truck size={18} aria-hidden /> {delivered ? <>Delivered on {delivered}</> : eta ? <>Arriving by {eta}</> : "Shipment details"}</p>
       {order.courierStatus && live && (
         <p className="mt-1 text-sm"><span className="text-ink-soft">Latest update:</span> {order.courierStatus}{order.courierStatusAt ? <span className="text-ink-soft"> · {formatDateTime(order.courierStatusAt)}</span> : null}</p>
       )}

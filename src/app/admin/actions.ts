@@ -700,3 +700,67 @@ export async function bookPickup(input: { date: string; time: string; count: num
     return { ok: true, pickupId };
   } catch (e) { return fail(e); }
 }
+
+/* ---------- Returns ---------- */
+export async function approveReturnAction(returnId: string, note: string): Promise<Result & { awb?: string | null }> {
+  const a = await requireAdmin();
+  try {
+    const { approveReturn } = await import("@/lib/returns");
+    const r = await approveReturn(returnId, typeof note === "string" ? note.slice(0, 300) : "", a.name);
+    await audit(a, "return", "return", returnId, `Approved return${r.awb ? `, pickup ${r.awb}` : ""}`);
+    revalidatePath("/admin/orders", "layout");
+    return { ok: true, awb: r.awb };
+  } catch (e) { return fail(e); }
+}
+export async function rejectReturnAction(returnId: string, reason: string): Promise<Result> {
+  const a = await requireAdmin();
+  try {
+    const { rejectReturn } = await import("@/lib/returns");
+    await rejectReturn(returnId, typeof reason === "string" ? reason : "", a.name);
+    await audit(a, "return", "return", returnId, `Rejected return: ${reason}`);
+    revalidatePath("/admin/orders", "layout");
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+export async function receiveReturnAction(returnId: string, restock: boolean): Promise<Result> {
+  const a = await requireAdmin();
+  try {
+    const { receiveReturn } = await import("@/lib/returns");
+    await receiveReturn(returnId, Boolean(restock), a.name);
+    await audit(a, "return", "return", returnId, `Return received${restock ? ", restocked" : ""}`);
+    revalidatePath("/admin/orders", "layout");
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+export async function refundReturnAction(orderId: string, amountPaise: number): Promise<Result> {
+  const r = await refundOrder(orderId, amountPaise, "Return refund");
+  if (!r.error) { const { completeReturn } = await import("@/lib/returns"); await completeReturn(orderId); }
+  return r;
+}
+export async function bulkBookShipments(orderIds: string[]): Promise<Result & { booked?: number; failed?: string[] }> {
+  const a = await requireAdmin();
+  try {
+    const { bookDelhivery, parcelGrams } = await import("@/lib/shipping");
+    const s = await (await import("@/lib/settings")).getSettingsFresh();
+    const orders = await db.select().from(schema.orders).where(inArray(schema.orders.id, orderIds.slice(0, 50)));
+    let booked = 0; const failed: string[] = [];
+    for (const o of orders) {
+      if (o.awb || !["confirmed", "packed"].includes(o.status)) continue;
+      const pcs = (await db.select({ q: schema.orderItems.qty }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id))).reduce((x, i) => x + i.q, 0);
+      try { await bookDelhivery(o.id, parcelGrams(s, pcs), a.name); booked++; } catch (e) { failed.push(`${o.number}: ${(e as Error).message}`); }
+    }
+    revalidatePath("/admin/orders");
+    return { ok: true, booked, failed, message: `${booked} booked with Delhivery.${failed.length ? ` ${failed.length} couldn't be booked.` : ""}` };
+  } catch (e) { return fail(e); }
+}
+export async function bulkLabels(orderIds: string[]): Promise<Result & { labels?: { number: string; url: string }[] }> {
+  await requireAdmin();
+  try {
+    const { labelLink } = await import("@/lib/delhivery");
+    const orders = (await db.select().from(schema.orders).where(inArray(schema.orders.id, orderIds.slice(0, 50)))).filter((o) => o.awb && o.courier === "Delhivery");
+    if (!orders.length) return { error: "None of these orders are booked with Delhivery yet." };
+    const labels: { number: string; url: string }[] = [];
+    for (const o of orders) { try { labels.push({ number: o.number, url: await labelLink(o.awb!) }); } catch { /* skipped */ } }
+    return { ok: true, labels };
+  } catch (e) { return fail(e); }
+}

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { money, STATUS_LABEL } from "./format";
 import { getSettings } from "./settings";
@@ -34,7 +34,16 @@ type Message = {
 
 type Line = { name: string; variantLabel: string | null; qty: number; unitPrice: number };
 
-export function buildOrderMessage(event: OrderEventName, o: Order, opts: { orderFeedback: boolean; deliveryFeedback: boolean; items?: Line[] }): Message {
+type Ret = typeof schema.returnRequests.$inferSelect;
+const RETURN_NOW: Record<string, string> = {
+  requested: "We've received your return request and will reply within 1 working day.",
+  approved: "Your return is approved. Our courier will pick it up from your address.",
+  rejected: "We couldn't accept this return.",
+  picked_up: "Your return has been picked up and is on its way to us.",
+  received: "We've received your return. Your refund is on its way.",
+  completed: "Your refund has been issued.",
+};
+export function buildOrderMessage(event: OrderEventName, o: Order, opts: { orderFeedback: boolean; deliveryFeedback: boolean; items?: Line[]; ret?: Ret | null }): Message {
   const first = o.name.split(" ")[0];
   const track = trackingLink(o);
   const shipLine = [o.courier, o.awb ? `AWB ${o.awb}` : null].filter(Boolean).join(" · ");
@@ -126,16 +135,20 @@ export function buildOrderMessage(event: OrderEventName, o: Order, opts: { order
         params: [first, money(o.refundedTotal), o.number, track],
         text: `Hi ${first}, we've refunded ${money(o.refundedTotal)} for your WonderVastra order ${o.number}. Banks usually take 5–7 working days to show it.\nDetails: ${track}`,
       };
-    case "return_update":
+    case "return_update": {
+      const r = opts.ret;
+      const now = r ? RETURN_NOW[r.status] ?? STATUS_LABEL[o.status] : `Your order is now: ${STATUS_LABEL[o.status] ?? o.status}.`;
+      const extra = r?.status === "rejected" && r.adminNote ? ` Reason: ${r.adminNote}` : r?.status === "approved" && r.pickupAwb ? ` Pickup AWB ${r.pickupAwb}.` : "";
       return {
         subject: `Update on your return for ${o.number}`,
         heading: "Return update",
-        lines: [`Your order <b>${escapeHtml(o.number)}</b> is now: <b>${escapeHtml(STATUS_LABEL[o.status] ?? o.status)}</b>.`],
+        lines: [`Order <b>${escapeHtml(o.number)}</b>: ${escapeHtml(now + extra)}`],
         cta: { label: "View order", url: track },
         template: "vv_return_update",
-        params: [first, o.number, STATUS_LABEL[o.status] ?? o.status, track],
-        text: `Hi ${first}, update on your WonderVastra order ${o.number}: ${STATUS_LABEL[o.status] ?? o.status}.\nDetails: ${track}`,
+        params: [first, o.number, now + extra, track],
+        text: `Hi ${first}, return update for your WonderVastra order ${o.number}: ${now}${extra}\nDetails: ${track}`,
       };
+    }
   }
 }
 
@@ -244,13 +257,24 @@ export async function notifyOrder(orderId: string, event: OrderEventName) {
     if (!o) return;
     const s = await getSettings();
     const items = event === "order_placed" ? await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId)) : [];
-    const m = buildOrderMessage(event, o, { orderFeedback: s.orderFeedbackEnabled, deliveryFeedback: s.deliveryFeedbackEnabled, items });
+    const ret = event === "return_update" ? (await db.select().from(schema.returnRequests).where(eq(schema.returnRequests.orderId, orderId)).orderBy(desc(schema.returnRequests.createdAt)).limit(1))[0] ?? null : null;
+    const m = buildOrderMessage(event, o, { orderFeedback: s.orderFeedbackEnabled, deliveryFeedback: s.deliveryFeedbackEnabled, items, ret });
     await dispatch({
       orderId,
       event,
       email: { to: o.email, subject: m.subject, html: renderEmail(m, `You're receiving this because you ordered from ${s.storeName}.`) },
       whatsapp: o.whatsappOptIn ? { to: o.phone, template: m.template, params: m.params, text: m.text } : null,
     });
+    if (event === "return_update" && ret?.status === "requested" && s.adminAlertEmail) {
+      await dispatch({
+        orderId, event: "admin_return_request",
+        email: { to: s.adminAlertEmail, subject: `Return request on ${o.number}`, html: renderEmail({
+          heading: "A customer wants to return items",
+          lines: [`<b>${escapeHtml(o.name)}</b> asked to return items from <b>${escapeHtml(o.number)}</b>. Reason: ${escapeHtml(ret.reason)}.`],
+          cta: { label: "Review the return", url: `${siteUrl()}/admin/orders/${o.id}` },
+        }, "Store alert") },
+      });
+    }
     if (event === "order_placed" && s.adminAlertEmail) {
       await dispatch({
         orderId,

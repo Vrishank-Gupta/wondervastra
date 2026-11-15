@@ -8,6 +8,9 @@ import { ArrowLeft, ExternalLink, FileText, MessageCircle, Phone } from "lucide-
 import { db, schema } from "@/db";
 import { OrderManager } from "@/components/admin/order-manager";
 import { DelhiveryPanel } from "@/components/admin/delhivery-panel";
+import { ReturnPanel } from "@/components/admin/return-panel";
+import { returnValue } from "@/lib/returns";
+import { nextStep } from "@/lib/next-step";
 import { delhiveryConfigured } from "@/lib/delhivery";
 import { DELHIVERY, quoteShipment, shippingReady } from "@/lib/shipping";
 import { Panel, PayBadge, StatusBadge } from "@/components/admin/ui";
@@ -58,13 +61,29 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3 [&>*]:min-w-0">
         <div className="space-y-5 xl:col-span-2">
-          {delhiveryConfigured() && !["pending_payment", "cancelled"].includes(o.status) && (!o.courier || o.courier === DELHIVERY) && (
+          {(() => {
+            const latest = [...returns].sort((x, y) => y.createdAt - x.createdAt)[0] ?? null;
+            const n = nextStep(o, latest);
+            const tone = n.tone === "act" ? "border-madder bg-clay-soft" : n.tone === "done" ? "border-line bg-pine-soft" : "border-line bg-sand-soft";
+            return (
+              <div className={`flex flex-wrap items-center justify-between gap-3 rounded-sm border-l-4 p-4 ${tone}`} data-testid="next-step">
+                <div><p className="text-xs font-bold tracking-[0.1em] uppercase text-ink-soft">{n.tone === "act" ? "Next step" : "Status"}</p><p className="text-lg font-semibold">{n.label}</p>{n.detail && <p className="text-sm">{n.detail}</p>}</div>
+                {n.anchor && <a href={`#${n.anchor}`} className="btn btn-primary btn-sm">Go</a>}
+              </div>
+            );
+          })()}
+          <div id="return" className="scroll-mt-24 empty:hidden">{returns.length > 0 && (() => {
+            const r = [...returns].sort((a, b) => b.createdAt - a.createdAt)[0];
+            return <ReturnPanel ret={{ ...r }} delhivery={shippingReady(s)} canRefund={o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded"} suggestedRefund={returnValue(r, o, items)}
+              lines={r.items.length ? r.items.map((x) => { const it = items.find((i) => i.id === x.itemId); return { name: it?.name ?? "Item", label: it?.variantLabel ?? null, qty: x.qty, image: it?.image ?? null }; }) : items.map((it) => ({ name: it.name, label: it.variantLabel, qty: it.qty, image: it.image }))} />;
+          })()}</div>
+          <div id="delhivery" className="scroll-mt-24 empty:hidden">{delhiveryConfigured() && !["pending_payment", "cancelled"].includes(o.status) && (!o.courier || o.courier === DELHIVERY) && (
             <DelhiveryPanel
               orderId={o.id} status={o.status} ready={shippingReady(s)}
               booked={o.awb && o.courier === DELHIVERY ? { awb: o.awb, trackingUrl: o.trackingUrl, courierStatus: o.courierStatus, statusAt: o.courierStatusAt, etaAt: o.etaAt, cost: o.shippingCost } : null}
               quote={!o.awb && shippingReady(s) && ["confirmed", "packed"].includes(o.status) ? await quoteShipment(o.id).catch(() => null) : null}
             />
-          )}
+          )}</div>
           <OrderManager
             order={{ id: o.id, status: o.status, courier: o.courier, awb: o.awb, trackingUrl: o.trackingUrl, total: o.total, refundedTotal: o.refundedTotal, paymentStatus: o.paymentStatus, paymentMethod: o.paymentMethod }}
             nextStatuses={TRANSITIONS[o.status]}
@@ -117,7 +136,6 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
             {o.customerNote && <p className="mt-2 rounded-sm bg-sand-soft p-2 text-sm"><b>Note:</b> {o.customerNote}</p>}
             <p className="mt-2 text-xs text-ink-soft">Came from: <b className="capitalize">{o.utmSource ?? "direct"}</b>{o.utmCampaign ? ` / ${o.utmCampaign}` : ""}</p>
           </Panel>
-          {returns.length > 0 && <Panel title="Return request">{returns.map((r) => <p key={r.id} className="text-sm"><b>{r.reason}</b>{r.details ? `: ${r.details}` : ""}<span className="block text-xs text-ink-soft">{formatDateTime(r.createdAt)}</span></p>)}</Panel>}
           <Panel title="Payment">
             <dl className="space-y-1 text-sm">
               <div className="flex justify-between gap-2"><dt>Method</dt><dd className="font-medium">{o.paymentMethod === "cod" ? "Cash on delivery" : "Razorpay"}</dd></div>

@@ -27,19 +27,32 @@ export async function cancelOrderAction(token: string): Promise<{ error?: string
   return {};
 }
 
-export async function requestReturnAction(token: string, reason: string, details: string): Promise<{ error?: string }> {
-  if (typeof token !== "string" || typeof reason !== "string") return { error: "Please pick a reason." };
-  details = typeof details === "string" ? details : "";
+export async function requestReturnAction(token: string, input: { reason: string; details: string; items: { itemId: string; qty: number }[]; photos: string[]; confirmed: boolean }): Promise<{ error?: string }> {
+  if (typeof token !== "string" || !input || typeof input !== "object") return { error: "Something went wrong. Please reload the page." };
+  const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 100) : "";
+  const details = typeof input.details === "string" ? input.details.trim().slice(0, 1000) : "";
   const o = await byToken(token).catch(() => null);
   if (!o) return { error: "Order not found." };
   if (o.status === "return_requested") return {};
   const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
-  if (!(await returnEligible(o, items))) return { error: "This order isn't eligible for a return any more." };
+  if (!(await returnEligible(o, items))) return { error: "The return window for this order has closed." };
+  const prods = await db.select({ id: schema.products.id, returnable: schema.products.returnable }).from(schema.products);
+  const picked = (Array.isArray(input.items) ? input.items : []).map((x) => {
+    const it = items.find((i) => i.id === x?.itemId);
+    const qty = Math.floor(Number(x?.qty));
+    return it && prods.find((p) => p.id === it.productId)?.returnable && qty >= 1 && qty <= it.qty ? { itemId: it.id, qty } : null;
+  }).filter((x): x is { itemId: string; qty: number } => Boolean(x));
+  if (!picked.length) return { error: "Choose the items you want to return." };
   if (!reason) return { error: "Please pick a reason." };
+  // Only photos uploaded through our return form: our image host or local media.
+  const ok = (u: unknown) => typeof u === "string" && (/^https:\/\/res\.cloudinary\.com\//.test(u) || /^\/media\/[\w-]+\.jpg$/.test(u));
+  const photos = (Array.isArray(input.photos) ? input.photos : []).filter(ok).slice(0, 5) as string[];
+  if (!photos.length) return { error: "Add at least one photo of the items you're returning." };
+  if (input.confirmed !== true) return { error: "Please confirm the items are unused, unwashed, undamaged and in their original packaging." };
   try {
-    await changeOrderStatus(o.id, "return_requested", { actor: `${o.name} (customer)`, note: reason.slice(0, 100), silent: true });
+    await changeOrderStatus(o.id, "return_requested", { actor: `${o.name} (customer)`, note: reason, silent: true });
   } catch { return {}; } // Already requested from another tap.
-  await db.insert(schema.returnRequests).values({ id: newId(), orderId: o.id, reason: reason.slice(0, 100), details: details.slice(0, 1000) || null });
+  await db.insert(schema.returnRequests).values({ id: newId(), orderId: o.id, reason, details: details || null, items: picked, photos, confirmedCondition: true });
   await notifyOrder(o.id, "return_update");
   revalidatePath(`/order/${token}`);
   return {};

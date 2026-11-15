@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS = {
   dispatchDays: 2,
   deliveryDaysMin: 3,
   deliveryDaysMax: 7,
-  returnWindowDays: 7,
+  returnWindowDays: 3,
   orderFeedbackEnabled: true,
   deliveryFeedbackEnabled: true,
   adminAlertEmail: "",

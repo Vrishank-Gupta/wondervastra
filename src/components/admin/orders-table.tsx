@@ -2,13 +2,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { bulkSetStatus } from "@/app/admin/actions";
+import { bulkBookShipments, bulkLabels, bulkSetStatus } from "@/app/admin/actions";
+import type { NextStep } from "@/lib/next-step";
 import { formatDateTime, money } from "@/lib/format";
 import { PayBadge, StatusBadge, Tbl } from "./ui";
 
-type Row = { id: string; number: string; name: string; phone: string; status: string; paymentStatus: string; paymentMethod: string; total: number; createdAt: number; awb: string | null; source: string | null; qty: number };
+type Row = { id: string; number: string; name: string; phone: string; status: string; paymentStatus: string; paymentMethod: string; total: number; createdAt: number; awb: string | null; source: string | null; qty: number; next: NextStep };
 
-export function OrdersTable({ rows }: { rows: Row[] }) {
+export function OrdersTable({ rows, delhivery = false }: { rows: Row[]; delhivery?: boolean }) {
+  const [labels, setLabels] = useState<{ number: string; url: string }[]>([]);
   const router = useRouter();
   const [sel, setSel] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
@@ -26,21 +28,25 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
       {sel.length > 0 && (
         <div className="mb-2 flex flex-wrap items-center gap-2 rounded-sm bg-ink p-2 text-sm text-white">
           <b className="px-2">{sel.length} selected</b>
+          {delhivery && <button disabled={busy} onClick={async () => { setBusy(true); const r = await bulkBookShipments(sel); setMsg([r.message ?? r.error ?? "", ...(r.failed ?? [])].join(" ")); setSel([]); setBusy(false); router.refresh(); }} className="rounded-full bg-white px-3 py-1 font-medium text-ink">Book Delhivery</button>}
+          {delhivery && <button disabled={busy} onClick={async () => { setBusy(true); const r = await bulkLabels(sel); setBusy(false); if (r.error) setMsg(r.error); else { setLabels(r.labels ?? []); setMsg(`${r.labels?.length ?? 0} labels ready. Open each to print.`); } }} className="rounded-full bg-white px-3 py-1 font-medium text-ink">Print labels</button>}
           <button disabled={busy} onClick={() => run("packed")} className="rounded-full bg-white px-3 py-1 font-medium text-ink">Mark packed</button>
           <button disabled={busy} onClick={() => run("delivered")} className="rounded-full bg-white px-3 py-1 font-medium text-ink">Mark delivered</button>
         </div>
       )}
       {msg && <p className="mb-2 text-sm font-medium" role="status">{msg}</p>}
+      {labels.length > 0 && <p className="mb-2 flex flex-wrap gap-2 text-sm">{labels.map((l) => <a key={l.number} className="rounded-full border border-line bg-white px-3 py-1 font-medium underline" href={l.url} target="_blank" rel="noreferrer">Label {l.number}</a>)}</p>}
       <Tbl>
         <thead><tr>
           <th><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSel(all ? [] : rows.map((r) => r.id))} className="size-4 accent-ink" /></th>
-          <th>Order</th><th>Date</th><th>Customer</th><th>Status</th><th>Payment</th><th className="text-right">Total</th><th>Pcs</th><th>AWB</th><th>Source</th>
+          <th>Order</th><th>Next</th><th>Date</th><th>Customer</th><th>Status</th><th>Payment</th><th className="text-right">Total</th><th>Pcs</th><th>AWB</th><th>Source</th>
         </tr></thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className="hover:bg-ivory">
               <td><input type="checkbox" aria-label={`Select ${r.number}`} className="size-4 accent-ink" checked={sel.includes(r.id)} onChange={() => setSel((s) => (s.includes(r.id) ? s.filter((x) => x !== r.id) : [...s, r.id]))} /></td>
               <td><Link href={`/admin/orders/${r.id}`} className="font-mono text-xs font-medium underline">{r.number}</Link></td>
+              <td><Link href={`/admin/orders/${r.id}${r.next.anchor ? `#${r.next.anchor}` : ""}`} title={r.next.detail} className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${r.next.tone === "act" ? "bg-madder text-white" : r.next.tone === "done" ? "bg-pine-soft" : "bg-sand-soft"}`}>{r.next.label}</Link></td>
               <td className="text-xs whitespace-nowrap text-ink-soft">{formatDateTime(r.createdAt)}</td>
               <td className="whitespace-nowrap">{r.name}<span className="block text-xs text-ink-soft">{r.phone}</span></td>
               <td><StatusBadge status={r.status} /></td>

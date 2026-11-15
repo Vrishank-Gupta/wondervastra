@@ -510,7 +510,19 @@ export const returnRequests = sqliteTable(
     orderId: text("order_id").notNull(),
     reason: text("reason").notNull(),
     details: text("details"),
-    status: text("status", { enum: ["requested", "approved", "rejected", "completed"] }).notNull().default("requested"),
+    /** requested → approved (pickup booked) → picked_up → received → completed (refunded); or rejected. */
+    status: text("status", { enum: ["requested", "approved", "rejected", "picked_up", "received", "completed"] }).notNull().default("requested"),
+    /** What's coming back: order item id and how many. */
+    items: text("items", { mode: "json" }).$type<{ itemId: string; qty: number }[]>().notNull().default([]),
+    photos: text("photos", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /** The customer ticked "unused, unwashed, undamaged, in original packaging". */
+    confirmedCondition: bool("confirmed_condition").notNull().default(false),
+    /** Shown to the customer: why it was rejected, or a note on approval. */
+    adminNote: text("admin_note"),
+    pickupAwb: text("pickup_awb"),
+    pickupStatus: text("pickup_status"),
+    decidedAt: ts("decided_at"),
+    receivedAt: ts("received_at"),
     createdAt: created(),
     updatedAt: updated(),
   },

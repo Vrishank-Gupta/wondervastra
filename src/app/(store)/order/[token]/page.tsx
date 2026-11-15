@@ -3,10 +3,12 @@ import { WhatsAppGroupBand } from "@/components/store/whatsapp-group";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PartyPopper } from "lucide-react";
-import { OrderActions } from "@/components/store/order-actions-ui";
+import { OrderActions, ReturnPanel } from "@/components/store/order-actions-ui";
+import { desc, eq, inArray } from "drizzle-orm";
+import { db, schema } from "@/db";
 import { OrderBody } from "@/components/store/order-view";
 import { formatDate, STATUS_LABEL } from "@/lib/format";
-import { orderBundleByToken, returnEligible } from "@/lib/order-access";
+import { orderBundleByToken, returnWindow } from "@/lib/order-access";
 import { CartResetOnPlaced } from "@/components/store/cart-reset";
 import { getSettings } from "@/lib/settings";
 
@@ -19,7 +21,9 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   if (!data) notFound();
   const { order, items, events } = data;
   const settings = await getSettings();
-  const canReturn = await returnEligible(order, items);
+  const win = await returnWindow(order);
+  const [request] = await db.select().from(schema.returnRequests).where(eq(schema.returnRequests.orderId, order.id)).orderBy(desc(schema.returnRequests.createdAt)).limit(1);
+  const prods = items.length ? await db.select({ id: schema.products.id, returnable: schema.products.returnable }).from(schema.products).where(inArray(schema.products.id, items.map((i) => i.productId))) : [];
   const closed = order.status === "cancelled" || order.status === "pending_payment";
   const sentTo = [emailConfigured() && order.email, whatsappConfigured() && order.whatsappOptIn && "your WhatsApp"].filter(Boolean) as string[];
   const fb = closed ? null : order.deliveredAt && settings.deliveryFeedbackEnabled ? "delivery" : order.placedAt && settings.orderFeedbackEnabled ? "order" : null;
@@ -47,7 +51,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <span className="sticker bg-sand-soft px-3 py-1 text-sm">{STATUS_LABEL[order.status]}</span>
       </div>
       <OrderBody order={order} items={items} events={events} actions={
-        <OrderActions token={order.accessToken} canCancel={order.status === "confirmed"} canReturn={canReturn} feedbackType={fb} />
+        <>
+          <ReturnPanel token={order.accessToken} status={order.status} deliveredAt={order.deliveredAt} closesAt={win.closesAt} open={win.open} days={win.days}
+            items={items.map((i) => ({ id: i.id, name: i.name, label: i.variantLabel, qty: i.qty, image: i.image, returnable: Boolean(prods.find((p) => p.id === i.productId)?.returnable) }))}
+            request={request ? { status: request.status, reason: request.reason, details: request.details, adminNote: request.adminNote, photos: request.photos, items: request.items, pickupAwb: request.pickupAwb, pickupStatus: request.pickupStatus, createdAt: request.createdAt } : null} />
+          <OrderActions token={order.accessToken} canCancel={order.status === "confirmed"} feedbackType={fb} />
+        </>
       } />
     </div>
   );

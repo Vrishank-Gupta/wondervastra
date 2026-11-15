@@ -157,7 +157,7 @@ export async function markPaymentFailed(orderId: string, reason: string) {
 }
 
 /** Stock just came back for these orders' items: message anyone waiting for them. */
-async function alertRestocked(orderIds: string[]) {
+export async function alertRestocked(orderIds: string[]) {
   if (!orderIds.length) return;
   const { processStockAlerts } = await import("./inventory");
   const items = await db.select({ productId: orderItems.productId }).from(orderItems).where(inArray(orderItems.orderId, orderIds));

@@ -21,10 +21,15 @@ export function customerOrderFilter(c: { id: string; email: string | null; phone
   if (c.phone) conds.push(eq(schema.orders.phone, c.phone));
   return or(...conds)!;
 }
-export async function returnEligible(order: typeof schema.orders.$inferSelect, items: { productId: string }[]) {
-  if (order.status !== "delivered" || !order.deliveredAt) return false;
+/** The return window: opens on delivery and stays open for the store's return days (3), to the minute. */
+export async function returnWindow(order: Pick<typeof schema.orders.$inferSelect, "status" | "deliveredAt">) {
   const s = await getSettings();
-  if (Date.now() > order.deliveredAt + s.returnWindowDays * 86_400_000) return false;
+  const closesAt = order.deliveredAt ? order.deliveredAt + s.returnWindowDays * 86_400_000 : null;
+  return { days: s.returnWindowDays, closesAt, open: order.status === "delivered" && closesAt != null && Date.now() <= closesAt };
+}
+
+export async function returnEligible(order: typeof schema.orders.$inferSelect, items: { productId: string }[]) {
+  if (!(await returnWindow(order)).open) return false;
   const prods = await db.select({ id: schema.products.id, returnable: schema.products.returnable }).from(schema.products);
   return items.some((i) => prods.find((p) => p.id === i.productId)?.returnable);
 }

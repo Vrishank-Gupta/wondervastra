@@ -92,6 +92,27 @@ export async function createShipment(s: ShipmentInput): Promise<string> {
   throw new Error(`Delhivery didn't book this shipment${why ? `: ${why}` : "."}`);
 }
 
+/**
+ * A return pickup: Delhivery collects from the customer and delivers to our pickup address. Delhivery calls
+ * these "Pickup" shipments; the customer's address goes in the main fields.
+ */
+export async function createReturnPickup(s: Omit<ShipmentInput, "cod" | "total"> & { value: number }): Promise<string> {
+  const shipment = {
+    name: s.name, add: s.address, pin: s.pincode, city: s.city, state: s.state, country: "India", phone: s.phone.replace(/\D/g, "").slice(-10),
+    order: `${s.orderNumber}-R`, payment_mode: "Pickup", total_amount: (s.value / 100).toFixed(2), cod_amount: "0",
+    products_desc: s.products.slice(0, 200), quantity: String(s.quantity), weight: String(Math.round(s.grams)),
+    shipment_length: String(s.box.l), shipment_width: String(s.box.w), shipment_height: String(s.box.h), shipping_mode: "Surface", address_type: "home",
+    return_name: s.seller.name, return_add: s.seller.address,
+  };
+  const json = await call("/api/cmu/create.json", { method: "POST", form: { format: "json", data: JSON.stringify({ shipments: [shipment], pickup_location: { name: s.pickupName } }) } }) as unknown as {
+    rmk?: string; packages?: { waybill?: string; status?: string; remarks?: string[] | string }[];
+  };
+  const pkg = json.packages?.[0];
+  if (pkg?.waybill && pkg.status !== "Fail") return pkg.waybill;
+  const why = [pkg?.remarks, json.rmk].flat().filter(Boolean).join(" ");
+  throw new Error(`Delhivery didn't book the return pickup${why ? `: ${why}` : "."}`);
+}
+
 /** A link to the printable shipping label (PDF). */
 export async function labelLink(awb: string): Promise<string> {
   const json = await call(`/api/p/packing_slip?wbns=${encodeURIComponent(awb)}&pdf=true`) as unknown as { packages?: { pdf_download_link?: string }[] };

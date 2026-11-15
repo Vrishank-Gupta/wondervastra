@@ -27,7 +27,7 @@ function faqItems(s: StoreSettings): { q: string; a: string }[] {
     { q: "Is delivery free?", a: "Yes, on every order, with no minimum." },
     { q: "How do I track my order?", a: `We'll send you a tracking link by ${channels()} when it ships. You can also use the Track Order page anytime.` },
     { q: "Can I cancel my order?", a: "Yes, from your order page, until it has been packed." },
-    { q: "Can I return an item?", a: `Eligible items can be returned within ${s.returnWindowDays} days of delivery. For hygiene reasons, items must be unused with original packaging. See our returns policy.` },
+    { q: "Can I return an item?", a: `Yes, within ${s.returnWindowDays} days of delivery, if it's unused, unwashed and undamaged in its original packaging. Start the return from your order page with photos, and we'll pick it up for free once approved. See our returns policy.` },
     { q: "An item is sold out. Will it come back?", a: "Tap “Notify me” on the product page and we'll message you as soon as it's restocked." },
   ];
 }
@@ -60,10 +60,11 @@ const PAGES: Record<string, Page> = {
     <h2>Failed delivery</h2><p>If delivery fails because of an incorrect address or if the recipient is unavailable, please contact us {contactLine(s)}.</p>
   </> },
   "returns-policy": { title: "Returns & refunds", body: (s) => <>
-    <h2>Return window</h2><p>You can request a return within {s.returnWindowDays} days of delivery from your order page. Items marked as non-returnable on the product page can&apos;t be returned. For hygiene reasons this usually includes briefs, trunks and women&apos;s innerwear, unless they arrive damaged or wrong.</p>
-    <h2>Condition</h2><p>For hygiene reasons, items must be unused, unwashed and in their original packaging.</p>
-    <h2>Damaged or wrong item</h2><p>If you received something damaged or incorrect, contact us {contactLine(s)} within 48 hours of delivery, with photos if possible.</p>
-    <h2>Refunds</h2><p>After we receive and check the return, refunds go to your original payment method. Banks usually take 5–7 working days to show the amount.{s.codEnabled ? " For cash on delivery orders, we'll ask for your UPI or bank details." : ""}</p>
+    <h2>Return window</h2><p>You can ask for a return within <b>{s.returnWindowDays} days of delivery</b>. The window opens when your parcel is delivered and your order page shows exactly when it closes.</p>
+    <h2>What can be returned</h2><p>Only <b>unused, unwashed and undamaged</b> items, with their tags and in the original packaging. For hygiene reasons we can&apos;t accept thermals that have been worn or washed. Items marked non-returnable on the product page can&apos;t be returned.</p>
+    <h2>How to return</h2><ol><li>Open your order page (from your order message or <a href="/track">Track order</a>) and tap <b>Start a return</b>.</li><li>Choose the items, pick a reason, and add 1 to 5 photos of the items, tags and packaging.</li><li>We review it within 1 working day. If it&apos;s approved, we book a free pickup from your address. If not, we tell you why.</li><li>Keep the items packed and ready for the courier.</li></ol>
+    <h2>Damaged or wrong item</h2><p>If something arrives damaged or isn&apos;t what you ordered, start a return within {s.returnWindowDays} days with photos, or contact us {contactLine(s)}.</p>
+    <h2>Refunds</h2><p>Once the items reach us and pass a quick check, we refund to your original payment method. Banks usually take 5–7 working days to show the amount.{s.codEnabled ? " For cash on delivery orders, we'll ask for your UPI or bank details." : ""}</p>
     <h2>Cancellations</h2><p>You can cancel from your order page until it has been packed. Prepaid cancellations are refunded in full.</p>
   </> },
   "privacy-policy": { title: "Privacy policy", body: (s) => <>

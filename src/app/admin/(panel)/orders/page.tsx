@@ -7,6 +7,7 @@ import { OrdersTable } from "@/components/admin/orders-table";
 import { Empty, PageHead } from "@/components/admin/ui";
 import { PickupRequest } from "@/components/admin/pickup-request";
 import { delhiveryConfigured } from "@/lib/delhivery";
+import { nextStep } from "@/lib/next-step";
 
 export const metadata: Metadata = { title: "Orders" };
 const TABS = [
@@ -33,6 +34,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
   const items = rows.length
     ? await db.select({ orderId: schema.orderItems.orderId, qty: sql<number>`sum(${schema.orderItems.qty})` }).from(schema.orderItems).where(inArray(schema.orderItems.orderId, rows.map((r) => r.id))).groupBy(schema.orderItems.orderId)
     : [];
+  const rets = rows.length ? await db.select({ orderId: schema.returnRequests.orderId, status: schema.returnRequests.status, createdAt: schema.returnRequests.createdAt }).from(schema.returnRequests).where(inArray(schema.returnRequests.orderId, rows.map((r) => r.id))) : [];
   const exportQ = new URLSearchParams({ ...(sp.from ? { from: sp.from } : {}), ...(sp.to ? { to: sp.to } : {}) }).toString();
   return (
     <>
@@ -49,7 +51,8 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
         <button className="btn btn-ink btn-sm">Search</button>
       </form>
       {rows.length ? (
-        <OrdersTable rows={rows.map((r) => ({ id: r.id, number: r.number, name: r.name, phone: r.phone, status: r.status, paymentStatus: r.paymentStatus, paymentMethod: r.paymentMethod, total: r.total, createdAt: r.createdAt, awb: r.awb, source: r.utmSource, qty: Number(items.find((i) => i.orderId === r.id)?.qty ?? 0) }))} />
+        <OrdersTable rows={rows.map((r) => ({ id: r.id, number: r.number, name: r.name, phone: r.phone, status: r.status, paymentStatus: r.paymentStatus, paymentMethod: r.paymentMethod, total: r.total, createdAt: r.createdAt, awb: r.awb, source: r.utmSource, qty: Number(items.find((i) => i.orderId === r.id)?.qty ?? 0),
+          next: nextStep(r, rets.filter((x) => x.orderId === r.id).sort((a, b) => b.createdAt - a.createdAt)[0] ?? null) }))} delhivery={delhiveryConfigured()} />
       ) : <Empty>No orders match.</Empty>}
     </>
   );
