@@ -78,6 +78,9 @@ function NotifyForm({ product, variant, soon = false, inStock = [], otherColors 
   );
 }
 
+/** A listing sold as separate Top and Bottom pieces also offers both together. A set has no stock of its own: it takes one of each piece. */
+export const SET = "Set (Top + Bottom)";
+
 export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [] }: Props) {
   const router = useRouter();
   const { add } = useCart();
@@ -85,10 +88,21 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   const colors = useMemo(() => {
     const m = new Map<string, string | null>();
     variants.forEach((v) => { if (v.option2 !== "Default") m.set(v.option2, v.colorHex); });
-    return [...m].map(([name, hex]) => ({ name, hex }));
+    const list = [...m].map(([name, hex]) => ({ name, hex }));
+    return m.has("Top") && m.has("Bottom") ? [{ name: SET, hex: null }, ...list] : list;
   }, [variants]);
+  const hasSet = colors[0]?.name === SET;
+  // Text choices (Top / Bottom / Set) are shown as buttons, real colours as swatches.
+  const asText = colors.length > 0 && colors.every((c) => !c.hex);
+  /** The variant for a size and choice; for a set, a combined view of its top and bottom. */
+  const pick = (s: string, c: string): Variant | null => {
+    if (c !== SET) return variants.find((v) => v.option1 === s && v.option2 === c) ?? null;
+    const t = variants.find((v) => v.option1 === s && v.option2 === "Top"), b = variants.find((v) => v.option1 === s && v.option2 === "Bottom");
+    if (!t || !b) return null;
+    return { ...t, id: `${t.id}+${b.id}`, option2: SET, stock: Math.min(t.stock, b.stock), price: t.price + b.price, mrp: t.mrp + b.mrp, saleEndsAt: t.saleEndsAt ?? b.saleEndsAt, saleName: t.saleName ?? b.saleName };
+  };
   const first = variants.find((v) => v.stock > 0) ?? variants[0];
-  const [color, setColor] = useState(first?.option2 ?? "Default");
+  const [color, setColor] = useState(hasSet ? SET : first?.option2 ?? "Default");
   // Clothing: the buyer must choose a size themselves; guessing one leads to wrong-size orders and returns.
   const needsSize = sizes.length > 1;
   const [size, setSize] = useState(needsSize ? "" : first?.option1 ?? "Free size");
@@ -98,7 +112,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   const [heart, setHeart] = useState(wished);
   const [copied, setCopied] = useState(false);
 
-  const variant = variants.find((v) => v.option1 === size && v.option2 === color) ?? null;
+  const variant = pick(size, color);
   const soon = p.comingSoon;
   const nothingLeft = !variants.some((v) => v.stock > 0);
   const choosing = needsSize && !size && !nothingLeft;
@@ -122,8 +136,11 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     setSizeError(true);
     document.getElementById("size-picker")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const buyNow = () => { if (choosing) return askSize(); if (variant) { add(variant.id, qty, { open: false }); router.push("/checkout"); } };
-  const addCart = () => { if (choosing) return askSize(); if (variant) { add(variant.id, qty); setQty(1); } };
+  const addVariant = (open: boolean) => { if (variant) for (const id of variant.id.split("+")) add(id, qty, { open }); };
+  const buyNow = () => { if (choosing) return askSize(); if (variant) { addVariant(false); router.push("/checkout"); } };
+  const addCart = () => { if (choosing) return askSize(); if (variant) { addVariant(true); setQty(1); } };
+  /** For "notify me" on a sold-out set: the piece that ran out. */
+  const alertVariant = variant && color === SET ? variants.find((v) => variant.id.split("+").includes(v.id) && v.stock === 0) ?? null : variant;
   const toggleWish = async () => {
     const next = !heart;
     setHeart(next);
@@ -180,7 +197,11 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
             <legend className="mb-2 text-xs font-bold tracking-[0.08em] uppercase">{p.option2Label}: <span className="font-semibold normal-case tracking-normal text-ink-soft">{color}</span></legend>
             <div className="flex flex-wrap gap-2.5">
               {colors.map((c) => {
-                const any = variants.some((v) => v.option2 === c.name && v.stock > 0);
+                const any = sizes.some((s) => (pick(s, c.name)?.stock ?? 0) > 0);
+                if (asText) return (
+                  <button key={c.name} type="button" aria-pressed={c.name === color} onClick={() => pickColor(c.name)}
+                    className={`border px-3.5 py-2 text-sm font-semibold ${c.name === color ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${any ? "" : "text-ink/40 line-through"}`}>{c.name}</button>
+                );
                 return (
                   <button key={c.name} type="button" aria-pressed={c.name === color} aria-label={`${c.name}${any ? "" : ", sold out"}`} title={c.name} onClick={() => pickColor(c.name)}
                     className={`relative size-9 rounded-full border ${c.name === color ? "border-ink ring-1 ring-ink ring-offset-2" : "border-ink/15"} ${any ? "" : "opacity-40"}`} style={{ background: c.hex ?? "#ddd" }} />
@@ -194,7 +215,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
             <legend className="mb-2 text-xs font-bold tracking-[0.08em] uppercase">{choosing ? `Select ${p.option1Label.toLowerCase()}` : p.option1Label}</legend>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
-                const v = variants.find((x) => x.option1 === s && x.option2 === color);
+                const v = pick(s, color);
                 const out = !v || v.stock === 0;
                 const h = p.sizeHeights[s];
                 return (
@@ -210,15 +231,17 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
 
         <div className="mt-5" aria-live="polite">
           {sold ? (
-            <NotifyForm key={variant?.id ?? "all"} product={p} variant={soon ? null : variant} soon={soon} inStock={nothingLeft || soon ? [] : sizes.filter((s) => variants.some((v) => v.option1 === s && v.option2 === color && v.stock > 0))}
-              otherColors={nothingLeft || soon || !variant ? [] : variants.filter((v) => v.option1 === variant.option1 && v.option2 !== color && v.stock > 0).map((v) => v.option2)} onColor={pickColor} />
+            <NotifyForm key={variant?.id ?? "all"} product={p} variant={soon ? null : alertVariant} soon={soon} inStock={nothingLeft || soon ? [] : sizes.filter((s) => (pick(s, color)?.stock ?? 0) > 0)}
+              otherColors={nothingLeft || soon || !variant ? [] : colors.map((c) => c.name).filter((c) => c !== color && (pick(variant.option1, c)?.stock ?? 0) > 0)} onColor={pickColor} />
           ) : (
             <>
               {choosing && <p className={`mb-3 text-sm font-medium ${sizeError ? "text-clay" : "text-ink-soft"}`} role={sizeError ? "alert" : undefined}>{sizeError ? `Please select a ${p.option1Label.toLowerCase()} first.` : `Select a ${p.option1Label.toLowerCase()} to see availability.`}</p>}
               {!choosing && p.showStockCount && (
                 <p className={`mb-3 flex items-center gap-2 text-sm ${low ? "text-clay" : "text-pine"}`}>
                   <span className={`size-1.5 rounded-full ${low ? "bg-clay" : "bg-pine"}`} aria-hidden />
-                  {low ? `Only ${variant!.stock} ${variant!.stock === 1 ? "piece" : "pieces"} left` : `${variant!.stock} pieces available`}
+                  {color === SET
+                    ? low ? `Only ${variant!.stock} ${variant!.stock === 1 ? "set" : "sets"} left` : `${variant!.stock} sets available`
+                    : low ? `Only ${variant!.stock} ${variant!.stock === 1 ? "piece" : "pieces"} left` : `${variant!.stock} pieces available`}
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-3">

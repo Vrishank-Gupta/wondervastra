@@ -148,7 +148,7 @@ export async function deleteBrand(id: string): Promise<Result> {
 /* ---------- products ---------- */
 const VariantInput = z.object({
   id: z.string().optional(), sku: z.string().trim().max(60).nullable().optional(), option1: z.string().trim().min(1).max(40), option2: z.string().trim().min(1).max(40),
-  colorHex: z.string().max(9).nullable().optional(), price: z.number().int().positive().nullable().optional(), stock: z.number().int().min(0), active: z.boolean().default(true),
+  colorHex: z.string().max(9).nullable().optional(), price: z.number().int().positive().nullable().optional(), mrp: z.number().int().positive().nullable().optional(), stock: z.number().int().min(0), active: z.boolean().default(true),
 });
 const ProductInput = z.object({
   id: z.string().optional(), name: z.string().trim().min(2).max(120), slug: z.string().trim().max(90).optional(),
@@ -175,6 +175,8 @@ export async function saveProduct(input: unknown): Promise<Result> {
     const keys = d.variants.filter((v) => v.active).map((v) => `${v.option1}|${v.option2}`);
     if (new Set(keys).size !== keys.length) return { error: "Two variants have the same size and colour." };
     if (d.compareAtPrice && d.compareAtPrice < d.price) return { error: "MRP can't be lower than the selling price." };
+    const lowMrp = d.variants.find((v) => v.active && v.mrp && v.mrp < (v.price ?? d.price));
+    if (lowMrp) return { error: `The MRP for ${[lowMrp.option1, lowMrp.option2].filter((x) => x !== "Free size" && x !== "Default").join(" · ") || "this item"} can't be lower than its selling price.` };
 
     const id = d.id ?? newId();
     const before = d.id ? (await db.select().from(schema.products).where(eq(schema.products.id, d.id)))[0] : null;
@@ -217,7 +219,7 @@ export async function saveProduct(input: unknown): Promise<Result> {
         const prev = v.id ? beforeVariants.find((b) => b.id === v.id) : undefined;
         const vId = prev?.id ?? newId();
         keep.add(vId);
-        const row = { sku: v.sku || null, option1: v.option1, option2: v.option2, colorHex: v.colorHex || null, price: v.price ?? null, active: v.active, sortOrder: i };
+        const row = { sku: v.sku || null, option1: v.option1, option2: v.option2, colorHex: v.colorHex || null, price: v.price ?? null, mrp: v.mrp ?? null, active: v.active, sortOrder: i };
         if (prev) {
           // Relative update: an order placed while this form was open can't be overwritten.
           const delta = v.stock - prev.stock;

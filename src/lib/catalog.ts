@@ -77,13 +77,16 @@ export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", asy
     const brand = p.brandId ? brandRows.find((b) => b.id === p.brandId) ?? null : null;
     if (brand && !brand.active) return [];
     const vs = vars.filter((v) => v.productId === p.id);
-    const base = vs.length ? Math.min(...vs.map((v) => v.price ?? p.price)) : p.price;
+    // The card shows the cheapest size, with that size's own MRP.
+    const cheapest = vs.length ? vs.reduce((a, v) => ((v.price ?? p.price) < (a.price ?? p.price) ? v : a)) : null;
+    const base = cheapest ? cheapest.price ?? p.price : p.price;
     const { price, sale } = bestSalePrice(base, p.id, p.categoryId, liveSales, now, p.brandId);
-    const mrp = Math.max(p.compareAtPrice ?? 0, base);
+    const mrp = Math.max(cheapest?.mrp ?? p.compareAtPrice ?? 0, base);
     const totalStock = p.forceOutOfStock || p.comingSoon ? 0 : vs.reduce((a, v) => a + Math.max(0, v.stock), 0);
     const r = ratings.find((x) => x.id === p.id);
     const colors = new Map<string, string | null>();
-    vs.forEach((v) => { if (v.option2 !== "Default") colors.set(v.option2, v.colorHex); });
+    // Only real colours get dots on the card; text options such as Top / Bottom don't.
+    vs.forEach((v) => { if (v.option2 !== "Default" && v.colorHex) colors.set(v.option2, v.colorHex); });
     return [{
       id: p.id, name: p.name, slug: p.slug, shortDescription: p.shortDescription,
       categoryId: p.categoryId, categoryName: cat.name, categorySlug: cat.slug,
@@ -168,7 +171,7 @@ export const getProductBySlug = cache(async (slug: string) => {
     return {
       id: v.id, option1: v.option1, option2: v.option2, colorHex: v.colorHex, sku: v.sku,
       stock: p.forceOutOfStock || p.comingSoon ? 0 : Math.max(0, v.stock),
-      price, mrp: Math.max(p.compareAtPrice ?? 0, base),
+      price, mrp: Math.max(v.mrp ?? p.compareAtPrice ?? 0, base),
       saleName: sale?.name ?? null, saleEndsAt: sale && !isOpenEnded(sale.endsAt) ? sale.endsAt : null,
     };
   });

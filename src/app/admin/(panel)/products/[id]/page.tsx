@@ -35,7 +35,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
         forceOutOfStock: p.forceOutOfStock, comingSoon: p.comingSoon, launchNote: p.launchNote ?? "", showStockCount: p.showStockCount, maxPerOrder: str(p.maxPerOrder), maxPerCustomer: str(p.maxPerCustomer), lowStockThreshold: String(p.lowStockThreshold),
         hsnCode: p.hsnCode ?? "", seoTitle: p.seoTitle ?? "", seoDescription: p.seoDescription ?? "", sizeHeights: p.sizeHeights ?? {},
         images: imgs.map((i) => ({ url: i.url, alt: i.alt ?? p.name })),
-        variants: vars.filter((v) => v.active).map((v) => ({ id: v.id, sku: v.sku ?? "", option1: v.option1, option2: v.option2, colorHex: v.colorHex ?? "", price: str(v.price, 100), stock: String(v.stock), active: v.active })),
+        variants: vars.filter((v) => v.active).map((v) => ({ id: v.id, sku: v.sku ?? "", option1: v.option1, option2: v.option2, colorHex: v.colorHex ?? "", price: str(v.price, 100), mrp: str(v.mrp, 100), stock: String(v.stock), active: v.active })),
       }} />
       <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 [&>*]:min-w-0">
         <Panel title={`Waiting for restock (${alerts.length})`}>

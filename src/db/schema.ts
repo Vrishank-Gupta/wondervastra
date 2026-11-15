@@ -114,6 +114,8 @@ export const variants = sqliteTable(
     colorHex: text("color_hex"),
     /** Optional price override for this variant. */
     price: integer("price"),
+    /** Optional MRP for this variant, when the printed MRP differs by size. Falls back to the listing's MRP. */
+    mrp: integer("mrp"),
     stock: integer("stock").notNull().default(0),
     active: bool("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),

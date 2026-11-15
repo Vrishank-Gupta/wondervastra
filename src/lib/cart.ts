@@ -138,7 +138,7 @@ export async function quoteCart(
     if (qty > 0) {
       priceLines.push({
         key: v.id, productId: p.id, categoryId: p.categoryId, brandId: p.brandId, basePrice: v.price ?? p.price,
-        compareAt: p.compareAtPrice, qty, deliveryMode: p.deliveryMode, deliveryCharge: p.deliveryCharge,
+        compareAt: v.mrp ?? p.compareAtPrice, qty, deliveryMode: p.deliveryMode, deliveryCharge: p.deliveryCharge,
       });
     }
   }

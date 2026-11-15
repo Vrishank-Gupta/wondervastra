@@ -359,7 +359,7 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
   await page.getByRole("button", { name: "Artificial Jewellery" }).click();
   await page.getByLabel("Name", { exact: true }).fill("Kundan Jhumka Earrings");
   await page.getByLabel(/Selling price/).fill("499");
-  await page.getByLabel(/MRP/).fill("799");
+  await page.locator("#mrp").fill("799");
   await expect(page.getByText("Buyers see 38% off MRP")).toBeVisible();
   await page.getByText("Free delivery", { exact: true }).click();
   // Colours outside the ready-made list are typed in; sizes stay "Free size" for jewellery.
@@ -1043,5 +1043,60 @@ test("one account per email: email code, password sign-up, password login, forgo
     await other.close();
   } finally {
     fake.close();
+  }
+});
+
+test("thermal warmers: MRP per size, and Top / Bottom / Set where a set takes one of each", async ({ page, request }) => {
+  const pid = "e2e-warmer";
+  const cat = await one("select id from categories where slug='kids-thermals'");
+  const brand = await one("select id from brands where name='Dollar'");
+  const photo = await one("select url from product_images limit 1");
+  await db.execute({ sql: "insert into products (id, name, slug, category_id, brand_id, status, price, compare_at_price, option1_label, option2_label, created_at, updated_at) values (?,?,?,?,?,'active',23000,32500,'Size','Piece',0,0)", args: [pid, "Ultra Kids' Thermal Warmer", "e2e-warmer", cat.id as string, brand.id as string] });
+  await db.execute({ sql: "insert into product_images (id, product_id, url, alt, sort_order) values ('e2e-warmer-img', ?, ?, 'Warmer', 0)", args: [pid, photo.url as string] });
+  const v = [
+    ["e2e-w-t55", "2–3 Y (55 cm)", "Top", 25000, 35500, 4], ["e2e-w-b55", "2–3 Y (55 cm)", "Bottom", 25000, 35500, 2],
+    ["e2e-w-t60", "4–5 Y (60 cm)", "Top", 25000, 35500, 3], ["e2e-w-b60", "4–5 Y (60 cm)", "Bottom", 25000, 35500, 0],
+  ] as const;
+  for (const [i, [id, s, piece, price, mrp, stock]] of v.entries()) {
+    await db.execute({ sql: "insert into variants (id, product_id, option1, option2, price, mrp, stock, active, sort_order) values (?,?,?,?,?,?,?,1,?)", args: [id, pid, s, piece, price, mrp, stock, i] });
+  }
+  try {
+    await page.goto("/p/e2e-warmer");
+    // The choice is text buttons, with Set first and chosen.
+    const pieces = page.getByRole("button", { name: /^(Set \(Top \+ Bottom\)|Top|Bottom)$/ });
+    await expect(pieces).toHaveCount(3);
+    await expect(page.getByRole("button", { name: "Set (Top + Bottom)" })).toHaveAttribute("aria-pressed", "true");
+    // Size 60 has no bottoms, so the set is sold out in 60 but a top alone isn't.
+    await expect(page.locator("#size-picker").getByRole("button", { name: "4–5 Y (60 cm)" })).toHaveClass(/line-through/);
+    await page.locator("#size-picker").getByRole("button", { name: "2–3 Y (55 cm)" }).click();
+    await expect(page.getByTestId("price")).toHaveText("₹500");
+    await expect(page.getByText("MRP ₹710")).toBeVisible();
+    await expect(page.getByText("Only 2 sets left")).toBeVisible();
+    await page.getByRole("button", { name: "Add to cart" }).first().click();
+    const cart = await page.evaluate(() => JSON.parse(localStorage.getItem("vv_cart") ?? "[]"));
+    expect(cart.map((i: { variantId: string; qty: number }) => `${i.variantId}:${i.qty}`).sort()).toEqual(["e2e-w-b55:1", "e2e-w-t55:1"]);
+
+    // Each piece is priced with its own size's MRP.
+    const q = await request.post("/api/cart/quote", { headers: { "x-real-ip": "10.68.0.1" }, data: { items: [{ variantId: "e2e-w-t55", qty: 1 }, { variantId: "e2e-w-b55", qty: 1 }] } }).then((r) => r.json());
+    expect(q.subtotal).toBe(50000);
+    expect(q.mrpTotal).toBe(71000);
+
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Top", exact: true }).click();
+    await page.locator("#size-picker").getByRole("button", { name: "4–5 Y (60 cm)" }).click();
+    await expect(page.getByText("Only 3 pieces left")).toBeVisible();
+
+    // The seller sees and edits the MRP per size; an MRP below the price is refused with the size named.
+    await adminLogin(page);
+    await page.goto(`/admin/products/${pid}`);
+    await expect(page.getByLabel("MRP for Top · 2–3 Y (55 cm)")).toHaveValue("355");
+    await page.getByText("More options").click();
+    await page.getByLabel("MRP for Bottom · 4–5 Y (60 cm)").fill("200");
+    await page.getByRole("button", { name: "Save changes" }).first().click();
+    await expect(page.getByText("The MRP for 4–5 Y (60 cm) · Bottom can't be lower than its selling price.")).toBeVisible();
+  } finally {
+    await db.execute({ sql: "delete from variants where product_id=?", args: [pid] });
+    await db.execute({ sql: "delete from product_images where product_id=?", args: [pid] });
+    await db.execute({ sql: "delete from products where id=?", args: [pid] });
   }
 });

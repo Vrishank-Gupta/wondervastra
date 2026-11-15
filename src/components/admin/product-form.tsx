@@ -7,7 +7,7 @@ import { saveProduct } from "@/app/admin/actions";
 import { COLOURS, SIZE_SETS, TYPICAL_HEIGHTS, autoShortDescription, colourHex, presetFor, type SizeSet } from "@/lib/listing-presets";
 import { Panel } from "./ui";
 
-type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; stock: string; active: boolean };
+type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; mrp?: string; stock: string; active: boolean };
 export type ProductFormData = {
   id?: string; name: string; slug: string; shortDescription: string; description: string; categoryId: string; brandId: string; status: "draft" | "active" | "archived";
   price: string; compareAtPrice: string; tags: string; featured: boolean; material: string; care: string; sizeGuide: string;
@@ -72,7 +72,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
   const [colours, setColours] = useState<{ name: string; hex: string }[]>(() =>
     uniq(live.map((v) => v.option2)).filter((c) => c !== PLAIN).map((c) => ({ name: c, hex: live.find((v) => v.option2 === c)?.colorHex || colourHex(c) })));
   const [stock, setStock] = useState<Record<string, string>>(() => Object.fromEntries(initial.variants.map((v) => [key(v.option1, v.option2), v.active ? v.stock : "0"])));
-  const [meta, setMeta] = useState<Record<string, { id?: string; sku: string; price: string }>>(() => Object.fromEntries(initial.variants.map((v) => [key(v.option1, v.option2), { id: v.id, sku: v.sku, price: v.price }])));
+  const [meta, setMeta] = useState<Record<string, { id?: string; sku: string; price: string; mrp: string }>>(() => Object.fromEntries(initial.variants.map((v) => [key(v.option1, v.option2), { id: v.id, sku: v.sku, price: v.price, mrp: v.mrp ?? "" }])));
   const [customSize, setCustomSize] = useState("");
   const [customColour, setCustomColour] = useState("");
   const [fillAll, setFillAll] = useState("");
@@ -151,7 +151,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
     setBusy(true); setMsg(null);
     const variants = C.flatMap((c) => S.map((s) => {
       const m = meta[key(s, c)];
-      return { id: m?.id, sku: m?.sku || null, option1: s, option2: c, colorHex: colours.find((x) => x.name === c)?.hex || null, price: m?.price ? paise(m.price) : null, stock: Number(stock[key(s, c)] || 0), active: true };
+      return { id: m?.id, sku: m?.sku || null, option1: s, option2: c, colorHex: colours.find((x) => x.name === c)?.hex || null, price: m?.price ? paise(m.price) : null, mrp: m?.mrp ? paise(m.mrp) : null, stock: Number(stock[key(s, c)] || 0), active: true };
     }));
     const r = await saveProduct({
       id: f.id, name: f.name, slug: f.slug || undefined,
@@ -359,18 +359,19 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               <div><label className="label text-xs" htmlFor="lst">Say “only a few left” below</label><input id="lst" className="input" type="number" min="0" value={f.lowStockThreshold} onChange={(e) => set("lowStockThreshold", e.target.value)} /></div>
             </div>
             <div>
-              <p className="label">Different price or SKU for one size or colour <span className="font-normal text-ink-soft">(optional; SKUs are made for you)</span></p>
+              <p className="label">Different price, MRP or SKU for one size or colour <span className="font-normal text-ink-soft">(optional; leave empty to use the prices above; SKUs are made for you)</span></p>
               <div className="max-h-72 overflow-auto rounded-sm border border-line">
                 <table className="w-full text-sm [&_td]:px-2 [&_td]:py-1 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-soft">
-                  <thead><tr><th>Variant</th><th>Price ₹</th><th>SKU</th></tr></thead>
+                  <thead><tr><th>Variant</th><th>Price ₹</th><th>MRP ₹</th><th>SKU</th></tr></thead>
                   <tbody>
                     {C.flatMap((c) => S.map((s) => {
-                      const k = key(s, c); const m = meta[k] ?? { sku: "", price: "" };
+                      const k = key(s, c); const m = meta[k] ?? { sku: "", price: "", mrp: "" };
                       const label = [c !== PLAIN && c, s !== FREE && s].filter(Boolean).join(" · ") || "This item";
                       return (
                         <tr key={k} className="border-t border-line">
                           <td className="whitespace-nowrap">{label}</td>
                           <td><input aria-label={`Price for ${label}`} className="input w-24 px-2 py-1" type="number" min="1" step="0.01" placeholder={f.price || "Same"} value={m.price} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, price: e.target.value } }))} /></td>
+                          <td><input aria-label={`MRP for ${label}`} className="input w-24 px-2 py-1" type="number" min="1" step="0.01" placeholder={f.compareAtPrice || "Same"} value={m.mrp} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, mrp: e.target.value } }))} /></td>
                           <td><input aria-label={`SKU for ${label}`} className="input w-36 px-2 py-1 font-mono text-xs" placeholder="Auto" value={m.sku} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, sku: e.target.value } }))} /></td>
                         </tr>
                       );

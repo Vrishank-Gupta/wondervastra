@@ -50,6 +50,13 @@
       "when": 1794668307182,
       "tag": "0006_customer_logins",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794711992941,
+      "tag": "0007_variant_mrp",
+      "breakpoints": true
     }
   ]
 }
