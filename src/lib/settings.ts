@@ -5,7 +5,7 @@ import { clearMemo, memo } from "./memo";
 
 export const DEFAULT_SETTINGS = {
   storeName: "WonderVastra",
-  tagline: "100% original brands at the lowest prices. Thermals for kids, babies and men.",
+  tagline: "100% original brands at the lowest prices. Thermals for kids (ages 2–11) and men.",
   announcement: "",
   supportEmail: "",
   whatsappNumber: "",
@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS = {
   codMaxOrder: 500000,
   dispatchDays: 2,
   deliveryDaysMin: 3,
-  deliveryDaysMax: 7,
+  deliveryDaysMax: 5,
   returnWindowDays: 3,
   orderFeedbackEnabled: true,
   deliveryFeedbackEnabled: true,

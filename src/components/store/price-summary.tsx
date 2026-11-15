@@ -10,6 +10,8 @@ export function CouponBox({ quote }: { quote: Quote | null }) {
   const [text, setText] = useState(coupon);
   useEffect(() => setText(coupon), [coupon]);
   const applied = quote?.coupon?.code === coupon && coupon;
+  // No coupons running and none typed in: don't show an empty box that invites a hunt for codes.
+  if (quote && (quote as Quote & { couponsLive?: boolean }).couponsLive === false && !coupon && !quote.coupon) return null;
   return (
     <div>
       {applied ? (

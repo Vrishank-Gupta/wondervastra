@@ -59,3 +59,8 @@ export function waLink(number: string, text?: string) {
 export function withBrand(name: string, brand?: string | null) {
   return brand && !name.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${name}` : name;
 }
+
+/** "2–3 Y (45 cm)" → "2–3 Y", "S (80 cm)" → "S": one filter entry per age or size across brands' own charts. */
+export function sizeKey(s: string) {
+  return s.replace(/\s*\([^)]*\)\s*$/, "").trim() || s;
+}

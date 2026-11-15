@@ -35,7 +35,7 @@ export async function GET() {
     "- Every product is 100% original branded stock, sold at the lowest prices the store can offer",
     `- Payment: ${pay}`,
     `- Delivery area: ${areaPhrase(s)}`,
-    `- Dispatch within ${s.dispatchDays} working days; delivery usually ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after dispatch`,
+    `- Delivery usually within ${s.deliveryDaysMin}–${s.deliveryDaysMax} days of ordering (exact date shown for each pincode)`,
     ...offerTiers(offers).map((t) => `- Offer: ${t.label.toLowerCase()}${t.minPieces ? " pieces" : ""}, get ${t.reward.toLowerCase()} (applied automatically in the cart)`),
     "- Free delivery on every order",
     `- Returns: eligible unused items within ${s.returnWindowDays} days of delivery`,

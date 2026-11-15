@@ -74,3 +74,25 @@ export function ncrPlace(pincode: string): string | null {
 export function areaLabel(s: { deliveryAreaName: string; deliveryPincodes: string }) {
   return s.deliveryPincodes.trim() ? s.deliveryAreaName.trim() || "selected areas" : "India";
 }
+
+/** India Post's first two pincode digits → state, for the regions around our delivery area. */
+const PIN_STATE: Record<string, string> = {
+  "11": "Delhi", "12": "Haryana", "13": "Haryana", "14": "Punjab", "15": "Punjab", "16": "Chandigarh", "17": "Himachal Pradesh",
+  "18": "Jammu and Kashmir", "19": "Jammu and Kashmir", "20": "Uttar Pradesh", "21": "Uttar Pradesh", "22": "Uttar Pradesh", "23": "Uttar Pradesh",
+  "24": "Uttarakhand", "25": "Uttar Pradesh", "26": "Uttarakhand", "27": "Uttar Pradesh", "28": "Uttar Pradesh", "30": "Rajasthan", "31": "Rajasthan",
+  "32": "Rajasthan", "33": "Rajasthan", "34": "Rajasthan",
+};
+/** The states a customer can pick at checkout: only those our delivery pincodes reach. Null means everywhere. */
+export function statesForArea(pincodes: string): string[] | null {
+  const { rules } = parsePincodes(pincodes);
+  if (!rules.length) return null;
+  const out = new Set<string>();
+  for (const r of rules) {
+    for (let p = Math.floor(r.from / 10_000); p <= Math.floor(r.to / 10_000); p++) {
+      const st = PIN_STATE[String(p)];
+      if (!st) return null; // An area we don't map: don't hide any state.
+      out.add(st);
+    }
+  }
+  return [...out].sort();
+}

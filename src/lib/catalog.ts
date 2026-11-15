@@ -1,3 +1,5 @@
+import { cheapestSet } from "./sets";
+import { sizeKey } from "./utils";
 import { cache } from "react";
 import { memo } from "./memo";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
@@ -7,6 +9,8 @@ import { bestSalePrice, isLive, isOpenEnded, type OfferRule, type SaleRule } fro
 const { products, productImages, variants, categories, brands, reviews, sales, cartOffers } = schema;
 
 export type ProductCard = {
+  /** Sold as top + bottom: price and MRP are for the set; piecePrice is the cheapest single piece. */
+  setOf2?: boolean; piecePrice?: number | null; minPieces?: number;
   id: string; name: string; slug: string; shortDescription: string | null;
   categoryId: string; categoryName: string; categorySlug: string;
   brandId: string | null; brandName: string | null; brandSlug: string | null; isHouse: boolean;
@@ -81,7 +85,14 @@ export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", asy
     const cheapest = vs.length ? vs.reduce((a, v) => ((v.price ?? p.price) < (a.price ?? p.price) ? v : a)) : null;
     const base = cheapest ? cheapest.price ?? p.price : p.price;
     const { price, sale } = bestSalePrice(base, p.id, p.categoryId, liveSales, now, p.brandId, cheapest?.minPrice);
-    const mrp = Math.max(cheapest?.mrp ?? p.compareAtPrice ?? 0, base);
+    let mrp = Math.max(cheapest?.mrp ?? p.compareAtPrice ?? 0, base);
+    // Sold as top + bottom: the card shows the set, as the product page does, with the single-piece price beside it.
+    const set = cheapestSet(vs.map((v) => {
+      const b = v.price ?? p.price;
+      return { option1: v.option1, option2: v.option2, price: bestSalePrice(b, p.id, p.categoryId, liveSales, now, p.brandId, v.minPrice).price, mrp: Math.max(v.mrp ?? p.compareAtPrice ?? 0, b), stock: p.forceOutOfStock || p.comingSoon ? 0 : v.stock };
+    }));
+    let cardPrice = price;
+    if (set) { cardPrice = set.price; mrp = set.mrp; }
     const totalStock = p.forceOutOfStock || p.comingSoon ? 0 : vs.reduce((a, v) => a + Math.max(0, v.stock), 0);
     const r = ratings.find((x) => x.id === p.id);
     const colors = new Map<string, string | null>();
@@ -92,7 +103,8 @@ export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", asy
       categoryId: p.categoryId, categoryName: cat.name, categorySlug: cat.slug,
       brandId: brand?.id ?? null, brandName: brand?.name ?? null, brandSlug: brand?.slug ?? null, isHouse: brand?.isHouse ?? false,
       images: imgs.filter((i) => i.productId === p.id).map((i) => ({ url: i.url, alt: i.alt })),
-      price, mrp, discountPct: mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0,
+      price: cardPrice, mrp, discountPct: mrp > cardPrice ? Math.round(((mrp - cardPrice) / mrp) * 100) : 0,
+      setOf2: Boolean(set), piecePrice: set ? set.piece : null, minPieces: p.minPieces,
       saleName: sale?.name ?? null, saleBadge: sale?.badge ?? null, saleEndsAt: sale && !isOpenEnded(sale.endsAt) ? sale.endsAt : null,
       inStock: totalStock > 0, totalStock, lowStock: totalStock > 0 && totalStock <= p.lowStockThreshold, showStockCount: p.showStockCount,
       comingSoon: p.comingSoon, launchNote: p.launchNote,
@@ -133,7 +145,7 @@ export function applyFilters(cards: ProductCard[], f: Filters) {
       .map((x) => x.c);
   }
   if (f.color) out = out.filter((c) => c.colors.some((x) => x.name === f.color));
-  if (f.size) out = out.filter((c) => c.sizes.includes(f.size!));
+  if (f.size) out = out.filter((c) => c.sizes.some((s) => s === f.size || sizeKey(s) === f.size));
   if (f.min != null) out = out.filter((c) => c.price >= f.min!);
   if (f.max != null) out = out.filter((c) => c.price <= f.max!);
   if (f.onSale) out = out.filter((c) => c.discountPct > 0);

@@ -1,3 +1,4 @@
+import { ContactForm } from "@/components/store/contact-form";
 import { areaPhrase, faqPage, JsonLd } from "@/lib/seo";
 import { waLink } from "@/lib/utils";
 import type { Metadata } from "next";
@@ -22,7 +23,7 @@ function faqItems(s: StoreSettings): { q: string; a: string }[] {
     s.deliveryPincodes.trim()
       ? { q: "Where do you deliver?", a: `We deliver across ${areaPhrase(s)} for now. Enter your pincode on any product page to check. If we don't reach you yet, leave your number there and we'll tell you as soon as we do.` }
       : { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners, and delivery is free on every order." },
-    { q: "When will my order arrive?", a: `We dispatch within ${s.dispatchDays} working days, and delivery usually takes ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after that depending on your location.` },
+    { q: "When will my order arrive?", a: `Usually within ${s.deliveryDaysMin}–${s.deliveryDaysMax} days of ordering. Enter your pincode on any product page or at checkout to see your delivery date, and we send a tracking link once it ships.` },
     { q: "What sizes do kids' thermals come in?", a: "Kids' warmers fit ages 2 to 11 years, in sizes 45 to 75 cm. Each listing shows the age with every size and has the brand's size guide. Kids' wear is sold in twos: mix any sizes, tops and trousers." },
     { q: "Is delivery free?", a: "Yes, on every order, with no minimum." },
     { q: "How do I track my order?", a: `We'll send you a tracking link by ${channels()} when it ships. You can also use the Track Order page anytime.` },
@@ -39,22 +40,18 @@ const PAGES: Record<string, Page> = {
     <ul><li>Comfort you can wear all day</li><li>Colours that go with what you already own</li><li>Honest pricing and free delivery on every order</li><li>Keeping you updated at every step of your order</li></ul>
   </> },
   contact: { title: "Contact us", body: (s) => <>
-    <p>Questions about an order or a product? We&apos;d love to help.</p>
-    {s.whatsappNumber && <p><b>WhatsApp:</b> <a href={waLink(s.whatsappNumber)} target="_blank" rel="noreferrer">{s.whatsappNumber}</a> (chat with us)</p>}
-    {s.supportEmail && <p><b>Email:</b> <a href={`mailto:${s.supportEmail}`}>{s.supportEmail}</a></p>}
-    {s.supportHours && (s.whatsappNumber || s.supportEmail) && <p><b>Hours:</b> {s.supportHours}</p>}
-    {s.whatsappGroupUrl && <p><b>WhatsApp group:</b> <a href={s.whatsappGroupUrl} target="_blank" rel="noreferrer">Join for new arrivals and deals</a></p>}
+    <p>Questions about an order, sizes or a product? Send us a message and we&apos;ll reply by email{s.supportHours ? ` (${s.supportHours})` : ""}.</p>
+    <ContactForm />
+    {s.supportEmail && <p>Or email us at <a href={`mailto:${s.supportEmail}`}>{s.supportEmail}</a>. If it&apos;s about an order, include the order number.</p>}
     {s.legalName && <p><b>Business name:</b> {s.legalName}</p>}
-    {s.businessAddress && <p><b>Address:</b> {s.businessAddress}</p>}
     {s.gstin && <p><b>GSTIN:</b> {s.gstin}</p>}
-    <p>Please keep your order number handy so we can help you faster.</p>
   </> },
   faq: { title: "FAQs", body: (s) => <>{faqItems(s).map((x) => <div key={x.q}><h2>{x.q}</h2><p>{x.a}</p></div>)}</> },
   "shipping-policy": { title: "Shipping policy", body: (s) => <>
     {s.deliveryPincodes.trim()
       ? <><h2>Where we deliver</h2><p>We deliver across {areaPhrase(s)} for now. Enter your pincode on any product page or at checkout to check. If we don&apos;t deliver to you yet, leave your number and we&apos;ll tell you when we do.</p></>
       : <p>We ship across India through trusted courier partners.</p>}
-    <h2>Dispatch & delivery time</h2><p>Orders are dispatched within {s.dispatchDays} working days. Delivery usually takes {s.deliveryDaysMin}–{s.deliveryDaysMax} days after dispatch.</p>
+    <h2>Delivery time</h2><p>Orders usually arrive within {s.deliveryDaysMin}–{s.deliveryDaysMax} days. Enter your pincode on a product page or at checkout to see your delivery date. You get a tracking link as soon as your parcel ships.</p>
     <h2>Free delivery</h2><p>Every order ships free, whatever its size. There is no minimum order.</p>
     <h2>Tracking</h2><p>When your order ships, you&apos;ll get the courier name, AWB number and tracking link by {channels()}.</p>
     <h2>Failed delivery</h2><p>If delivery fails because of an incorrect address or if the recipient is unavailable, please contact us {contactLine(s)}.</p>

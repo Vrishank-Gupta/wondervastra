@@ -24,7 +24,7 @@ export function TrustStrip({ settings }: { settings: StoreSettings }) {
   const items = [
     { icon: CreditCard, title: online ? "Secure payment" : "Easy payment", text: paymentLine(online, settings.codEnabled).replace(/ available$/, "") },
     areaLabel(settings) === "India"
-      ? { icon: Truck, title: `Ships in ${settings.dispatchDays} days`, text: `Delivered in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` }
+      ? { icon: Truck, title: "Free delivery", text: `Delivered in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` }
       : { icon: Truck, title: `Delivering in ${areaLabel(settings)}`, text: `Arrives in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` },
     { icon: BadgeCheck, title: "100% original brands", text: "At the lowest prices" },
     { icon: RotateCcw, title: `${settings.returnWindowDays}-day returns`, text: "On eligible items" },

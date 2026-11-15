@@ -1,3 +1,4 @@
+import { cheapestSet } from "@/lib/sets";
 import { abs, breadcrumbs, JsonLd, returnPolicy, shippingDetails } from "@/lib/seo";
 import { capabilities } from "@/lib/capabilities";
 import type { Metadata } from "next";
@@ -23,9 +24,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const d = await getProductBySlug(slug);
   if (!d) return { title: "Not found" };
   const { product: p, images, variants, brand } = d;
-  const price = variants.length ? Math.min(...variants.map((v) => v.price)) : p.price;
+  const set = cheapestSet(variants);
+  const price = set ? set.price : variants.length ? Math.min(...variants.map((v) => v.price)) : p.price;
   const fullName = withBrand(p.name, brand?.name);
-  const title = p.seoTitle || `${fullName} · ${money(price)}`;
+  const title = p.seoTitle || `${fullName} · ${set ? `Set ${money(price)}` : money(price)}`;
   const description = p.seoDescription || p.shortDescription || `Shop ${fullName} at WonderVastra.`;
   return {
     title, description, alternates: { canonical: `/p/${p.slug}` },

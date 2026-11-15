@@ -55,6 +55,8 @@ export function ProductCard({ p, priority = false, wished = false }: { p: Card; 
           <span className="font-bold">{money(p.price)}</span>
           {p.mrp > p.price && !p.comingSoon && <><s className="text-xs text-ink-soft">{money(p.mrp)}</s><span className="text-xs font-bold text-madder">{p.discountPct}% off</span></>}
         </p>
+        {p.setOf2 && <p className="text-[11px] text-ink-soft">Set of top + bottom{p.piecePrice ? ` · or ${money(p.piecePrice)} a piece` : ""}</p>}
+        {(p.minPieces ?? 1) > 1 && <p className="mt-0.5 inline-block bg-sand-soft px-1.5 py-0.5 text-[11px] font-semibold">Sold in {p.minPieces}s · mix any sizes</p>}
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold">
           {p.colors.length > 1 && (
             <span className="flex items-center gap-1" aria-label={`${p.colors.length} colours`}>

@@ -1,9 +1,8 @@
 "use client";
-import { paymentLine } from "@/lib/payment-copy";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Bell, Check, ChevronDown, Heart, Link2, MessageCircle, RotateCcw, Ruler, ShieldCheck, Star, Truck, Wallet } from "lucide-react";
+import { Bell, Check, ChevronDown, Heart, Link2, MessageCircle, RotateCcw, Ruler, ShieldCheck, Star, Truck } from "lucide-react";
 import { money } from "@/lib/format";
 import { ProductGallery } from "./product-gallery";
 import { track } from "./tracker";
@@ -294,12 +293,12 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
           </div>
         )}
 
-        {!soon && <DeliveryCheck area={settings.deliveryArea} restricted={settings.areaRestricted} days={`Dispatched in ${settings.dispatchDays} working days, delivered in about ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days`} />}
+        {!soon && <DeliveryCheck area={settings.deliveryArea} restricted={settings.areaRestricted} days={`Delivered in about ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days. Enter your pincode for the exact date.`} />}
 
         <ul className="mt-5 grid gap-2 text-sm">
           <li className="flex items-center gap-2"><Truck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.deliveryMode === "free" || p.deliveryCharge === 0 ? <span className="text-pine">Free delivery</span> : <span>Delivery charge: {money(p.deliveryCharge)}</span>}</li>
-          <li className="flex items-center gap-2"><ShieldCheck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />Dispatched in {settings.dispatchDays} working days, delivered in about {settings.deliveryDaysMin}–{settings.deliveryDaysMax} days</li>
-          <li className="flex items-center gap-2"><Wallet size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{paymentLine(settings.onlinePayments, p.codAllowed && settings.codEnabled)}</li>
+          <li className="flex items-center gap-2"><ShieldCheck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />Delivered in about {settings.deliveryDaysMin}–{settings.deliveryDaysMax} days</li>
+          
           <li className="flex items-center gap-2"><RotateCcw size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.returnable ? `Returnable within ${settings.returnWindowDays} days of delivery` : "This item can't be returned"}</li>
         </ul>
 

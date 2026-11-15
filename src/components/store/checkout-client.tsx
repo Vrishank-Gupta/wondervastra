@@ -16,12 +16,12 @@ import { AreaWaitlist, etaLabel, lookupPin, rememberPin, savedPin, type PinResul
 type Addr = { id: string; name: string; phone: string; line1: string; line2: string | null; city: string; state: string; pincode: string };
 type Props = {
   customer: { name: string | null; email: string | null; phone: string | null } | null;
-  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; codEnabled: boolean; deliveryArea: string; testMode?: boolean;
+  addresses: Addr[]; online: boolean; simulated: boolean; live: boolean; codFee: number; codEnabled: boolean; deliveryArea: string; states?: string[] | null; testMode?: boolean;
 };
 declare global { interface Window { Razorpay?: new (o: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void } } }
 
 
-export function CheckoutClient({ customer, addresses, online, simulated, codFee, codEnabled, deliveryArea, testMode = false }: Props) {
+export function CheckoutClient({ customer, addresses, online, simulated, codFee, codEnabled, deliveryArea, states, testMode = false }: Props) {
   const { items, ready, coupon, clear, setCoupon, attribution } = useCart();
   const [email, setEmail] = useState(customer?.email ?? "");
   const [name, setName] = useState(customer?.name ?? addresses[0]?.name ?? "");
@@ -68,9 +68,18 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
   }, [pincode]);
   const outside = Boolean(area && area.pincode === pincode && !area.serviceable);
 
-  async function placeOrder(e: React.FormEvent) {
+  async function placeOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!quote) return;
+    // One clear message listing what's missing, instead of the browser's small bubble.
+    const bad = [...e.currentTarget.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select, textarea")].filter((el) => !el.checkValidity());
+    if (bad.length) {
+      const name = (el: HTMLElement) => (document.querySelector(`label[for="${el.id}"]`)?.textContent ?? el.getAttribute("aria-label") ?? el.id).replace(/\s*\(optional\)/i, "").trim();
+      const missing = bad.map((el) => (el.validity.valueMissing ? name(el) : `${name(el)} (check the format)`));
+      setError(`Please fill in: ${missing.join(", ")}.`);
+      bad[0].focus();
+      return;
+    }
     if (outside) { setError(`We don't deliver to ${pincode} yet. Please use an address in ${deliveryArea}.`); document.getElementById("pincode")?.focus(); return; }
     setBusy(true); setError("");
     try {
@@ -156,7 +165,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
       {simulated && (
         <p className="mb-4 flex items-start gap-2 rounded-sm border border-line bg-sand-soft p-3 text-sm font-medium"><AlertTriangle size={18} aria-hidden className="shrink-0" /> Test mode: Razorpay keys aren&apos;t set, so online payment is simulated and no money moves.</p>
       )}
-      <form onSubmit={placeOrder} className="grid gap-6 pb-24 lg:grid-cols-[1fr_24rem] lg:pb-0">
+      <form onSubmit={placeOrder} noValidate className="grid gap-6 pb-24 lg:grid-cols-[1fr_24rem] lg:pb-0">
         <div className="space-y-5">
           {/* On phones the full summary sits below the form, so what's being bought is one tap away at the top. */}
           {quote && (
@@ -207,7 +216,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
               )}
               <div className="sm:col-span-2"><label className="label" htmlFor="state">State</label>
                 <select id="state" className="input" autoComplete="address-level1" required value={state} onChange={(e) => setState(e.target.value)}>
-                  <option value="">Select state</option>{STATES.map((s) => <option key={s}>{s}</option>)}
+                  <option value="">Select state</option>{(states ?? STATES).map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div className="sm:col-span-2"><label className="label" htmlFor="note">Order note <span className="font-normal text-ink-soft">(optional)</span></label><input id="note" className="input" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Gift message, delivery instructions…" /></div>
@@ -240,7 +249,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
             {itemList}
             <CouponBox quote={quote} />
             {quote && <PriceSummary quote={quote} />}
-            {error && <p className="rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">{error}</p>}
+            {error && <p className="hidden rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium lg:block" role="alert">{error}</p>}
             {quote?.minimumIssue
               ? <p role="alert" className="text-sm font-medium text-clay">{quote.minimumIssue} <Link className="underline" href="/cart">Review your cart</Link>.</p>
               : hasIssue && <p className="text-sm font-medium text-clay">Some items changed. <Link className="underline" href="/cart">Review your cart</Link>.</p>}
@@ -252,6 +261,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
           </div>
         </aside>
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] lg:hidden">
+          {error && <p className="mb-2 rounded-sm bg-clay-soft p-2 text-xs font-medium" role="alert" data-testid="mobile-error">{error}</p>}
           <button disabled={busy || !quote || Boolean(nothing) || Boolean(quote?.minimumIssue)} className="btn btn-primary w-full text-lg">
             {busy ? <Loader2 className="animate-spin" size={18} aria-hidden /> : <Lock size={16} aria-hidden />}
             {method === "cod" ? `Place order · ${quote ? money(quote.total) : ""}` : `Pay ${quote ? money(quote.total) : ""}`}

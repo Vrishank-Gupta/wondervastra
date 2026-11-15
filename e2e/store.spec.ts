@@ -5,6 +5,8 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import sharp from "sharp";
 
 const db = createClient({ url: "file:./data/e2e.db" });
+// The app writes to the same file (visitor beacons etc.): wait for a lock instead of failing.
+test.beforeAll(async () => { await db.execute("PRAGMA busy_timeout=10000"); });
 const ADMIN = { email: "e2e@vastravibe.test", password: "e2e-password-1234" };
 const rows = async (sql: string, args: (string | number)[] = []) => (await db.execute({ sql, args })).rows as unknown as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 const one = async (sql: string, args: (string | number)[] = []) => (await rows(sql, args))[0];
@@ -1460,5 +1462,40 @@ test("photos and size guide open above everything, close with X, Esc, Back; size
       const overlap = link.x < s.x + s.width && s.x < link.x + link.width && link.y < s.y + s.height && s.y < link.y + link.height;
       expect(overlap).toBe(false);
     }
+  }
+});
+
+test("audit fixes: contact form emails support, checkout lists missing fields and only NCR states, no coupon box without coupons, no address shown", async ({ page }) => {
+  await db.execute(`insert into settings (key, value, updated_at) values ('supportEmail', '"support@example.com"', 0), ('businessAddress', '"D-1 Secret Lane"', 0) on conflict(key) do update set value=excluded.value`);
+  try {
+    await page.goto("/info/contact");
+    await expect(page.locator("main")).not.toContainText("Secret Lane");
+    const form = page.getByTestId("contact-form");
+    await form.getByRole("button", { name: "Send message" }).click();
+    await expect(form.getByRole("alert")).toHaveText("Please tell us your name.");
+    await form.getByLabel("Your name").fill("Ritu");
+    await form.getByLabel("Email").fill("ritu@example.com");
+    await form.getByLabel(/Order number/).fill("WV123");
+    await form.getByLabel("How can we help?").fill("Which size for a 6 year old?");
+    await form.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByTestId("contact-sent")).toBeVisible();
+    const n = await one("select recipient, subject from notifications where event='contact_message' order by created_at desc limit 1");
+    expect(n).toMatchObject({ recipient: "support@example.com", subject: "Message from Ritu about WV123" });
+
+    // Checkout: states limited to the delivery area; a clear list of what's missing.
+    const v = (await one("select v.id from variants v join products p on p.id=v.product_id where p.slug='rupa-boys-thermal-top' and v.active=1 and v.stock>0 limit 1")).id;
+    await page.evaluate((id) => localStorage.setItem("vv_cart", JSON.stringify([{ variantId: id, qty: 1 }])), v as string);
+    await page.goto("/checkout");
+    const states = await page.locator("#state option").allTextContents();
+    expect(states.filter((x) => x !== "Select state")).toEqual(["Delhi", "Haryana", "Uttar Pradesh"]);
+    await expect(page.getByText("Total").first()).toBeVisible();
+    await page.locator("form[novalidate]").evaluate((f) => (f as HTMLFormElement).requestSubmit());
+    await expect(page.getByRole("alert").filter({ hasText: "Please fill in:" }).first()).toContainText("Full name");
+    await db.execute("update coupons set active=0");
+    await page.reload();
+    await expect(page.getByLabel("Coupon code")).toHaveCount(0);
+  } finally {
+    await db.execute("update coupons set active=1");
+    await db.execute("delete from settings where key in ('supportEmail','businessAddress')");
   }
 });

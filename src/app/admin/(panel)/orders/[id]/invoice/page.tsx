@@ -32,7 +32,6 @@ export default async function Invoice({ params }: { params: Promise<{ id: string
         <div className="flex justify-between gap-4 border-b border-line pb-3">
           <div>
             <p className="font-display text-2xl">{seller}</p>
-            {s.businessAddress && <p className="whitespace-pre-line">{s.businessAddress}</p>}
             {s.businessState && <p>State: {s.businessState}</p>}
             {s.gstin && <p>GSTIN: {s.gstin}</p>}
           </div>

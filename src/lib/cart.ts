@@ -14,7 +14,7 @@ export type QuoteLineView = {
   saleName: string | null; deliveryMode: "free" | "flat"; deliveryCharge: number; codAllowed: boolean; returnable: boolean;
   issue: string | null; sku: string | null; hsnCode: string | null;
 };
-export type CartQuote = Quote & { views: QuoteLineView[]; codAvailable: boolean; codReason: string | null; blockingIssues: boolean; minimumIssue: string | null };
+export type CartQuote = Quote & { views: QuoteLineView[]; codAvailable: boolean; codReason: string | null; blockingIssues: boolean; minimumIssue: string | null; couponsLive: boolean };
 
 type SetListing = { minPieces: number; comboAbove: number | null };
 /**
@@ -87,6 +87,13 @@ export async function loadCoupon(code: string | null | undefined, who: Identity)
 }
 
 /** The single source of truth for cart contents, limits and totals. Never trusts client prices. */
+/** Whether any coupon could be used right now: the coupon box only shows when one exists. */
+async function anyLiveCoupon() {
+  const now = Date.now();
+  const rows = await db.select({ startsAt: coupons.startsAt, endsAt: coupons.endsAt, usageLimit: coupons.usageLimit, usedCount: coupons.usedCount }).from(coupons).where(eq(coupons.active, true));
+  return rows.some((c) => (c.startsAt == null || c.startsAt <= now) && (c.endsAt == null || c.endsAt > now) && (c.usageLimit == null || c.usedCount < c.usageLimit));
+}
+
 export async function quoteCart(
   items: CartInput[],
   opts: { couponCode?: string | null; paymentMethod?: "razorpay" | "cod"; who?: Identity } = {},
@@ -195,5 +202,5 @@ export async function quoteCart(
   else if (views.some((v) => v.qty > 0 && !v.codAllowed)) codReason = "An item in your cart is prepaid only.";
   else if (s.codMaxOrder && quote.subtotal > s.codMaxOrder) codReason = "Cash on delivery isn't available for orders this large.";
 
-  return { ...quote, views, codAvailable: !codReason, codReason, blockingIssues: views.some((v) => v.qty === 0) || Boolean(minimumIssue), minimumIssue };
+  return { ...quote, views, codAvailable: !codReason, codReason, blockingIssues: views.some((v) => v.qty === 0) || Boolean(minimumIssue), minimumIssue, couponsLive: await anyLiveCoupon() };
 }

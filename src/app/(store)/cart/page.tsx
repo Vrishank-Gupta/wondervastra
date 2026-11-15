@@ -35,7 +35,7 @@ export default function CartPage() {
               <div className="min-w-0 flex-1">
                 <Link href={`/p/${l.slug}`} className="font-medium hover:underline">{l.name}</Link>
                 <p className="text-sm text-ink-soft">{l.variantLabel}</p>
-                <p className="text-xs font-medium">{l.deliveryMode === "free" ? <span className="text-pine">Free delivery</span> : `Delivery ${money(l.deliveryCharge)}`}</p>
+                {l.deliveryMode !== "free" && l.deliveryCharge > 0 && <p className="text-xs font-medium">{`Delivery ${money(l.deliveryCharge)}`}</p>}
                 {l.issue && <p className="mt-1 text-sm font-medium text-clay">{l.issue}</p>}
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   {l.qty > 0 ? <QtyStepper qty={l.qty} max={l.maxQty} label={l.name} onChange={(n) => setQty(l.variantId, n)} /> : <span />}

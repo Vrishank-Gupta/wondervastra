@@ -178,9 +178,9 @@ function toText(html: string) {
     .split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n\n");
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
-  // Replies go to the shop's real mailbox; the sending address (orders@) has no inbox.
-  const replyTo = (await getSettings()).supportEmail || undefined;
+async function sendEmail(to: string, subject: string, html: string, replyToOverride?: string) {
+  // Replies go to the shop's real mailbox (or, for a contact message, to the customer); the sending address has no inbox.
+  const replyTo = replyToOverride || (await getSettings()).supportEmail || undefined;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
@@ -215,7 +215,7 @@ async function sendWhatsApp(phone: string, template: string, params: string[]) {
 type Dispatch = {
   orderId?: string | null;
   event: string;
-  email?: { to: string; subject: string; html: string } | null;
+  email?: { to: string; subject: string; html: string; replyTo?: string } | null;
   whatsapp?: { to: string; template: string; params: string[]; text: string } | null;
 };
 
@@ -227,7 +227,7 @@ export async function dispatch(d: Dispatch) {
     let providerId: string | undefined;
     let error: string | undefined;
     if (emailConfigured()) {
-      try { providerId = await sendEmail(d.email.to, d.email.subject, d.email.html); status = "sent"; }
+      try { providerId = await sendEmail(d.email.to, d.email.subject, d.email.html, d.email.replyTo); status = "sent"; }
       catch (e) { status = "failed"; error = (e as Error).message; }
     }
     await db.insert(schema.notifications).values({

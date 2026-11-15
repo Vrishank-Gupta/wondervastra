@@ -131,10 +131,10 @@ export function SettingsForm({ initial, isOwner, demand }: { initial: StoreSetti
               <Field id="sc" label="If one order has items with different delivery charges" hint="Most shops charge once per parcel.">
                 <select id="sc" className="input" value={s.shippingCombine} onChange={(e) => up("shippingCombine", e.target.value as "highest" | "sum")}><option value="highest">Charge once (the highest charge)</option><option value="sum">Add up every item&apos;s charge</option></select>
               </Field>
-              {days("dispatchDays", "You pack and send within", "Working days after an order comes in.")}
+              {days("dispatchDays", "You pack and send within", "Working days after an order comes in. Not shown to customers; it's used to work out their delivery date.")}
               <div />
-              {days("deliveryDaysMin", "Courier delivers in, fastest", "Shown to customers as “delivered in 3–7 days”.")}
-              {days("deliveryDaysMax", "Courier delivers in, slowest")}
+              {days("deliveryDaysMin", "Customers are told it arrives in, fastest", "Days from ordering, packing included. Shown as “delivered in 3–5 days”.")}
+              {days("deliveryDaysMax", "…and slowest")}
             </div>
             <p className="mt-3 text-sm text-ink-soft">Free delivery above an amount is set in <a className="font-medium underline" href="/admin/discounts">Discounts</a>.</p>
           </Panel>

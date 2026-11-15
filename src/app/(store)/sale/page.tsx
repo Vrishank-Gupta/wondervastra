@@ -9,7 +9,7 @@ import { getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/
 import { isLive, isOpenEnded, saleLabel } from "@/lib/pricing";
 import { money } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Offers & sales", description: "Live discounts, coupons and limited-time sales on original branded thermals at WonderVastra.", alternates: { canonical: "/sale" } };
+export const metadata: Metadata = { title: "Winter Sale", description: "Winter Sale on every listing: original branded thermals below MRP, extra savings when you pick more pieces, and free delivery at WonderVastra.", alternates: { canonical: "/sale" } };
 
 export default async function SalePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [cards, allSales, offers, coupons] = await Promise.all([
@@ -20,12 +20,13 @@ export default async function SalePage({ searchParams }: { searchParams: Promise
   const sales = salesWithItems(allSales, cards);
   const shown = coupons.filter((c) => isLive(c, now) && (c.usageLimit == null || c.usedCount < c.usageLimit) && c.description);
   const onOffer = cards.filter((c) => c.discountPct > 0);
+  const maxOff = Math.max(0, ...cards.map((c) => c.discountPct));
   return (
     <>
       <div className="bg-madder text-white">
         <div className="container-x py-8 sm:py-12">
-          <h1 className="text-6xl sm:text-8xl">Sale &amp; offers</h1>
-          <p className="mt-2 text-white/85">Every live deal in one place. Applied automatically at checkout, except coupons.</p>
+          <h1 className="text-6xl sm:text-8xl">Winter Sale</h1>
+          <p className="mt-2 max-w-2xl text-white/90">On every listing: {maxOff > 0 ? <>up to <b>{maxOff}% below MRP</b>, </> : null}with extra savings when you pick more pieces. Free delivery on every order.</p>
           <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {sales.map((s) => (
               <div key={s.id} className="flex bg-white text-ink flex-col gap-2 p-4">
@@ -34,7 +35,7 @@ export default async function SalePage({ searchParams }: { searchParams: Promise
                 {!isOpenEnded(s.endsAt) && <Countdown endsAt={s.endsAt} />}
               </div>
             ))}
-            {offers.map((o) => (
+            {offers.filter((o) => o.type !== "free_shipping").map((o) => (
               <div key={o.id} className="flex bg-white text-ink items-center gap-3 p-4"><Tag size={18} strokeWidth={1.5} aria-hidden className="shrink-0" /><div><p className="font-semibold">{o.name}</p><p className="text-xs text-ink-soft">{o.minPieces ? `Pick any ${o.minPieces} pieces. Applied automatically in your cart` : `Applied automatically on carts above ${money(o.minSubtotal)}`}</p></div></div>
             ))}
             {shown.map((c) => (

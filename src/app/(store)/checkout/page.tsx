@@ -1,3 +1,4 @@
+import { statesForArea } from "@/lib/delivery-area";
 import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -25,6 +26,7 @@ export default async function CheckoutPage() {
       testMode={razorpayTestMode()}
       codFee={settings.codFee}
       codEnabled={settings.codEnabled}
+      states={statesForArea(settings.deliveryPincodes)}
       deliveryArea={areaLabel(settings)}
     />
   );

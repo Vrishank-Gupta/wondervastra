@@ -222,7 +222,7 @@ export function priceCart(input: {
   const freeByOffer = qualifying.find((o) => o.type === "free_shipping");
   let shipping = baseShipping;
   let shippingNote: string | null = null;
-  if (baseShipping === 0) shippingNote = lines.length ? "Free delivery on these items" : null;
+  if (baseShipping === 0) shippingNote = null; // Free anyway: "Delivery FREE" says it once.
   else if (coupon?.freeShipping) { shipping = 0; shippingNote = `Free delivery with ${coupon.code}`; }
   else if (freeByOffer) { shipping = 0; shippingNote = freeByOffer.name; }
 
