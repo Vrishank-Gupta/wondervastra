@@ -1353,3 +1353,28 @@ test("returns: 3-day window from delivery, photos and reason, admin approves wit
     await db.execute("delete from settings where key in ('delhiveryPickupName','delhiveryPickupPin')");
   }
 });
+
+test("size guide: table from the admin editor, opens beside the sizes, highlights the chosen size only", async ({ page }) => {
+  const prod = await one("select id, slug from products where slug='rupa-boys-thermal-top'");
+  await adminLogin(page);
+  await page.goto(`/admin/products/${prod.id}`);
+  await page.getByText("More options").click();
+  await page.getByRole("button", { name: "Start from my sizes" }).click();
+  await page.getByLabel("Row 1, Age").fill("2–4 years");
+  await page.getByLabel("Row 1, Chest (cm)").fill("50");
+  await page.getByRole("button", { name: "Save changes" }).first().click();
+  await expect(page.getByText(/^Saved/).first()).toBeVisible();
+  const chart = JSON.parse((await one("select size_chart from products where id=?", [prod.id])).size_chart as string);
+  expect(chart[0].rows[0]).toEqual(["2–4 Y", "2–4 years", "50", ""]);
+
+  await page.goto(`/p/${prod.slug}`);
+  await page.locator("#size-picker").getByRole("button", { name: "2–4 Y", exact: true }).click();
+  await page.getByTestId("size-guide-open").click();
+  const guide = page.getByTestId("size-guide");
+  await expect(guide).toContainText("Your pick, 2–4 Y, is highlighted.");
+  await expect(guide.getByRole("row", { name: /2–4 Y 2–4 years 50/ })).toHaveClass(/bg-pine-soft/);
+  await expect(guide.getByRole("row", { name: /^4–6 Y/ })).not.toHaveClass(/bg-pine-soft/);
+  await page.keyboard.press("Escape");
+  await expect(guide).toBeHidden();
+  await db.execute({ sql: "update products set size_chart='[]' where id=?", args: [prod.id] });
+});

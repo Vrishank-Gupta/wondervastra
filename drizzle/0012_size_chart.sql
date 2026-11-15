@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `size_chart` text DEFAULT '[]' NOT NULL;

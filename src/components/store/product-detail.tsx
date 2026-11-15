@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Bell, Check, ChevronDown, Heart, Link2, MessageCircle, RotateCcw, Ruler, ShieldCheck, Star, Truck, Wallet } from "lucide-react";
 import { money } from "@/lib/format";
 import { ProductGallery } from "./product-gallery";
+import { SizeGuideButton, SizeTables, type SizeTable } from "./size-guide";
 import NextImage from "next/image";
 import { useCart } from "./cart-context";
 import { QtyStepper } from "./cart-drawer";
@@ -17,7 +18,7 @@ type Variant = {
   stock: number; price: number; mrp: number; saleName: string | null; saleEndsAt: number | null;
 };
 type Product = {
-  id: string; name: string; slug: string; shortDescription: string | null; description: string | null; material: string | null; care: string | null; sizeGuide: string | null; sizeHeights: Record<string, string>;
+  id: string; name: string; slug: string; shortDescription: string | null; description: string | null; material: string | null; care: string | null; sizeGuide: string | null; sizeChart?: SizeTable[]; sizeHeights: Record<string, string>;
   option1Label: string; option2Label: string; deliveryMode: "free" | "flat"; deliveryCharge: number; codAllowed: boolean; returnable: boolean;
   showStockCount: boolean; lowStockThreshold: number; maxPerOrder: number | null; maxPerCustomer: number | null; forceOutOfStock: boolean; comingSoon: boolean; launchNote: string | null;
   minPieces?: number; comboAbove?: number | null;
@@ -227,8 +228,11 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
           </fieldset>
         )}
         {(sizes.length > 1 || sizes[0] !== "Free size") && (
-          <fieldset id="size-picker" className={`mt-5 ${sizeError && choosing ? "-m-2 border border-clay p-2" : ""}`}>
+          <fieldset id="size-picker" className={`relative mt-5 ${sizeError && choosing ? "-m-2 border border-clay p-2" : ""}`}>
             <legend className="mb-2 text-xs font-bold tracking-[0.08em] uppercase">{choosing ? `Select ${p.option1Label.toLowerCase()}` : p.option1Label}</legend>
+            <div className="absolute top-0 right-0">
+              <SizeGuideButton tables={p.sizeChart ?? []} note={p.sizeChart?.length ? null : p.sizeGuide} charts={images.filter((im) => /size chart|size guide/i.test(im.alt ?? ""))} selected={size || undefined} name={p.name} />
+            </div>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const v = pick(s, color);
@@ -314,8 +318,9 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         <div className="mt-5 border-t border-line">
           {p.description && <Accordion title="Description" open>{p.description}</Accordion>}
           {p.material && <Accordion title="Material">{p.material}</Accordion>}
-          {(p.sizeGuide || sizes.some((s) => p.sizeHeights[s])) && (
+          {(p.sizeChart?.length || p.sizeGuide || sizes.some((s) => p.sizeHeights[s])) && (
             <Accordion title="Size guide" open={!p.description}>
+              {p.sizeChart?.length ? <div className="whitespace-normal text-ink"><SizeTables tables={p.sizeChart} highlight={size || undefined} /></div> : null}
               {sizes.some((s) => p.sizeHeights[s]) && (
                 <table className="mb-2 w-full max-w-xs text-left text-sm whitespace-normal [&_td]:border-b [&_td]:border-line [&_td]:py-1 [&_th]:pb-1 [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase">
                   <thead><tr><th>{p.option1Label}</th><th>Child&apos;s height</th></tr></thead>

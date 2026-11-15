@@ -155,6 +155,7 @@ const ProductInput = z.object({
   shortDescription: z.string().trim().max(200).nullable().optional(), description: z.string().trim().max(5000).nullable().optional(),
   categoryId: z.string().min(1, "Choose a category"), brandId: z.string().nullable().optional(), status: z.enum(["draft", "active", "archived"]),
   price: z.number().int().positive("Enter a price"), compareAtPrice: z.number().int().positive().nullable().optional(),
+  sizeChart: z.array(z.object({ title: z.string().max(60), columns: z.array(z.string().max(40)).min(1).max(8), rows: z.array(z.array(z.string().max(40)).max(8)).max(30) })).max(4).default([]),
   tags: z.array(z.string()).default([]), featured: z.boolean(), material: z.string().max(200).nullable().optional(), care: z.string().max(1000).nullable().optional(), sizeGuide: z.string().max(1000).nullable().optional(),
   sizeHeights: z.record(z.string().max(40), z.string().trim().max(20).regex(/^(\d{2,3}(\s*[-–]\s*\d{2,3})?)?$/, "Height should be in cm, like 104 or 104–116")).default({}),
   option1Label: z.string().trim().min(1).max(30), option2Label: z.string().trim().min(1).max(30),
@@ -191,7 +192,7 @@ export async function saveProduct(input: unknown): Promise<Result> {
 
     const values = {
       name: d.name, slug, shortDescription: d.shortDescription, description: d.description, categoryId: d.categoryId, brandId: d.brandId || null, status: d.status,
-      price: d.price, compareAtPrice: d.compareAtPrice ?? null, tags: d.tags, featured: d.featured, material: d.material, care: d.care, sizeGuide: d.sizeGuide,
+      price: d.price, compareAtPrice: d.compareAtPrice ?? null, sizeChart: d.sizeChart, tags: d.tags, featured: d.featured, material: d.material, care: d.care, sizeGuide: d.sizeGuide,
       sizeHeights: Object.fromEntries(Object.entries(d.sizeHeights).filter(([size, h]) => h && d.variants.some((v) => v.option1 === size)).map(([size, h]) => [size, h.replace(/\s*[-–]\s*/, "–")])),
       option1Label: d.option1Label, option2Label: d.option2Label, deliveryMode: d.deliveryMode, deliveryCharge: d.deliveryMode === "free" ? 0 : d.deliveryCharge,
       codAllowed: d.codAllowed, returnable: d.returnable, forceOutOfStock: d.forceOutOfStock, showStockCount: d.showStockCount,

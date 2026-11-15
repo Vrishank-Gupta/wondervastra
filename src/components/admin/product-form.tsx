@@ -1,4 +1,5 @@
 "use client";
+import { SizeChartEditor, type SizeTable } from "./size-chart-editor";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import { Panel } from "./ui";
 type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; mrp?: string; minPrice?: string; stock: string; active: boolean };
 export type ProductFormData = {
   id?: string; name: string; slug: string; shortDescription: string; description: string; categoryId: string; brandId: string; status: "draft" | "active" | "archived";
-  price: string; compareAtPrice: string; tags: string; featured: boolean; material: string; care: string; sizeGuide: string;
+  price: string; compareAtPrice: string; tags: string; featured: boolean; material: string; care: string; sizeChart?: SizeTable[]; sizeGuide: string;
   option1Label: string; option2Label: string; deliveryMode: "free" | "flat"; deliveryCharge: string; codAllowed: boolean; returnable: boolean;
   forceOutOfStock: boolean; comingSoon: boolean; launchNote: string; showStockCount: boolean; maxPerOrder: string; maxPerCustomer: string; lowStockThreshold: string; minPieces?: string; comboAbove?: string; hsnCode: string; seoTitle: string; seoDescription: string;
   images: { url: string; alt: string }[]; variants: Variant[];
@@ -158,7 +159,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
       shortDescription: f.shortDescription || autoShortDescription({ brand: brandName, name: f.name, colours: C, sizes: S, material: f.material }) || null,
       description: f.description || null, categoryId: f.categoryId, brandId: f.brandId || null, status: status ?? f.status,
       price: paise(f.price), compareAtPrice: f.compareAtPrice ? paise(f.compareAtPrice) : null, tags: tagList(f.tags), featured: f.featured,
-      material: f.material || null, care: f.care || null, sizeGuide: f.sizeGuide || null, option1Label: f.option1Label, option2Label: f.option2Label,
+      material: f.material || null, care: f.care || null, sizeGuide: f.sizeGuide || null, sizeChart: (f.sizeChart ?? []).map((t) => ({ title: t.title.trim(), columns: t.columns.map((c) => c.trim()), rows: t.rows.filter((r) => r.some((c) => c.trim())).map((r) => r.map((c) => c.trim())) })).filter((t) => t.rows.length), option1Label: f.option1Label, option2Label: f.option2Label,
       deliveryMode: f.deliveryMode, deliveryCharge: paise(f.deliveryCharge || "0"), codAllowed: f.codAllowed, returnable: f.returnable, forceOutOfStock: f.forceOutOfStock, comingSoon: f.comingSoon, launchNote: f.launchNote || null, showStockCount: f.showStockCount,
       maxPerOrder: optInt(f.maxPerOrder), maxPerCustomer: optInt(f.maxPerCustomer), lowStockThreshold: Number(f.lowStockThreshold || 0), minPieces: Math.max(1, Number(f.minPieces || 1)), comboAbove: f.comboAbove ? paise(f.comboAbove) : null, hsnCode: f.hsnCode || null, seoTitle: f.seoTitle || null, seoDescription: f.seoDescription || null,
       images: f.images, variants,
@@ -338,7 +339,11 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               <div><label className="label" htmlFor="hsn">HSN code <span className="font-normal text-ink-soft">(for GST bills, already filled in)</span></label><input id="hsn" className="input" value={f.hsnCode} onChange={(e) => set("hsnCode", e.target.value)} /></div>
             </div>
             <div><label className="label" htmlFor="care">Care instructions</label><textarea id="care" className="input" rows={2} value={f.care} onChange={(e) => set("care", e.target.value)} /></div>
-            <div><label className="label" htmlFor="sg">Size guide</label><textarea id="sg" className="input" rows={2} value={f.sizeGuide} onChange={(e) => set("sizeGuide", e.target.value)} /></div>
+            <div>
+              <p className="label">Size chart <span className="font-normal text-ink-soft">(shown as a table under “Size guide” on the listing)</span></p>
+              <SizeChartEditor value={f.sizeChart ?? []} onChange={(v) => set("sizeChart", v)} sizes={S.filter((x) => x !== FREE)} />
+            </div>
+            <div><label className="label" htmlFor="sg">Size guide note <span className="font-normal text-ink-soft">(optional, shown under the chart)</span></label><textarea id="sg" className="input" rows={2} value={f.sizeGuide} onChange={(e) => set("sizeGuide", e.target.value)} /></div>
             <div>
               <label className="label" htmlFor="tags">Extra search words <span className="font-normal text-ink-soft">(separate with commas)</span></label>
               <input id="tags" className="input" placeholder="winter, value, new" value={f.tags} onChange={(e) => set("tags", e.target.value)} />

@@ -85,6 +85,13 @@
       "when": 1794724064194,
       "tag": "0011_returns_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794725391446,
+      "tag": "0012_size_chart",
+      "breakpoints": true
     }
   ]
 }

@@ -63,6 +63,8 @@ export const products = sqliteTable(
     material: text("material"),
     care: text("care"),
     sizeGuide: text("size_guide"),
+    /** Size chart tables shown in the size guide: [{ title, columns, rows }]. */
+    sizeChart: text("size_chart", { mode: "json" }).$type<{ title: string; columns: string[]; rows: string[][] }[]>().notNull().default([]),
     /** Body height for each size, shown next to it: { "4–6 Y": "104–116" } (cm). */
     sizeHeights: text("size_heights", { mode: "json" }).$type<Record<string, string>>().notNull().default({}),
     option1Label: text("option1_label").notNull().default("Size"),
