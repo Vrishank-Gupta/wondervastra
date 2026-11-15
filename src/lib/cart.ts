@@ -14,7 +14,13 @@ export type QuoteLineView = {
   saleName: string | null; deliveryMode: "free" | "flat"; deliveryCharge: number; codAllowed: boolean; returnable: boolean;
   issue: string | null; sku: string | null; hsnCode: string | null;
 };
-export type CartQuote = Quote & { views: QuoteLineView[]; codAvailable: boolean; codReason: string | null; blockingIssues: boolean };
+export type CartQuote = Quote & { views: QuoteLineView[]; codAvailable: boolean; codReason: string | null; blockingIssues: boolean; minimumIssue: string | null };
+
+type SetListing = { minPieces: number; comboAbove: number | null };
+/** "Sold in 2s": too few pieces of this listing, unless the whole cart (at normal prices) is above `comboAbove`. */
+export function belowMinimum(p: SetListing, pieces: number, cartValue: number) {
+  return pieces > 0 && pieces < p.minPieces && !(p.comboAbove != null && cartValue > p.comboAbove);
+}
 
 /** Cart lines, orders and invoices carry the brand, so "Lux Cozi Cotton Vest" is clear long after purchase. */
 export function withBrand(name: string, brand?: string | null) {
@@ -138,8 +144,21 @@ export async function quoteCart(
     if (qty > 0) {
       priceLines.push({
         key: v.id, productId: p.id, categoryId: p.categoryId, brandId: p.brandId, basePrice: v.price ?? p.price,
-        compareAt: v.mrp ?? p.compareAtPrice, qty, deliveryMode: p.deliveryMode, deliveryCharge: p.deliveryCharge,
+        compareAt: v.mrp ?? p.compareAtPrice, minPrice: v.minPrice, qty, deliveryMode: p.deliveryMode, deliveryCharge: p.deliveryCharge,
       });
+    }
+  }
+
+  // "Sold in 2s": counted per listing across sizes, against the cart's value at normal prices.
+  const cartValue = priceLines.reduce((a, l) => a + l.basePrice * l.qty, 0);
+  let minimumIssue: string | null = null;
+  for (const p of prods) {
+    const own = priceLines.filter((l) => l.productId === p.id);
+    const pieces = own.reduce((a, l) => a + l.qty, 0);
+    if (belowMinimum(p, pieces, cartValue) && !minimumIssue) {
+      const name = withBrand(p.name, brandRows.find((b) => b.id === p.brandId)?.name);
+      minimumIssue = `${name} is sold in ${p.minPieces}s: add ${p.minPieces - pieces} more (any size, top or trouser)${p.comboAbove ? `, or shop for over ₹${Math.round(p.comboAbove / 100).toLocaleString("en-IN")} in all` : ""}.`;
+      for (const l of own) { const m = meta.get(l.key); if (m && !m.issue) m.issue = `Add ${p.minPieces - pieces} more to buy this`; }
     }
   }
 
@@ -168,5 +187,5 @@ export async function quoteCart(
   else if (views.some((v) => v.qty > 0 && !v.codAllowed)) codReason = "An item in your cart is prepaid only.";
   else if (s.codMaxOrder && quote.subtotal > s.codMaxOrder) codReason = "Cash on delivery isn't available for orders this large.";
 
-  return { ...quote, views, codAvailable: !codReason, codReason, blockingIssues: views.some((v) => v.qty === 0) };
+  return { ...quote, views, codAvailable: !codReason, codReason, blockingIssues: views.some((v) => v.qty === 0) || Boolean(minimumIssue), minimumIssue };
 }

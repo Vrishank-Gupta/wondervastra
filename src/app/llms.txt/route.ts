@@ -1,3 +1,4 @@
+import { offerTiers } from "@/lib/pricing";
 import { getActiveBrands, getActiveCategories, getAllCards, getLiveOffers } from "@/lib/catalog";
 import { capabilities } from "@/lib/capabilities";
 import { money } from "@/lib/format";
@@ -35,7 +36,8 @@ export async function GET() {
     `- Payment: ${pay}`,
     `- Delivery area: ${areaPhrase(s)}`,
     `- Dispatch within ${s.dispatchDays} working days; delivery usually ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after dispatch`,
-    ...offers.map((o) => `- Offer: ${o.type === "free_shipping" ? `free delivery on orders above ${money(o.minSubtotal)}` : `${o.name} (orders above ${money(o.minSubtotal)})`}`),
+    ...offerTiers(offers).map((t) => `- Offer: ${t.label.toLowerCase()}${t.minPieces ? " pieces" : ""}, get ${t.reward.toLowerCase()} (applied automatically in the cart)`),
+    "- Free delivery on every order",
     `- Returns: eligible unused items within ${s.returnWindowDays} days of delivery`,
     "- No account needed to order; every order gets a tracking link",
     ...(s.supportEmail ? [`- Contact: ${s.supportEmail}${s.whatsappNumber ? `, WhatsApp ${s.whatsappNumber}` : ""}${s.supportHours ? ` (${s.supportHours})` : ""}`] : []),

@@ -7,7 +7,7 @@ export function newToken() {
   return randomBytes(24).toString("base64url");
 }
 export function slugify(s: string) {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  return s.toLowerCase().trim().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
 }
 /** A same-site path to send someone back to after login. Anything else (other sites, protocol-relative or backslash tricks) becomes the fallback. */
 export function safeNext(next: unknown, fallback = "/account") {

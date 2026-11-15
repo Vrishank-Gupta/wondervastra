@@ -7,12 +7,12 @@ import { saveProduct } from "@/app/admin/actions";
 import { COLOURS, SIZE_SETS, TYPICAL_HEIGHTS, autoShortDescription, colourHex, presetFor, type SizeSet } from "@/lib/listing-presets";
 import { Panel } from "./ui";
 
-type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; mrp?: string; stock: string; active: boolean };
+type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; mrp?: string; minPrice?: string; stock: string; active: boolean };
 export type ProductFormData = {
   id?: string; name: string; slug: string; shortDescription: string; description: string; categoryId: string; brandId: string; status: "draft" | "active" | "archived";
   price: string; compareAtPrice: string; tags: string; featured: boolean; material: string; care: string; sizeGuide: string;
   option1Label: string; option2Label: string; deliveryMode: "free" | "flat"; deliveryCharge: string; codAllowed: boolean; returnable: boolean;
-  forceOutOfStock: boolean; comingSoon: boolean; launchNote: string; showStockCount: boolean; maxPerOrder: string; maxPerCustomer: string; lowStockThreshold: string; hsnCode: string; seoTitle: string; seoDescription: string;
+  forceOutOfStock: boolean; comingSoon: boolean; launchNote: string; showStockCount: boolean; maxPerOrder: string; maxPerCustomer: string; lowStockThreshold: string; minPieces?: string; comboAbove?: string; hsnCode: string; seoTitle: string; seoDescription: string;
   images: { url: string; alt: string }[]; variants: Variant[];
   /** Height in cm per size, e.g. { "4–6 Y": "104–116" }. */
   sizeHeights: Record<string, string>;
@@ -72,7 +72,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
   const [colours, setColours] = useState<{ name: string; hex: string }[]>(() =>
     uniq(live.map((v) => v.option2)).filter((c) => c !== PLAIN).map((c) => ({ name: c, hex: live.find((v) => v.option2 === c)?.colorHex || colourHex(c) })));
   const [stock, setStock] = useState<Record<string, string>>(() => Object.fromEntries(initial.variants.map((v) => [key(v.option1, v.option2), v.active ? v.stock : "0"])));
-  const [meta, setMeta] = useState<Record<string, { id?: string; sku: string; price: string; mrp: string }>>(() => Object.fromEntries(initial.variants.map((v) => [key(v.option1, v.option2), { id: v.id, sku: v.sku, price: v.price, mrp: v.mrp ?? "" }])));
+  const [meta, setMeta] = useState<Record<string, { id?: string; sku: string; price: string; mrp: string; minPrice: string }>>(() => Object.fromEntries(initial.variants.map((v) => [key(v.option1, v.option2), { id: v.id, sku: v.sku, price: v.price, mrp: v.mrp ?? "", minPrice: v.minPrice ?? "" }])));
   const [customSize, setCustomSize] = useState("");
   const [customColour, setCustomColour] = useState("");
   const [fillAll, setFillAll] = useState("");
@@ -151,7 +151,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
     setBusy(true); setMsg(null);
     const variants = C.flatMap((c) => S.map((s) => {
       const m = meta[key(s, c)];
-      return { id: m?.id, sku: m?.sku || null, option1: s, option2: c, colorHex: colours.find((x) => x.name === c)?.hex || null, price: m?.price ? paise(m.price) : null, mrp: m?.mrp ? paise(m.mrp) : null, stock: Number(stock[key(s, c)] || 0), active: true };
+      return { id: m?.id, sku: m?.sku || null, option1: s, option2: c, colorHex: colours.find((x) => x.name === c)?.hex || null, price: m?.price ? paise(m.price) : null, mrp: m?.mrp ? paise(m.mrp) : null, minPrice: m?.minPrice ? paise(m.minPrice) : null, stock: Number(stock[key(s, c)] || 0), active: true };
     }));
     const r = await saveProduct({
       id: f.id, name: f.name, slug: f.slug || undefined,
@@ -160,7 +160,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
       price: paise(f.price), compareAtPrice: f.compareAtPrice ? paise(f.compareAtPrice) : null, tags: tagList(f.tags), featured: f.featured,
       material: f.material || null, care: f.care || null, sizeGuide: f.sizeGuide || null, option1Label: f.option1Label, option2Label: f.option2Label,
       deliveryMode: f.deliveryMode, deliveryCharge: paise(f.deliveryCharge || "0"), codAllowed: f.codAllowed, returnable: f.returnable, forceOutOfStock: f.forceOutOfStock, comingSoon: f.comingSoon, launchNote: f.launchNote || null, showStockCount: f.showStockCount,
-      maxPerOrder: optInt(f.maxPerOrder), maxPerCustomer: optInt(f.maxPerCustomer), lowStockThreshold: Number(f.lowStockThreshold || 0), hsnCode: f.hsnCode || null, seoTitle: f.seoTitle || null, seoDescription: f.seoDescription || null,
+      maxPerOrder: optInt(f.maxPerOrder), maxPerCustomer: optInt(f.maxPerCustomer), lowStockThreshold: Number(f.lowStockThreshold || 0), minPieces: Math.max(1, Number(f.minPieces || 1)), comboAbove: f.comboAbove ? paise(f.comboAbove) : null, hsnCode: f.hsnCode || null, seoTitle: f.seoTitle || null, seoDescription: f.seoDescription || null,
       images: f.images, variants,
       sizeHeights: Object.fromEntries(S.map((s) => [s, heightOf(s).trim()]).filter(([, h]) => h)),
     });
@@ -358,20 +358,29 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               <div><label className="label text-xs" htmlFor="mpc">Most pieces one customer can buy, ever</label><input id="mpc" className="input" type="number" min="1" placeholder="No limit" value={f.maxPerCustomer} onChange={(e) => set("maxPerCustomer", e.target.value)} /></div>
               <div><label className="label text-xs" htmlFor="lst">Say “only a few left” below</label><input id="lst" className="input" type="number" min="0" value={f.lowStockThreshold} onChange={(e) => set("lowStockThreshold", e.target.value)} /></div>
             </div>
+            <fieldset className="rounded-sm border border-line p-3">
+              <legend className="px-1 text-sm font-semibold">Sold in sets <span className="font-normal text-ink-soft">(optional, e.g. kids&apos; wear sold in 2s)</span></legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div><label className="label text-xs" htmlFor="minp">Fewest pieces per order</label><input id="minp" className="input" type="number" min="1" placeholder="1" value={f.minPieces ?? ""} onChange={(e) => set("minPieces", e.target.value)} /></div>
+                <div><label className="label text-xs" htmlFor="cabove">…but any number when the whole cart is above ₹</label><input id="cabove" className="input" type="number" min="1" placeholder="Never" value={f.comboAbove ?? ""} onChange={(e) => set("comboAbove", e.target.value)} /></div>
+              </div>
+              <p className="mt-2 text-xs text-ink-soft">Pieces of this listing count together, any sizes. Leave empty to sell single pieces.</p>
+            </fieldset>
             <div>
-              <p className="label">Different price, MRP or SKU for one size or colour <span className="font-normal text-ink-soft">(optional; leave empty to use the prices above; SKUs are made for you)</span></p>
+              <p className="label">Different price, MRP, minimum price or SKU for one size or colour <span className="font-normal text-ink-soft">(optional; leave empty to use the prices above. Min price is used only when you run a “minimum price” sale. SKUs are made for you)</span></p>
               <div className="max-h-72 overflow-auto rounded-sm border border-line">
                 <table className="w-full text-sm [&_td]:px-2 [&_td]:py-1 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-soft">
-                  <thead><tr><th>Variant</th><th>Price ₹</th><th>MRP ₹</th><th>SKU</th></tr></thead>
+                  <thead><tr><th>Variant</th><th>Price ₹</th><th>MRP ₹</th><th title="Used only when you run a minimum-price sale">Min price ₹</th><th>SKU</th></tr></thead>
                   <tbody>
                     {C.flatMap((c) => S.map((s) => {
-                      const k = key(s, c); const m = meta[k] ?? { sku: "", price: "", mrp: "" };
+                      const k = key(s, c); const m = meta[k] ?? { sku: "", price: "", mrp: "", minPrice: "" };
                       const label = [c !== PLAIN && c, s !== FREE && s].filter(Boolean).join(" · ") || "This item";
                       return (
                         <tr key={k} className="border-t border-line">
                           <td className="whitespace-nowrap">{label}</td>
                           <td><input aria-label={`Price for ${label}`} className="input w-24 px-2 py-1" type="number" min="1" step="0.01" placeholder={f.price || "Same"} value={m.price} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, price: e.target.value } }))} /></td>
                           <td><input aria-label={`MRP for ${label}`} className="input w-24 px-2 py-1" type="number" min="1" step="0.01" placeholder={f.compareAtPrice || "Same"} value={m.mrp} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, mrp: e.target.value } }))} /></td>
+                          <td><input aria-label={`Min price for ${label}`} className="input w-24 px-2 py-1" type="number" min="1" step="0.01" placeholder="None" value={m.minPrice} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, minPrice: e.target.value } }))} /></td>
                           <td><input aria-label={`SKU for ${label}`} className="input w-36 px-2 py-1 font-mono text-xs" placeholder="Auto" value={m.sku} onChange={(e) => setMeta((x) => ({ ...x, [k]: { ...m, sku: e.target.value } }))} /></td>
                         </tr>
                       );

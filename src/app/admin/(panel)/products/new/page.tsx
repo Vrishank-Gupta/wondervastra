@@ -14,7 +14,7 @@ export default async function NewProduct() {
       <PageHead title="New listing" />
       <ProductForm categories={cats.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name }))} brands={brands.filter((b) => b.active).map((b) => ({ id: b.id, name: b.name, isHouse: b.isHouse }))} initial={{
         name: "", slug: "", shortDescription: "", description: "", categoryId: cats.filter((c) => c.active).length === 1 ? cats.find((c) => c.active)!.id : "", brandId: "", status: "draft", price: "", compareAtPrice: "", tags: "", featured: false,
-        material: "", care: "", sizeGuide: "", option1Label: "Size", option2Label: "Colour", deliveryMode: "flat", deliveryCharge: String(s.defaultDeliveryCharge / 100),
+        material: "", care: "", sizeGuide: "", option1Label: "Size", option2Label: "Colour", deliveryMode: "free", deliveryCharge: String(s.defaultDeliveryCharge / 100),
         codAllowed: true, returnable: true, forceOutOfStock: false, comingSoon: false, launchNote: "", showStockCount: true, maxPerOrder: "", maxPerCustomer: "", lowStockThreshold: "5", hsnCode: "", seoTitle: "", seoDescription: "", sizeHeights: {},
         images: [], variants: [{ sku: "", option1: "Free size", option2: "Default", colorHex: "", price: "", stock: "0", active: true }],
       }} />

@@ -15,7 +15,7 @@ import { ProductRail, SectionTitle } from "@/components/store/product-rail";
 import { wishedIds } from "@/components/store/listing";
 import { BrandTile } from "@/components/store/brand-tile";
 import { getActiveBrands, getActiveCategories, getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
-import { isLive, isOpenEnded } from "@/lib/pricing";
+import { isLive, isOpenEnded, offerTiers } from "@/lib/pricing";
 import { money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { AUDIENCES, bannerSrc } from "@/lib/home-banners";
@@ -125,10 +125,10 @@ export default async function Home() {
       {(offers.length > 0 || shownCoupons.length > 0) && (
         <section aria-label="Offers" className="border-b border-line">
           <div className="container-x py-3"><div className="rail lg:grid lg:grid-flow-col lg:auto-cols-fr">
-            {[...offers].sort((a, b) => a.minSubtotal - b.minSubtotal).map((o) => (
-              <div key={o.id} className="flex min-w-[15rem] shrink-0 items-center gap-3 border border-dashed border-ink/40 px-4 py-3">
-                <span className="font-display text-3xl leading-none text-madder">{o.type === "free_shipping" ? "Free" : o.type === "percent" ? `${o.value}%` : money(o.value)}</span>
-                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{o.type === "free_shipping" ? "Delivery" : "Off your cart"}</b>on orders above {money(o.minSubtotal)}</span>
+            {offerTiers(offers).map((t) => (
+              <div key={`${t.minPieces}-${t.minSubtotal}-${t.reward}`} className="flex min-w-[13rem] shrink-0 items-center gap-3 border border-dashed border-ink/40 px-4 py-3">
+                <span className="font-display text-3xl leading-none text-madder">{t.reward.replace(/ off.*$/, "").replace("Free delivery", "Free")}</span>
+                <span className="text-xs leading-snug"><b className="block text-[13px] uppercase">{t.reward.startsWith("Free") ? "Delivery" : "Off your cart"}</b>{t.label.toLowerCase().startsWith("pick") ? `${t.label}: mix any styles` : `${t.label} or more`}</span>
               </div>
             ))}
             {shownCoupons.map((c) => (

@@ -83,7 +83,9 @@ export function CartDrawer() {
                   {quote.totalSavings > 0 && <p className="text-center text-sm text-pine">You&apos;re saving {money(quote.totalSavings)}</p>}
                 </>
               )}
-              <Link href="/checkout" onClick={() => setDrawerOpen(false)} className="btn btn-primary w-full">Checkout</Link>
+              {quote?.minimumIssue
+                ? <p role="alert" data-testid="minimum-issue" className="rounded-sm bg-clay-soft p-2.5 text-sm font-medium">{quote.minimumIssue}</p>
+                : <Link href="/checkout" onClick={() => setDrawerOpen(false)} className="btn btn-primary w-full">Checkout</Link>}
               <Link href="/cart" onClick={() => setDrawerOpen(false)} className="block py-1 text-center text-sm font-medium underline">View full cart</Link>
             </footer>
           </>

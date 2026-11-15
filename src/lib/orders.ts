@@ -51,6 +51,7 @@ export async function createOrder(input: CheckoutInput) {
   const requested = new Map(input.items.map((i) => [i.variantId, i.qty]));
   const changed = quote.views.find((v) => v.qty !== (requested.get(v.variantId) ?? 0));
   if (changed) throw new CheckoutError(`${changed.name}: ${changed.issue ?? "quantity changed"}. Please review your cart.`);
+  if (quote.minimumIssue) throw new CheckoutError(quote.minimumIssue);
   if (input.couponCode && quote.couponError) throw new CheckoutError(quote.couponError);
   if (input.paymentMethod === "cod" && !quote.codAvailable) throw new CheckoutError(quote.codReason ?? "Cash on delivery isn't available.");
   if (input.expectedTotal != null && input.expectedTotal !== quote.total) {

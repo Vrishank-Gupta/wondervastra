@@ -82,6 +82,10 @@ export const products = sqliteTable(
     maxPerOrder: integer("max_per_order"),
     maxPerCustomer: integer("max_per_customer"),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
+    /** Sold in sets (kids' wear): fewest pieces of this listing per order, waived when the whole cart is above `comboAbove`. `comboFrom` is unused. */
+    minPieces: integer("min_pieces").notNull().default(1),
+    comboFrom: integer("combo_from"),
+    comboAbove: integer("combo_above"),
     hsnCode: text("hsn_code"),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
@@ -116,6 +120,8 @@ export const variants = sqliteTable(
     price: integer("price"),
     /** Optional MRP for this variant, when the printed MRP differs by size. Falls back to the listing's MRP. */
     mrp: integer("mrp"),
+    /** The lowest price this size may sell at. Used only by a "minimum price" sale the seller switches on (e.g. a weekend sale). */
+    minPrice: integer("combo_price"),
     stock: integer("stock").notNull().default(0),
     active: bool("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -431,7 +437,8 @@ export const sales = sqliteTable("sales", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   badge: text("badge"),
-  type: text("type", { enum: ["percent", "flat"] }).notNull(),
+  /** min_price: each size drops to its own minimum price. */
+  type: text("type", { enum: ["percent", "flat", "min_price"] }).notNull(),
   value: integer("value").notNull(),
   scope: text("scope", { enum: ["all", "category", "brand", "products"] }).notNull().default("all"),
   targetIds: text("target_ids", { mode: "json" }).$type<string[]>().notNull().default([]),
@@ -449,6 +456,8 @@ export const cartOffers = sqliteTable("cart_offers", {
   type: text("type", { enum: ["free_shipping", "percent", "flat"] }).notNull(),
   value: integer("value").notNull().default(0),
   minSubtotal: integer("min_subtotal").notNull(),
+  /** "Pick any 3": pieces in the cart needed for this offer. 0 = cart value only. */
+  minPieces: integer("min_pieces").notNull().default(0),
   maxDiscount: integer("max_discount"),
   combinesWithCoupons: bool("combines_with_coupons").notNull().default(true),
   startsAt: ts("starts_at"),

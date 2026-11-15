@@ -52,7 +52,9 @@ export default function CartPage() {
           <div className="card-pop space-y-4 p-4">
             <CouponBox quote={quote} />
             {quote && <PriceSummary quote={quote} />}
-            <Link href="/checkout" className="btn btn-primary w-full text-lg">Proceed to checkout</Link>
+            {quote?.minimumIssue
+              ? <p role="alert" data-testid="minimum-issue" className="rounded-sm bg-clay-soft p-3 text-sm font-medium">{quote.minimumIssue}</p>
+              : <Link href="/checkout" className="btn btn-primary w-full text-lg">Proceed to checkout</Link>}
             <p className="text-center text-xs text-ink-soft">No account needed · Track your order anytime</p>
           </div>
         </aside>

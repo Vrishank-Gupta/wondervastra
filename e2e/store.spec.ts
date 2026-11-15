@@ -388,7 +388,7 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
 
   await page.goto("/p/kundan-jhumka-earrings");
   await expect(page.getByRole("heading", { name: "Kundan Jhumka Earrings" })).toBeVisible();
-  await expect(page.getByText("Free delivery on this item")).toBeVisible();
+  await expect(page.getByText("Free delivery", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/9 pieces available/)).toBeVisible();
   await expect(page.getByText(/Limit 2 per order/)).toBeVisible();
   await page.getByRole("button", { name: "Silver" }).click();
@@ -1085,6 +1085,40 @@ test("thermal warmers: MRP per size, and Top / Bottom / Set where a set takes on
     await page.getByRole("button", { name: "Top", exact: true }).click();
     await page.locator("#size-picker").getByRole("button", { name: "4–5 Y (60 cm)" }).click();
     await expect(page.getByText("Only 3 pieces left")).toBeVisible();
+
+    // Kids' wear is sold in 2s (a cart above ₹1,500 allows one); minimum prices apply only during a minimum-price sale.
+    await db.execute({ sql: "update products set min_pieces=2, combo_above=150000 where id=?", args: [pid] });
+    await db.execute("update variants set combo_price=23000 where id in ('e2e-w-t55','e2e-w-b55','e2e-w-t60')");
+    const qt = (items: { variantId: string; qty: number }[], ip: string) => request.post("/api/cart/quote", { headers: { "x-real-ip": ip }, data: { items } }).then((r) => r.json());
+    const single = await qt([{ variantId: "e2e-w-t55", qty: 1 }], "10.68.0.2");
+    expect(single.minimumIssue).toContain("sold in 2s: add 1 more");
+    const three = await qt([{ variantId: "e2e-w-t55", qty: 2 }, { variantId: "e2e-w-b55", qty: 1 }], "10.68.0.4");
+    expect(three.minimumIssue).toBeNull();
+    expect(three.subtotal).toBe(75000); // no automatic minimum price
+    const big = await one("select v.id, coalesce(v.price, p.price) price, v.stock from variants v join products p on p.id=v.product_id where p.status='active' and v.active=1 and p.id<>? and coalesce(v.price, p.price) >= 50000 and v.stock >= 4 limit 1", [pid]);
+    const bigCart = await qt([{ variantId: "e2e-w-t55", qty: 1 }, { variantId: big.id as string, qty: Math.ceil(150100 / Number(big.price)) }], "10.68.0.5");
+    expect(bigCart.minimumIssue).toBeNull();
+    const refused = await createOrder(request, { items: [{ variantId: "e2e-w-t55", qty: 1 }], paymentMethod: "razorpay" }, "10.68.0.6");
+    expect(refused.status()).toBe(409);
+    expect((await refused.json()).error).toContain("sold in 2s");
+    await db.execute({ sql: "insert into sales (id, name, badge, type, value, scope, target_ids, starts_at, ends_at, show_banner, active, created_at) values ('e2e-weekend', 'Weekend Sale', 'Lowest prices', 'min_price', 1, 'products', ?, 0, ?, 0, 1, 0)", args: [JSON.stringify([pid]), Date.now() + 3600_000] });
+    try {
+      const weekend = await qt([{ variantId: "e2e-w-t55", qty: 2 }, { variantId: "e2e-w-b55", qty: 1 }], "10.68.0.7");
+      expect(weekend.subtotal).toBe(69000);
+      expect(weekend.views[0].saleName).toBe("Weekend Sale");
+    } finally {
+      await db.execute("delete from sales where id='e2e-weekend'");
+    }
+
+    // The product page explains it, and a single top in the cart can't go to checkout.
+    await page.evaluate(() => localStorage.setItem("vv_cart", "[]"));
+    await page.goto("/p/e2e-warmer");
+    await expect(page.getByTestId("combo")).toContainText("Sold in 2s");
+    await expect(page.getByTestId("combo")).toContainText("Cart over ₹1,500? Single pieces are fine too.");
+    await page.evaluate(() => localStorage.setItem("vv_cart", JSON.stringify([{ variantId: "e2e-w-t55", qty: 1 }])));
+    await page.goto("/cart");
+    await expect(page.getByTestId("minimum-issue")).toContainText("add 1 more");
+    await expect(page.getByRole("link", { name: "Proceed to checkout" })).toHaveCount(0);
 
     // The seller sees and edits the MRP per size; an MRP below the price is refused with the size named.
     await adminLogin(page);

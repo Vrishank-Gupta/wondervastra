@@ -148,7 +148,7 @@ export async function deleteBrand(id: string): Promise<Result> {
 /* ---------- products ---------- */
 const VariantInput = z.object({
   id: z.string().optional(), sku: z.string().trim().max(60).nullable().optional(), option1: z.string().trim().min(1).max(40), option2: z.string().trim().min(1).max(40),
-  colorHex: z.string().max(9).nullable().optional(), price: z.number().int().positive().nullable().optional(), mrp: z.number().int().positive().nullable().optional(), stock: z.number().int().min(0), active: z.boolean().default(true),
+  colorHex: z.string().max(9).nullable().optional(), price: z.number().int().positive().nullable().optional(), mrp: z.number().int().positive().nullable().optional(), minPrice: z.number().int().positive().nullable().optional(), stock: z.number().int().min(0), active: z.boolean().default(true),
 });
 const ProductInput = z.object({
   id: z.string().optional(), name: z.string().trim().min(2).max(120), slug: z.string().trim().max(90).optional(),
@@ -162,6 +162,7 @@ const ProductInput = z.object({
   codAllowed: z.boolean(), returnable: z.boolean(), forceOutOfStock: z.boolean(), showStockCount: z.boolean(),
   comingSoon: z.boolean().default(false), launchNote: z.string().trim().max(80).optional().nullable(),
   maxPerOrder: z.number().int().positive().nullable().optional(), maxPerCustomer: z.number().int().positive().nullable().optional(), lowStockThreshold: z.number().int().min(0),
+  minPieces: z.number().int().min(1).max(20).default(1), comboFrom: z.number().int().min(2).max(50).nullable().optional(), comboAbove: z.number().int().positive().nullable().optional(),
   hsnCode: z.string().max(12).nullable().optional(), seoTitle: z.string().max(70).nullable().optional(), seoDescription: z.string().max(170).nullable().optional(),
   images: z.array(z.object({ url: z.string().max(500), alt: z.string().max(200).nullable().optional() })),
   variants: z.array(VariantInput).min(1, "Add at least one variant"),
@@ -175,6 +176,8 @@ export async function saveProduct(input: unknown): Promise<Result> {
     const keys = d.variants.filter((v) => v.active).map((v) => `${v.option1}|${v.option2}`);
     if (new Set(keys).size !== keys.length) return { error: "Two variants have the same size and colour." };
     if (d.compareAtPrice && d.compareAtPrice < d.price) return { error: "MRP can't be lower than the selling price." };
+    const highMin = d.variants.find((v) => v.active && v.minPrice && v.minPrice > (v.price ?? d.price));
+    if (highMin) return { error: `The minimum price for ${[highMin.option1, highMin.option2].filter((x) => x !== "Free size" && x !== "Default").join(" · ") || "this item"} should be lower than its normal price.` };
     const lowMrp = d.variants.find((v) => v.active && v.mrp && v.mrp < (v.price ?? d.price));
     if (lowMrp) return { error: `The MRP for ${[lowMrp.option1, lowMrp.option2].filter((x) => x !== "Free size" && x !== "Default").join(" · ") || "this item"} can't be lower than its selling price.` };
 
@@ -193,7 +196,7 @@ export async function saveProduct(input: unknown): Promise<Result> {
       option1Label: d.option1Label, option2Label: d.option2Label, deliveryMode: d.deliveryMode, deliveryCharge: d.deliveryMode === "free" ? 0 : d.deliveryCharge,
       codAllowed: d.codAllowed, returnable: d.returnable, forceOutOfStock: d.forceOutOfStock, showStockCount: d.showStockCount,
       comingSoon: d.comingSoon, launchNote: d.comingSoon ? d.launchNote || null : null,
-      maxPerOrder: d.maxPerOrder ?? null, maxPerCustomer: d.maxPerCustomer ?? null, lowStockThreshold: d.lowStockThreshold,
+      maxPerOrder: d.maxPerOrder ?? null, maxPerCustomer: d.maxPerCustomer ?? null, lowStockThreshold: d.lowStockThreshold, minPieces: d.minPieces, comboFrom: null, comboAbove: d.comboAbove ?? null,
       hsnCode: d.hsnCode, seoTitle: d.seoTitle, seoDescription: d.seoDescription, updatedAt: Date.now(),
     };
     // Blank SKUs are filled in (brand-name-colour-size), so stock sheets and invoices always have one.
@@ -219,7 +222,7 @@ export async function saveProduct(input: unknown): Promise<Result> {
         const prev = v.id ? beforeVariants.find((b) => b.id === v.id) : undefined;
         const vId = prev?.id ?? newId();
         keep.add(vId);
-        const row = { sku: v.sku || null, option1: v.option1, option2: v.option2, colorHex: v.colorHex || null, price: v.price ?? null, mrp: v.mrp ?? null, active: v.active, sortOrder: i };
+        const row = { sku: v.sku || null, option1: v.option1, option2: v.option2, colorHex: v.colorHex || null, price: v.price ?? null, mrp: v.mrp ?? null, minPrice: v.minPrice ?? null, active: v.active, sortOrder: i };
         if (prev) {
           // Relative update: an order placed while this form was open can't be overwritten.
           const delta = v.stock - prev.stock;
@@ -432,7 +435,7 @@ export async function resendNotification(id: string): Promise<Result> {
 /* ---------- discounts ---------- */
 const dt = z.number().int().nullable().optional();
 const SaleInput = z.object({
-  id: z.string().optional(), name: z.string().trim().min(2).max(60), badge: z.string().trim().max(20).nullable().optional(), type: z.enum(["percent", "flat"]), value: z.number().int().positive(),
+  id: z.string().optional(), name: z.string().trim().min(2).max(60), badge: z.string().trim().max(20).nullable().optional(), type: z.enum(["percent", "flat", "min_price"]), value: z.number().int().positive(),
   scope: z.enum(["all", "category", "brand", "products"]), targetIds: z.array(z.string()), startsAt: z.number().int(), endsAt: z.number().int(), showBanner: z.boolean(), active: z.boolean(),
 });
 export async function saveSale(input: unknown): Promise<Result> {
@@ -501,7 +504,8 @@ export async function saveOffer(input: unknown): Promise<Result> {
   } catch (e) { return fail(e); }
 }
 const LadderInput = z.object({
-  steps: z.array(z.object({ minSubtotal: z.number().int().positive(), percent: z.number().int().min(1).max(90) })).max(10),
+  by: z.enum(["value", "pieces"]).default("value"),
+  steps: z.array(z.object({ min: z.number().int().positive(), percent: z.number().int().min(1).max(90) })).max(10),
   freeDeliveryMin: z.number().int().min(0).nullable(),
   combinesWithCoupons: z.boolean(),
 });
@@ -509,17 +513,20 @@ const LadderInput = z.object({
 export async function saveOfferLadder(input: unknown): Promise<Result> {
   const a = await requireAdmin();
   const parsed = LadderInput.safeParse(input);
-  if (!parsed.success) return { error: "Each step needs a cart amount above ₹0 and a discount from 1% to 90%." };
+  if (!parsed.success) return { error: "Each step needs an amount above 0 and a discount from 1% to 90%." };
   const d = parsed.data;
-  const steps = [...d.steps].sort((x, y) => x.minSubtotal - y.minSubtotal);
-  for (let i = 1; i < steps.length; i++) {
-    if (steps[i].minSubtotal === steps[i - 1].minSubtotal) return { error: `Two steps start at ₹${steps[i].minSubtotal / 100}. Give each step its own amount.` };
-    if (steps[i].percent <= steps[i - 1].percent) return { error: `The ₹${(steps[i].minSubtotal / 100).toLocaleString("en-IN")} step should give more than ${steps[i - 1].percent}%, or buyers gain nothing by adding more.` };
-  }
+  const pieces = d.by === "pieces";
   const inr = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
+  const what = (n: number) => (pieces ? `${n} pieces` : inr(n));
+  const steps = [...d.steps].sort((x, y) => x.min - y.min);
+  for (let i = 1; i < steps.length; i++) {
+    if (steps[i].min === steps[i - 1].min) return { error: `Two steps start at ${what(steps[i].min)}. Give each step its own amount.` };
+    if (steps[i].percent <= steps[i - 1].percent) return { error: `The ${what(steps[i].min)} step should give more than ${steps[i - 1].percent}%, or buyers gain nothing by adding more.` };
+  }
+  if (pieces && steps.some((s) => s.min < 2 || s.min > 50)) return { error: "Piece steps should be between 2 and 50 pieces." };
   const rows = [
-    ...steps.map((st) => ({ id: newId(), name: `${st.percent}% off above ${inr(st.minSubtotal)}`, type: "percent" as const, value: st.percent, minSubtotal: st.minSubtotal, maxDiscount: null, combinesWithCoupons: d.combinesWithCoupons, startsAt: null, endsAt: null, active: true })),
-    ...(d.freeDeliveryMin != null ? [{ id: newId(), name: d.freeDeliveryMin ? `Free delivery above ${inr(d.freeDeliveryMin)}` : "Free delivery on every order", type: "free_shipping" as const, value: 0, minSubtotal: d.freeDeliveryMin, maxDiscount: null, combinesWithCoupons: true, startsAt: null, endsAt: null, active: true }] : []),
+    ...steps.map((st) => ({ id: newId(), name: pieces ? `Pick any ${st.min}, get ${st.percent}% off` : `${st.percent}% off above ${inr(st.min)}`, type: "percent" as const, value: st.percent, minSubtotal: pieces ? 0 : st.min, minPieces: pieces ? st.min : 0, maxDiscount: null, combinesWithCoupons: d.combinesWithCoupons, startsAt: null, endsAt: null, active: true })),
+    ...(d.freeDeliveryMin != null ? [{ id: newId(), name: d.freeDeliveryMin ? `Free delivery above ${inr(d.freeDeliveryMin)}` : "Free delivery on every order", type: "free_shipping" as const, value: 0, minSubtotal: d.freeDeliveryMin, minPieces: 0, maxDiscount: null, combinesWithCoupons: true, startsAt: null, endsAt: null, active: true }] : []),
   ];
   const before = await db.select().from(schema.cartOffers);
   // One batch, so the store never sees a moment with no offers.

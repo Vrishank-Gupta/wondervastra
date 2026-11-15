@@ -6,6 +6,7 @@ import { Header, MobileTabBar } from "@/components/store/header";
 import { getCustomer } from "@/lib/auth";
 import { getActiveCategories, getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
 import { money } from "@/lib/format";
+import { offerTiers, saleLabel } from "@/lib/pricing";
 import { areaLabel } from "@/lib/delivery-area";
 import { getSettings } from "@/lib/settings";
 import { PREVIEW_MESSAGE, previewMode } from "@/lib/preview";
@@ -18,8 +19,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     settings.announcement,
     areaLabel(settings) !== "India" ? `Now delivering across ${areaLabel(settings)}` : null,
     "100% original brands at the lowest prices",
-    ...sales.map((s) => `${s.name}: ${s.type === "percent" ? `${s.value}% off` : `${money(s.value)} off`} selected styles`),
-    ...[...offers].sort((a, b) => a.minSubtotal - b.minSubtotal).map((o) => o.type === "free_shipping" ? (o.minSubtotal ? `Free delivery above ${money(o.minSubtotal)}` : "Free delivery on every order") : o.type === "percent" ? `Shop for ${money(o.minSubtotal)}, get ${o.value}% off` : o.name),
+    ...sales.map((s) => `${s.name}: ${saleLabel(s).replace("Lowest prices", "lowest prices on")} selected styles`),
+    ...offerTiers(offers).map((t) => `${t.label}, get ${t.reward}`),
+    "Free delivery on every order",
     settings.codEnabled ? "Cash on delivery available" : null,
     capabilities().whatsapp ? "Order updates on WhatsApp" : null,
   ].filter(Boolean) as string[];

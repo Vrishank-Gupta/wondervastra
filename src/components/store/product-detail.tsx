@@ -19,6 +19,7 @@ type Product = {
   id: string; name: string; slug: string; shortDescription: string | null; description: string | null; material: string | null; care: string | null; sizeGuide: string | null; sizeHeights: Record<string, string>;
   option1Label: string; option2Label: string; deliveryMode: "free" | "flat"; deliveryCharge: number; codAllowed: boolean; returnable: boolean;
   showStockCount: boolean; lowStockThreshold: number; maxPerOrder: number | null; maxPerCustomer: number | null; forceOutOfStock: boolean; comingSoon: boolean; launchNote: string | null;
+  minPieces?: number; comboAbove?: number | null;
 };
 type Props = {
   brand?: { name: string; slug: string; isHouse: boolean } | null;
@@ -26,7 +27,7 @@ type Props = {
   rating: { avg: number; count: number }; wished: boolean;
   settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number; deliveryArea: string; areaRestricted: boolean };
   /** Cart offers, cheapest threshold first: "₹1,000+ → 10% off". */
-  tiers?: { minSubtotal: number; reward: string }[];
+  tiers?: { minSubtotal: number; minPieces: number; label: string; reward: string }[];
 };
 
 function Accordion({ title, children, open = false }: { title: string; children: React.ReactNode; open?: boolean }) {
@@ -103,11 +104,13 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   };
   const first = variants.find((v) => v.stock > 0) ?? variants[0];
   const [color, setColor] = useState(hasSet ? SET : first?.option2 ?? "Default");
+  /** Listings sold in twos start at two single pieces; a set is already two. */
+  const qtyFor = (c: string) => (c === SET ? 1 : Math.max(1, p.minPieces ?? 1));
   // Clothing: the buyer must choose a size themselves; guessing one leads to wrong-size orders and returns.
   const needsSize = sizes.length > 1;
   const [size, setSize] = useState(needsSize ? "" : first?.option1 ?? "Free size");
   const [sizeError, setSizeError] = useState(false);
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState(() => qtyFor(hasSet ? SET : first?.option2 ?? "Default"));
   const [imgIdx, setImgIdx] = useState(0);
   const [heart, setHeart] = useState(wished);
   const [copied, setCopied] = useState(false);
@@ -127,7 +130,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
   const low = variant && variant.stock > 0 && variant.stock <= p.lowStockThreshold;
 
   const pickColor = (name: string) => {
-    setColor(name); setQty(1);
+    setColor(name); setQty(qtyFor(name));
     const i = images.findIndex((im) => im.alt?.toLowerCase().includes(`in ${name.toLowerCase()}`));
     if (i >= 0) setImgIdx(i);
   };
@@ -136,9 +139,9 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     setSizeError(true);
     document.getElementById("size-picker")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const addVariant = (open: boolean) => { if (variant) for (const id of variant.id.split("+")) add(id, qty, { open }); };
+  const addVariant = (open: boolean) => { if (variant) for (const id of variant.id.split("+")) add(id, Math.min(qty, Math.max(cap, 1)), { open }); };
   const buyNow = () => { if (choosing) return askSize(); if (variant) { addVariant(false); router.push("/checkout"); } };
-  const addCart = () => { if (choosing) return askSize(); if (variant) { addVariant(true); setQty(1); } };
+  const addCart = () => { if (choosing) return askSize(); if (variant) { addVariant(true); setQty(qtyFor(color)); } };
   /** For "notify me" on a sold-out set: the piece that ran out. */
   const alertVariant = variant && color === SET ? variants.find((v) => variant.id.split("+").includes(v.id) && v.stock === 0) ?? null : variant;
   const toggleWish = async () => {
@@ -186,6 +189,13 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
           <p className="mt-2 inline-flex items-center gap-1.5 bg-pine-soft px-2.5 py-1 text-xs font-bold text-pine"><ShieldCheck size={14} aria-hidden /> 100% original {brand.name} product, at our lowest price</p>
         )}
 
+        {(p.minPieces ?? 1) > 1 && (
+          <div className="mt-3 border border-dashed border-ink/40 bg-sand-soft p-3 text-sm" data-testid="combo">
+            <p><b>Sold in {p.minPieces}s.</b> Mix any sizes, tops and trousers{color === SET ? ", or take a set" : ""}.</p>
+            {p.comboAbove != null && <p className="mt-1 text-xs text-ink-soft">Cart over {money(p.comboAbove)}? Single pieces are fine too.</p>}
+          </div>
+        )}
+
         {saleEnds && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 bg-madder px-3 py-2.5 text-sm font-semibold text-white">
             <span className="uppercase">{variant?.saleName ?? first?.saleName} ends in</span><Countdown endsAt={saleEnds} compact />
@@ -219,7 +229,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
                 const out = !v || v.stock === 0;
                 const h = p.sizeHeights[s];
                 return (
-                  <button key={s} type="button" aria-pressed={s === size} aria-label={h ? `${s}, ${h} cm${out ? ", sold out" : ""}` : undefined} onClick={() => { setSize(s); setQty(1); setSizeError(false); }}
+                  <button key={s} type="button" aria-pressed={s === size} aria-label={h ? `${s}, ${h} cm${out ? ", sold out" : ""}` : undefined} onClick={() => { setSize(s); setQty(qtyFor(color)); setSizeError(false); }}
                     className={`min-w-12 border px-3.5 text-sm font-semibold ${h ? "py-1.5 leading-tight" : "py-2.5"} ${s === size ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${out ? "text-ink/40 line-through" : ""}`}>
                     {s}{h && <span className={`block text-[11px] font-medium ${s === size ? "text-white/80" : "text-ink-soft"}`}>{h} cm</span>}
                   </button>
@@ -261,17 +271,22 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
         {tiers.length > 0 && !soon && (
           <div className="mt-5 bg-sand-soft p-3" data-testid="tiers">
             <p className="text-[13px] font-bold tracking-[0.08em] uppercase">Buy more, save more</p>
-            <ul className="mt-2 flex flex-wrap gap-2">
-              {tiers.map((t) => <li key={t.minSubtotal} className="border border-dashed border-ink/40 bg-white px-2.5 py-1.5 text-xs"><b className="text-madder">{t.reward}</b> above {money(t.minSubtotal)}</li>)}
+            <ul className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-2">
+              {tiers.map((t) => (
+                <li key={`${t.minPieces}-${t.minSubtotal}`} className="border border-dashed border-ink/40 bg-white px-2.5 py-2 text-center">
+                  <span className="block text-xs font-semibold">{t.label}</span>
+                  <b className="block text-lg leading-tight text-madder">{t.reward}</b>
+                </li>
+              ))}
             </ul>
-            <p className="mt-2 text-xs text-ink-soft">Applied automatically in your cart. Mix any items.</p>
+            <p className="mt-2 text-xs text-ink-soft">{tiers.some((t) => t.minPieces) ? "Mix any styles, sizes and brands. " : "Mix any items. "}The discount is applied automatically in your cart.</p>
           </div>
         )}
 
         {!soon && <DeliveryCheck area={settings.deliveryArea} restricted={settings.areaRestricted} days={`Dispatched in ${settings.dispatchDays} working days, delivered in about ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days`} />}
 
         <ul className="mt-5 grid gap-2 text-sm">
-          <li className="flex items-center gap-2"><Truck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.deliveryMode === "free" ? <span className="text-pine">Free delivery on this item</span> : <span>Delivery charge: {money(p.deliveryCharge)}</span>}</li>
+          <li className="flex items-center gap-2"><Truck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.deliveryMode === "free" || p.deliveryCharge === 0 ? <span className="text-pine">Free delivery</span> : <span>Delivery charge: {money(p.deliveryCharge)}</span>}</li>
           <li className="flex items-center gap-2"><ShieldCheck size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />Dispatched in {settings.dispatchDays} working days, delivered in about {settings.deliveryDaysMin}–{settings.deliveryDaysMax} days</li>
           <li className="flex items-center gap-2"><Wallet size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{paymentLine(settings.onlinePayments, p.codAllowed && settings.codEnabled)}</li>
           <li className="flex items-center gap-2"><RotateCcw size={17} strokeWidth={1.5} aria-hidden className="shrink-0" />{p.returnable ? `Returnable within ${settings.returnWindowDays} days of delivery` : "This item can't be returned"}</li>

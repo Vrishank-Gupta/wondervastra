@@ -80,7 +80,7 @@ export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", asy
     // The card shows the cheapest size, with that size's own MRP.
     const cheapest = vs.length ? vs.reduce((a, v) => ((v.price ?? p.price) < (a.price ?? p.price) ? v : a)) : null;
     const base = cheapest ? cheapest.price ?? p.price : p.price;
-    const { price, sale } = bestSalePrice(base, p.id, p.categoryId, liveSales, now, p.brandId);
+    const { price, sale } = bestSalePrice(base, p.id, p.categoryId, liveSales, now, p.brandId, cheapest?.minPrice);
     const mrp = Math.max(cheapest?.mrp ?? p.compareAtPrice ?? 0, base);
     const totalStock = p.forceOutOfStock || p.comingSoon ? 0 : vs.reduce((a, v) => a + Math.max(0, v.stock), 0);
     const r = ratings.find((x) => x.id === p.id);
@@ -167,7 +167,7 @@ export const getProductBySlug = cache(async (slug: string) => {
   const now = Date.now();
   const pricedVariants = vars.map((v) => {
     const base = v.price ?? p.price;
-    const { price, sale } = bestSalePrice(base, p.id, p.categoryId, liveSales, now, p.brandId);
+    const { price, sale } = bestSalePrice(base, p.id, p.categoryId, liveSales, now, p.brandId, v.minPrice);
     return {
       id: v.id, option1: v.option1, option2: v.option2, colorHex: v.colorHex, sku: v.sku,
       stock: p.forceOutOfStock || p.comingSoon ? 0 : Math.max(0, v.stock),

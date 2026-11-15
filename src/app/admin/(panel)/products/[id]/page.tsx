@@ -32,10 +32,10 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
         id: p.id, name: p.name, slug: p.slug, shortDescription: p.shortDescription ?? "", description: p.description ?? "", categoryId: p.categoryId, brandId: p.brandId ?? "", status: p.status,
         price: str(p.price, 100), compareAtPrice: str(p.compareAtPrice, 100), tags: p.tags.join(", "), featured: p.featured, material: p.material ?? "", care: p.care ?? "", sizeGuide: p.sizeGuide ?? "",
         option1Label: p.option1Label, option2Label: p.option2Label, deliveryMode: p.deliveryMode, deliveryCharge: str(p.deliveryCharge, 100), codAllowed: p.codAllowed, returnable: p.returnable,
-        forceOutOfStock: p.forceOutOfStock, comingSoon: p.comingSoon, launchNote: p.launchNote ?? "", showStockCount: p.showStockCount, maxPerOrder: str(p.maxPerOrder), maxPerCustomer: str(p.maxPerCustomer), lowStockThreshold: String(p.lowStockThreshold),
+        forceOutOfStock: p.forceOutOfStock, comingSoon: p.comingSoon, launchNote: p.launchNote ?? "", showStockCount: p.showStockCount, minPieces: p.minPieces > 1 ? String(p.minPieces) : "", comboAbove: str(p.comboAbove, 100), maxPerOrder: str(p.maxPerOrder), maxPerCustomer: str(p.maxPerCustomer), lowStockThreshold: String(p.lowStockThreshold),
         hsnCode: p.hsnCode ?? "", seoTitle: p.seoTitle ?? "", seoDescription: p.seoDescription ?? "", sizeHeights: p.sizeHeights ?? {},
         images: imgs.map((i) => ({ url: i.url, alt: i.alt ?? p.name })),
-        variants: vars.filter((v) => v.active).map((v) => ({ id: v.id, sku: v.sku ?? "", option1: v.option1, option2: v.option2, colorHex: v.colorHex ?? "", price: str(v.price, 100), mrp: str(v.mrp, 100), stock: String(v.stock), active: v.active })),
+        variants: vars.filter((v) => v.active).map((v) => ({ id: v.id, sku: v.sku ?? "", option1: v.option1, option2: v.option2, colorHex: v.colorHex ?? "", price: str(v.price, 100), mrp: str(v.mrp, 100), minPrice: str(v.minPrice, 100), stock: String(v.stock), active: v.active })),
       }} />
       <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 [&>*]:min-w-0">
         <Panel title={`Waiting for restock (${alerts.length})`}>

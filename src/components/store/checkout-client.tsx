@@ -239,8 +239,10 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
             <CouponBox quote={quote} />
             {quote && <PriceSummary quote={quote} />}
             {error && <p className="rounded-sm border border-clay bg-clay-soft p-3 text-sm font-medium" role="alert">{error}</p>}
-            {hasIssue && <p className="text-sm font-medium text-clay">Some items changed. <Link className="underline" href="/cart">Review your cart</Link>.</p>}
-            <button disabled={busy || !quote || Boolean(nothing)} className="btn btn-primary hidden w-full text-lg lg:flex">
+            {quote?.minimumIssue
+              ? <p role="alert" className="text-sm font-medium text-clay">{quote.minimumIssue} <Link className="underline" href="/cart">Review your cart</Link>.</p>
+              : hasIssue && <p className="text-sm font-medium text-clay">Some items changed. <Link className="underline" href="/cart">Review your cart</Link>.</p>}
+            <button disabled={busy || !quote || Boolean(nothing) || Boolean(quote?.minimumIssue)} className="btn btn-primary hidden w-full text-lg lg:flex">
               {busy ? <Loader2 className="animate-spin" size={18} aria-hidden /> : <Lock size={16} aria-hidden />}
               {method === "cod" ? "Place order" : `Pay ${quote ? money(quote.total) : ""}`}
             </button>
@@ -248,7 +250,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
           </div>
         </aside>
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] lg:hidden">
-          <button disabled={busy || !quote || Boolean(nothing)} className="btn btn-primary w-full text-lg">
+          <button disabled={busy || !quote || Boolean(nothing) || Boolean(quote?.minimumIssue)} className="btn btn-primary w-full text-lg">
             {busy ? <Loader2 className="animate-spin" size={18} aria-hidden /> : <Lock size={16} aria-hidden />}
             {method === "cod" ? `Place order · ${quote ? money(quote.total) : ""}` : `Pay ${quote ? money(quote.total) : ""}`}
           </button>

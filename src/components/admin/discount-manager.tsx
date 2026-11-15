@@ -91,7 +91,7 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
             </form>
           )}
           {offers.length ? <ul>{offers.map((o) => (
-            <Row key={o.id} title={o.name} badge={<Badge r={o} />} sub={`${o.minSubtotal ? `When the cart is ${money(o.minSubtotal)} or more` : "On every order"}: ${o.type === "free_shipping" ? "free delivery" : o.type === "percent" ? `${o.value}% off${o.maxDiscount ? ` (up to ${money(o.maxDiscount)})` : ""}` : `${money(o.value)} off`}${o.endsAt ? ` · ends ${formatDateTime(o.endsAt)}` : ""}`}
+            <Row key={o.id} title={o.name} badge={<Badge r={o} />} sub={`${o.minPieces ? `When the cart has ${o.minPieces} or more pieces` : o.minSubtotal ? `When the cart is ${money(o.minSubtotal)} or more` : "On every order"}: ${o.type === "free_shipping" ? "free delivery" : o.type === "percent" ? `${o.value}% off${o.maxDiscount ? ` (up to ${money(o.maxDiscount)})` : ""}` : `${money(o.value)} off`}${o.endsAt ? ` · ends ${formatDateTime(o.endsAt)}` : ""}`}
               onEdit={() => setOffer({ id: o.id, name: o.name, type: o.type, value: o.type === "percent" ? String(o.value) : rup(o.value), min: rup(o.minSubtotal), max: rup(o.maxDiscount), combines: o.combinesWithCoupons, starts: toLocal(o.startsAt), ends: toLocal(o.endsAt), active: o.active })} onDelete={() => del("offer", o.id)} />
           ))}</ul> : <Empty>No cart offers yet.</Empty>}
         </Panel>
@@ -105,12 +105,14 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
               e.preventDefault();
               const s = sale as Record<string, never>;
               const type = s.type as string;
-              const r = await saveSale({ id: s.id || undefined, name: s.name, badge: s.badge || null, type, value: type === "percent" ? Number(s.value) : toP(s.value), scope: s.scope, targetIds: s.targetIds, startsAt: fromLocal(s.starts), endsAt: s.noEnd ? NO_END : fromLocal(s.ends), showBanner: s.banner, active: s.active });
+              const r = await saveSale({ id: s.id || undefined, name: s.name, badge: s.badge || null, type, value: type === "percent" ? Number(s.value) : type === "min_price" ? 1 : toP(s.value), scope: s.scope, targetIds: s.targetIds, startsAt: fromLocal(s.starts), endsAt: s.noEnd ? NO_END : fromLocal(s.ends), showBanner: s.banner, active: s.active });
               after(r, () => setSale(null));
             }}>
               <F id="sn" label="Sale name"><input id="sn" className="input" required placeholder="Diwali Dhamaka" value={String(sale.name)} onChange={(e) => setSale({ ...sale, name: e.target.value })} /></F>
-              <F id="st" label="Discount type"><select id="st" className="input" value={String(sale.type)} onChange={(e) => setSale({ ...sale, type: e.target.value })}><option value="percent">% off</option><option value="flat">₹ off each item</option></select></F>
-              <F id="sv" label={sale.type === "percent" ? "Percent off" : "₹ off"}><input id="sv" className="input" type="number" min="1" required value={String(sale.value)} onChange={(e) => setSale({ ...sale, value: e.target.value })} /></F>
+              <F id="st" label="Discount type"><select id="st" className="input" value={String(sale.type)} onChange={(e) => setSale({ ...sale, type: e.target.value })}><option value="percent">% off</option><option value="flat">₹ off each item</option><option value="min_price">Drop to each size&apos;s minimum price</option></select></F>
+              {sale.type === "min_price"
+                ? <p className="self-end text-xs text-ink-soft">Each size sells at the “Min price” set on its listing. Sizes without one keep their normal price.</p>
+                : <F id="sv" label={sale.type === "percent" ? "Percent off" : "₹ off"}><input id="sv" className="input" type="number" min="1" required value={String(sale.value)} onChange={(e) => setSale({ ...sale, value: e.target.value })} /></F>}
               <F id="ss" label="Starts"><input id="ss" className="input" type="datetime-local" required value={String(sale.starts)} onChange={(e) => setSale({ ...sale, starts: e.target.value })} /></F>
               <div><F id="se" label="Ends">{sale.noEnd ? <p className="input bg-line/40 text-ink-soft">No end date</p> : <input id="se" className="input" type="datetime-local" required value={String(sale.ends)} onChange={(e) => setSale({ ...sale, ends: e.target.value })} />}</F>
                 <label className="mt-1 flex items-center gap-2 text-xs"><input type="checkbox" className="size-3.5 accent-ink" checked={Boolean(sale.noEnd)} onChange={(e) => setSale({ ...sale, noEnd: e.target.checked })} /> No end date (runs until you turn it off, no countdown)</label></div>
@@ -129,7 +131,7 @@ export function DiscountManager({ sales, coupons, offers, categories, brands, pr
             </form>
           )}
           {sales.length ? <ul>{sales.map((s) => (
-            <Row key={s.id} title={s.name} badge={<Badge r={s} />} sub={`${s.type === "percent" ? `${s.value}%` : money(s.value)} off · ${s.scope === "all" ? "whole store" : `${s.targetIds.length} ${s.scope === "category" ? "categories" : s.scope === "brand" ? (s.targetIds.length === 1 ? "brand" : "brands") : "listings"}`} · ${isOpenEnded(s.endsAt) ? `from ${formatDateTime(s.startsAt)}, no end date` : `${formatDateTime(s.startsAt)} to ${formatDateTime(s.endsAt)}`}`}
+            <Row key={s.id} title={s.name} badge={<Badge r={s} />} sub={`${s.type === "min_price" ? "Minimum prices" : `${s.type === "percent" ? `${s.value}%` : money(s.value)} off`} · ${s.scope === "all" ? "whole store" : `${s.targetIds.length} ${s.scope === "category" ? "categories" : s.scope === "brand" ? (s.targetIds.length === 1 ? "brand" : "brands") : "listings"}`} · ${isOpenEnded(s.endsAt) ? `from ${formatDateTime(s.startsAt)}, no end date` : `${formatDateTime(s.startsAt)} to ${formatDateTime(s.endsAt)}`}`}
               onEdit={() => setSale({ id: s.id, name: s.name, badge: s.badge ?? "", type: s.type, value: s.type === "percent" ? String(s.value) : rup(s.value), scope: s.scope, targetIds: s.targetIds, starts: toLocal(s.startsAt), ends: isOpenEnded(s.endsAt) ? toLocal(Date.now() + 7 * 86400000) : toLocal(s.endsAt), noEnd: isOpenEnded(s.endsAt), q: "", banner: s.showBanner, active: s.active })} onDelete={() => del("sale", s.id)} />
           ))}</ul> : <Empty>No sales yet.</Empty>}
         </Panel>

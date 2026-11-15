@@ -1,0 +1,1 @@
+ALTER TABLE `cart_offers` ADD `min_pieces` integer DEFAULT 0 NOT NULL;

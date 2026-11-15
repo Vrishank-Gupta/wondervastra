@@ -21,9 +21,10 @@ function faqItems(s: StoreSettings): { q: string; a: string }[] {
     { q: "How do I pay?", a: online ? `UPI, cards, netbanking and wallets through Razorpay${s.codEnabled ? ", or cash on delivery on eligible items" : ""}.` : s.codEnabled ? "Cash on delivery on eligible items. Online payment (UPI and cards) is opening soon." : "Online payment is opening soon. Please contact us to order." },
     s.deliveryPincodes.trim()
       ? { q: "Where do you deliver?", a: `We deliver across ${areaPhrase(s)} for now. Enter your pincode on any product page to check. If we don't reach you yet, leave your number there and we'll tell you as soon as we do.` }
-      : { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners. Delivery charges are shown on each product page and in your cart before you pay." },
+      : { q: "Do you deliver across India?", a: "Yes. We ship across India through trusted courier partners, and delivery is free on every order." },
     { q: "When will my order arrive?", a: `We dispatch within ${s.dispatchDays} working days, and delivery usually takes ${s.deliveryDaysMin}–${s.deliveryDaysMax} days after that depending on your location.` },
-    { q: "What sizes do kids' thermals come in?", a: "Baby thermals come in sizes from 0–6 months up to 18–24 months, and kids' thermals for boys and girls from 2–4 years up to 12–14 years. Each product page shows the sizes in stock." },
+    { q: "What sizes do kids' thermals come in?", a: "Kids' warmers come in sizes from 6–18 months (45 cm) to 10–11 years (75 cm). The number is the chest of the top in cm, and each listing has a size guide with ages for tops and bottoms. Kids' wear is sold in twos: mix any sizes, tops and trousers." },
+    { q: "Is delivery free?", a: "Yes, on every order, with no minimum." },
     { q: "How do I track my order?", a: `We'll send you a tracking link by ${channels()} when it ships. You can also use the Track Order page anytime.` },
     { q: "Can I cancel my order?", a: "Yes, from your order page, until it has been packed." },
     { q: "Can I return an item?", a: `Eligible items can be returned within ${s.returnWindowDays} days of delivery. For hygiene reasons, items must be unused with original packaging. See our returns policy.` },
@@ -35,7 +36,7 @@ const PAGES: Record<string, Page> = {
   about: { title: "Our story", body: (s) => <>
     <p>{s.storeName} started with a simple idea: the everyday things you wear should be made well. We bring the thermal brands you already trust into one easy store, starting with warm layers for kids, babies and men: 100% original products, at the lowest prices we can offer.</p>
     <h2>What we care about</h2>
-    <ul><li>Comfort you can wear all day</li><li>Colours that go with what you already own</li><li>Honest pricing and clear delivery charges</li><li>Keeping you updated at every step of your order</li></ul>
+    <ul><li>Comfort you can wear all day</li><li>Colours that go with what you already own</li><li>Honest pricing and free delivery on every order</li><li>Keeping you updated at every step of your order</li></ul>
   </> },
   contact: { title: "Contact us", body: (s) => <>
     <p>Questions about an order or a product? We&apos;d love to help.</p>
@@ -54,7 +55,7 @@ const PAGES: Record<string, Page> = {
       ? <><h2>Where we deliver</h2><p>We deliver across {areaPhrase(s)} for now. Enter your pincode on any product page or at checkout to check. If we don&apos;t deliver to you yet, leave your number and we&apos;ll tell you when we do.</p></>
       : <p>We ship across India through trusted courier partners.</p>}
     <h2>Dispatch & delivery time</h2><p>Orders are dispatched within {s.dispatchDays} working days. Delivery usually takes {s.deliveryDaysMin}–{s.deliveryDaysMax} days after dispatch.</p>
-    <h2>Delivery charges</h2><p>Delivery charges depend on the item and are shown on each product page, in your cart and at checkout before you pay. Many items and larger orders ship free.</p>
+    <h2>Free delivery</h2><p>Every order ships free, whatever its size. There is no minimum order.</p>
     <h2>Tracking</h2><p>When your order ships, you&apos;ll get the courier name, AWB number and tracking link by {channels()}.</p>
     <h2>Failed delivery</h2><p>If delivery fails because of an incorrect address or if the recipient is unavailable, please contact us {contactLine(s)}.</p>
   </> },

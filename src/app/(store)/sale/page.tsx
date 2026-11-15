@@ -6,7 +6,7 @@ import { Countdown } from "@/components/store/countdown";
 import { filtersFromParams, Listing } from "@/components/store/listing";
 import { CopyCode } from "@/components/store/copy-code";
 import { getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
-import { isLive, isOpenEnded } from "@/lib/pricing";
+import { isLive, isOpenEnded, saleLabel } from "@/lib/pricing";
 import { money } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Offers & sales", description: "Live discounts, coupons and limited-time sales on original branded thermals at WonderVastra.", alternates: { canonical: "/sale" } };
@@ -30,12 +30,12 @@ export default async function SalePage({ searchParams }: { searchParams: Promise
             {sales.map((s) => (
               <div key={s.id} className="flex bg-white text-ink flex-col gap-2 p-4">
                 <p className="font-display text-2xl">{s.name}</p>
-                <p className="text-sm text-ink-soft">{s.type === "percent" ? `${s.value}% off` : `${money(s.value)} off`} selected styles</p>
+                <p className="text-sm text-ink-soft">{saleLabel(s).replace("Lowest prices", "Lowest prices on")} selected styles</p>
                 {!isOpenEnded(s.endsAt) && <Countdown endsAt={s.endsAt} />}
               </div>
             ))}
             {offers.map((o) => (
-              <div key={o.id} className="flex bg-white text-ink items-center gap-3 p-4"><Tag size={18} strokeWidth={1.5} aria-hidden className="shrink-0" /><div><p className="font-semibold">{o.name}</p><p className="text-xs text-ink-soft">Applied automatically on carts above {money(o.minSubtotal)}</p></div></div>
+              <div key={o.id} className="flex bg-white text-ink items-center gap-3 p-4"><Tag size={18} strokeWidth={1.5} aria-hidden className="shrink-0" /><div><p className="font-semibold">{o.name}</p><p className="text-xs text-ink-soft">{o.minPieces ? `Pick any ${o.minPieces} pieces. Applied automatically in your cart` : `Applied automatically on carts above ${money(o.minSubtotal)}`}</p></div></div>
             ))}
             {shown.map((c) => (
               <div key={c.id} className="flex bg-white text-ink items-center justify-between gap-3 p-4">

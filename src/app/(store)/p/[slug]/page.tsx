@@ -92,6 +92,7 @@ export default async function ProductPage({ params }: Props) {
           id: p.id, name: p.name, slug: p.slug, shortDescription: p.shortDescription, description: p.description, material: p.material, care: p.care, sizeGuide: p.sizeGuide, sizeHeights: p.sizeHeights ?? {},
           option1Label: p.option1Label, option2Label: p.option2Label, deliveryMode: p.deliveryMode, deliveryCharge: p.deliveryCharge, codAllowed: p.codAllowed, returnable: p.returnable,
           showStockCount: p.showStockCount, lowStockThreshold: p.lowStockThreshold, maxPerOrder: p.maxPerOrder, maxPerCustomer: p.maxPerCustomer, forceOutOfStock: p.forceOutOfStock, comingSoon: p.comingSoon, launchNote: p.launchNote,
+          minPieces: p.minPieces, comboAbove: p.comboAbove,
         }}
         images={images.map((i) => ({ url: i.url, alt: i.alt }))}
         variants={variants}
