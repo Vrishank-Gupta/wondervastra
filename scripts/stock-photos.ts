@@ -88,14 +88,15 @@ export async function categoryPhoto(slug: string) {
   return id ? save(id, `px-${id}-sq.jpg`, 1200, 1200) : null;
 }
 export async function bannerPhotos() {
-  for (const id of Object.values(BANNER_PHOTOS)) {
+  // Only Pexels stand-ins (numbers) are downloaded; the store's own banner photos (names) live in public/seed.
+  for (const id of Object.values(BANNER_PHOTOS).filter((x): x is number => typeof x === "number")) {
     await save(id, `px-${id}-wide.jpg`, 2400, 1100);
     await save(id, `px-${id}-tall.jpg`, 1080, 1350);
   }
 }
 
 export function writeCredits() {
-  const ids = new Set([...Object.values(PRODUCT_PHOTOS).flat(), ...Object.values(CATEGORY_PHOTOS), ...Object.values(BANNER_PHOTOS), ...Object.values(AUDIENCE_PHOTOS)]);
+  const ids = new Set([...Object.values(PRODUCT_PHOTOS).flat(), ...Object.values(CATEGORY_PHOTOS), ...Object.values(BANNER_PHOTOS).filter((x): x is number => typeof x === "number"), ...Object.values(AUDIENCE_PHOTOS)]);
   const lines = [...ids].sort((a, b) => a - b).map((id) => `- https://www.pexels.com/photo/${id}/`);
   fs.writeFileSync(path.join(OUT, "CREDITS.md"), `# Sample photo credits\n\nTemporary stand-in photos from Pexels, used under the Pexels License (https://www.pexels.com/license/). They show similar products, not WonderVastra's own. Replace them with your product photos before selling.\n\n${lines.join("\n")}\n`);
 }

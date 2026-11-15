@@ -51,7 +51,7 @@ export default async function Home() {
   const slides: Slide[] = [
     ...(categories.some((c) => c.slug === "kids-thermals" && !c.comingSoon) ? [{ key: "kids", eyebrow: "Ages 2 to 11 · Amul, Dollar", title: "Kids' thermals",
       text: "Soft, warm layers for little ones. 100% original brands at the lowest prices.", cta: "Shop kids'", href: "/c/kids-thermals",
-      ...bannerSrc("kids"), alt: "Baby in a white long-sleeve top and red beanie" }] : []),
+      ...bannerSrc("kids"), alt: "Boy in a Dollar Ultra charcoal thermal top and trouser" }] : []),
     ...(sale ? [{
       key: "sale", eyebrow: isOpenEnded(sale.endsAt) ? "On now" : `Ends in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`, title: sale.name,
       text: `${sale.type === "percent" ? `${sale.value}% off` : `${money(sale.value)} off`} ${saleScope}.`, cta: "Shop the sale", href: "/sale",
@@ -59,7 +59,7 @@ export default async function Home() {
     }] : []),
     ...(partners.length > 0 ? [{ key: "brands", eyebrow: `${partners.length} trusted ${partners.length === 1 ? "brand" : "brands"}`, title: "Brands you know",
       text: `${partners.slice(0, 4).map((b) => b.name).join(", ")}${partners.length > 4 ? " and more" : ""}. Genuine stock, one cart.`, cta: "Shop by brand", href: "/brands",
-      ...bannerSrc("brands"), alt: "Man in a white cotton vest" }] : []),
+      ...bannerSrc("brands"), alt: "Man in a Dollar Ultra full-sleeve thermal set" }] : []),
     ...(house ? [{ key: "label", eyebrow: houseItems.some((c) => !c.comingSoon) ? "Our own label" : "Coming soon", title: house.name,
       text: house.tagline ?? "Our own label.", cta: houseItems.some((c) => !c.comingSoon) ? "Shop the label" : "Get notified", href: `/brands/${house.slug}`,
       ...bannerSrc("label"), alt: "Man in a plain white hoodie" }] : []),

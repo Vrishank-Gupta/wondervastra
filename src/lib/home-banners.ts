@@ -2,7 +2,7 @@
  * Homepage banner images (temporary Pexels stand-ins, see scripts/stock-photos.ts).
  * Filenames carry the photo ID, so swapping a photo never shows a cached old one.
  */
-export const BANNER_PHOTOS = { sale: 6667775, kids: 14657994, brands: 15072827, label: 8217419 } as const;
+export const BANNER_PHOTOS = { sale: 6667775, kids: "wvkids1", brands: "wvmen1", label: 8217419 } as const;
 /** Kids' shortcut tiles (square), keyed by the listing tag they filter on. */
 export const AUDIENCES = [
   { tag: "boys", label: "Boys", sub: "2–14 years", img: "/seed/px-4008828-sq.jpg" },
