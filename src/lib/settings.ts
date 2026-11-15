@@ -34,6 +34,11 @@ export const DEFAULT_SETTINGS = {
   orderFeedbackEnabled: true,
   deliveryFeedbackEnabled: true,
   adminAlertEmail: "",
+  /** Delhivery: the pickup address name exactly as saved in Delhivery One, its pincode, and parcel defaults. */
+  delhiveryPickupName: "",
+  delhiveryPickupPin: "",
+  delhiveryPieceGrams: 250,
+  delhiveryBox: "30x25x5",
 };
 export type StoreSettings = typeof DEFAULT_SETTINGS;
 

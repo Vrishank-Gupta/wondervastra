@@ -5,6 +5,7 @@ import { STATES } from "@/lib/states";
 import { db, schema } from "@/db";
 import { clientIp, getCustomer, rateLimit } from "@/lib/auth";
 import { CheckoutError, createOrder, expireUnpaidOrders } from "@/lib/orders";
+import { estimateDelivery } from "@/lib/shipping";
 import { createRazorpayOrder, onlinePaymentsAvailable, razorpayConfigured, razorpayKeyId, simulationAllowed } from "@/lib/razorpay";
 import { newId, normalizeEmail, normalizePhone } from "@/lib/utils";
 import { PREVIEW_MESSAGE, previewMode } from "@/lib/preview";
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
 
   try {
     const order = await createOrder({ ...b, email, phone, customerId: customer?.id ?? null });
+    // The date promised at checkout, kept on the order until Delhivery's own estimate replaces it.
+    const eta = await estimateDelivery(settings, b.pincode).catch(() => null);
+    if (eta) await db.update(schema.orders).set({ etaAt: eta }).where(eq(schema.orders.id, order.id));
 
     if (customer) {
       if (!customer.name) await db.update(schema.customers).set({ name: b.name }).where(eq(schema.customers.id, customer.id));

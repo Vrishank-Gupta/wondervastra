@@ -10,7 +10,7 @@ import { useCart } from "./cart-context";
 import { OfferProgress } from "./offer-progress";
 import { CouponBox, PriceSummary } from "./price-summary";
 import { useQuote } from "./use-quote";
-import { AreaWaitlist, lookupPin, rememberPin, savedPin, type PinResult } from "./delivery-check";
+import { AreaWaitlist, etaLabel, lookupPin, rememberPin, savedPin, type PinResult } from "./delivery-check";
 
 type Addr = { id: string; name: string; phone: string; line1: string; line2: string | null; city: string; state: string; pincode: string };
 type Props = {
@@ -195,7 +195,7 @@ export function CheckoutClient({ customer, addresses, online, simulated, codFee,
               <div className="sm:col-span-2"><label className="label" htmlFor="name">Full name</label><input id="name" className="input" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} /></div>
               <div className="sm:col-span-2"><label className="label" htmlFor="line1">House no, building, street</label><input id="line1" className="input" autoComplete="address-line1" required value={line1} onChange={(e) => setLine1(e.target.value)} /></div>
               <div className="sm:col-span-2"><label className="label" htmlFor="line2">Area, landmark <span className="font-normal text-ink-soft">(optional)</span></label><input id="line2" className="input" autoComplete="address-line2" value={line2} onChange={(e) => setLine2(e.target.value)} /></div>
-              <div><label className="label" htmlFor="pincode">Pincode</label><input id="pincode" className="input" inputMode="numeric" autoComplete="postal-code" maxLength={6} required pattern="[1-9][0-9]{5}" title="6-digit pincode" value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ""))} aria-invalid={outside || undefined} aria-describedby={outside ? "pin-outside" : undefined} />{pinNote && !outside && <p className="mt-1 text-xs font-medium text-pine">{pinNote} · we deliver here</p>}</div>
+              <div><label className="label" htmlFor="pincode">Pincode</label><input id="pincode" className="input" inputMode="numeric" autoComplete="postal-code" maxLength={6} required pattern="[1-9][0-9]{5}" title="6-digit pincode" value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ""))} aria-invalid={outside || undefined} aria-describedby={outside ? "pin-outside" : undefined} />{pinNote && !outside && <p className="mt-1 text-xs font-medium text-pine">{pinNote} · we deliver here{area?.eta && area.pincode === pincode ? `, free delivery by ${etaLabel(area.eta)}` : ""}</p>}</div>
               <div><label className="label" htmlFor="city">City</label><input id="city" className="input" autoComplete="address-level2" required value={city} onChange={(e) => setCity(e.target.value)} /></div>
               {outside && area && (
                 <div id="pin-outside" className="space-y-2 rounded-sm border border-clay bg-clay-soft p-3 sm:col-span-2" role="alert">

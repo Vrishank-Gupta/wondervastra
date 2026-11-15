@@ -49,3 +49,20 @@ describe("minimum-price sale", () => {
     expect(run([l(null)], [weekend]).subtotal).toBe(25000);
   });
 });
+
+import { etaDate, orderStatusFor } from "@/lib/delhivery";
+describe("Delhivery", () => {
+  it("counts dispatch in working days (no Sundays), then transit, and never promises a Sunday", () => {
+    const fri = new Date("2026-11-13T10:00:00+05:30"); // Friday
+    expect(etaDate(fri, 2, 1).getDay()).toBe(2); // Sat, Mon dispatch → Tue
+    expect(etaDate(fri, 1, 1).getDay()).toBe(1); // Sat dispatch → Sun → moved to Mon
+  });
+  it("moves orders forward only", () => {
+    expect(orderStatusFor({ status: "In Transit", type: "UD" }, "packed")).toBe("shipped");
+    expect(orderStatusFor({ status: "In Transit", type: "UD" }, "shipped")).toBeNull();
+    expect(orderStatusFor({ status: "Dispatched", type: "UD" }, "shipped")).toBe("out_for_delivery");
+    expect(orderStatusFor({ status: "Delivered", type: "DL" }, "out_for_delivery")).toBe("delivered");
+    expect(orderStatusFor({ status: "Manifested", type: "UD" }, "packed")).toBeNull();
+    expect(orderStatusFor({ status: "RTO In Transit", type: "RT" }, "shipped")).toBeNull();
+  });
+});

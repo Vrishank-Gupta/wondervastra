@@ -139,6 +139,16 @@ export function SettingsForm({ initial, isOwner, demand }: { initial: StoreSetti
             <p className="mt-3 text-sm text-ink-soft">Free delivery above an amount is set in <a className="font-medium underline" href="/admin/discounts">Discounts</a>.</p>
           </Panel>
 
+          <Panel title="Delhivery shipping">
+            <p className="mb-3 text-sm text-ink-soft">Used to book shipments, print labels and show customers their delivery date. Copy the pickup address name exactly as it appears in Delhivery One under <b>Settings → Pickup locations</b>.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {text("delhiveryPickupName", "Pickup address name in Delhivery One", "Must match Delhivery One exactly, including spaces.", "e.g. WonderVastra Warehouse")}
+              {text("delhiveryPickupPin", "Pincode of that pickup address", "Delivery dates are worked out from here.", "e.g. 110016")}
+              <Field id="delhiveryPieceGrams" label="Weight of one piece" hint="Used for the parcel weight. A set is 2 pieces."><div className="flex items-center gap-2"><input id="delhiveryPieceGrams" className="input w-24" type="number" inputMode="numeric" min="10" value={s.delhiveryPieceGrams} onChange={(e) => up("delhiveryPieceGrams", Number(e.target.value))} /><span className="text-sm text-ink-soft">grams</span></div></Field>
+              {text("delhiveryBox", "Usual box size (cm)", "Length x width x height.", "30x25x5")}
+            </div>
+          </Panel>
+
           <Panel title="Cash on delivery">
             {toggle("codEnabled", "Let customers pay cash when the parcel arrives")}
             {s.codEnabled && <div className="mt-3 grid gap-4 sm:grid-cols-2">{rupees("codFee", "Extra charge for cash on delivery", "Added to the order total. Put 0 for no extra charge.")}{rupees("codMaxOrder", "Allow cash on delivery for orders up to", "Bigger orders must be paid online.")}</div>}

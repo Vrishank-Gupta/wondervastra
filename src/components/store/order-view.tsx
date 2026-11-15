@@ -45,10 +45,15 @@ export function Tracker({ order }: { order: Order }) {
 }
 
 export function ShipmentCard({ order }: { order: Order }) {
-  if (!order.awb && !order.trackingUrl) return null;
+  const live = ["confirmed", "packed", "shipped", "out_for_delivery"].includes(order.status);
+  const eta = live && order.etaAt ? new Date(order.etaAt).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }) : null;
+  if (!order.awb && !order.trackingUrl && !eta) return null;
   return (
-    <div className="rounded-sm border border-line bg-slate-soft p-4">
-      <p className="flex items-center gap-2 font-semibold"><Truck size={18} aria-hidden /> Shipment details</p>
+    <div className="rounded-sm border border-line bg-slate-soft p-4" data-testid="shipment">
+      <p className="flex items-center gap-2 font-semibold"><Truck size={18} aria-hidden /> {eta ? <>Arriving by {eta}</> : "Shipment details"}</p>
+      {order.courierStatus && live && (
+        <p className="mt-1 text-sm"><span className="text-ink-soft">Latest update:</span> {order.courierStatus}{order.courierStatusAt ? <span className="text-ink-soft"> · {formatDateTime(order.courierStatusAt)}</span> : null}</p>
+      )}
       <dl className="mt-1 text-sm">
         {order.courier && <div className="flex gap-1"><dt className="text-ink-soft">Courier:</dt><dd className="font-medium">{order.courier}</dd></div>}
         {order.awb && <div className="flex gap-1"><dt className="text-ink-soft">AWB:</dt><dd className="font-mono font-medium select-all">{order.awb}</dd></div>}

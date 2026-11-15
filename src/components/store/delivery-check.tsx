@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Bell, Check, Loader2, MapPin, X } from "lucide-react";
 
-export type PinResult = { pincode: string; serviceable: boolean; area: string; place: string | null; city: string | null; state: string | null };
+export type PinResult = { pincode: string; serviceable: boolean; area: string; place: string | null; city: string | null; state: string | null; eta?: number | null };
+/** "Tue, 18 Nov" */
+export const etaLabel = (t: number) => new Date(t).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
 const KEY = "wv-pin";
 const EVENT = "wv-pin-change";
@@ -92,7 +94,7 @@ export function DeliveryCheck({ area, restricted, days }: { area: string; restri
         <div className="mt-2 space-y-2" aria-live="polite">
           <div className="flex flex-wrap items-start justify-between gap-2">
             {result.serviceable
-              ? <p className="flex items-start gap-2 text-sm"><Check size={17} aria-hidden className="mt-0.5 shrink-0 text-pine" /><span><b className="text-pine">We deliver to {result.place ? `${result.place} ` : ""}{result.pincode}</b><span className="block text-ink-soft">{days}</span></span></p>
+              ? <p className="flex items-start gap-2 text-sm"><Check size={17} aria-hidden className="mt-0.5 shrink-0 text-pine" /><span><b className="text-pine">We deliver to {result.place ? `${result.place} ` : ""}{result.pincode}</b>{result.eta ? <span className="block font-medium" data-testid="eta">Free delivery by {etaLabel(result.eta)}</span> : <span className="block text-ink-soft">{days}</span>}</span></p>
               : <p className="flex items-start gap-2 text-sm"><X size={17} aria-hidden className="mt-0.5 shrink-0 text-clay" /><span><b>We don&apos;t deliver to {result.place ? `${result.place} ` : ""}{result.pincode} yet</b><span className="block text-ink-soft">We deliver only in {result.area} for now.</span></span></p>}
             <button type="button" className="text-sm font-medium underline" onClick={() => setEditing(true)}>Change</button>
           </div>
@@ -110,6 +112,6 @@ export function CartDeliveryNote() {
   const { result } = usePincode();
   if (!result) return null;
   return result.serviceable
-    ? <p className="flex items-center gap-1.5 text-xs text-pine"><Check size={14} aria-hidden /> Delivering to {result.place ? `${result.place} ` : ""}{result.pincode}</p>
+    ? <p className="flex items-center gap-1.5 text-xs text-pine"><Check size={14} aria-hidden /> Delivering to {result.place ? `${result.place} ` : ""}{result.pincode}{result.eta ? `, by ${etaLabel(result.eta)}` : ""}</p>
     : <p className="flex items-start gap-1.5 rounded-sm bg-clay-soft p-2 text-xs font-medium" role="status"><X size={14} aria-hidden className="mt-px shrink-0" /> We don&apos;t deliver to {result.pincode} yet, only {result.area}. You can use a {result.area} address at checkout.</p>;
 }

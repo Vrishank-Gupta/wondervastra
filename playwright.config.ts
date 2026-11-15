@@ -21,6 +21,8 @@ const env: Record<string, string> = {
   // Google sign-in talks to a fake Google run by the tests (e2e/store.spec.ts), never the real one.
   GOOGLE_CLIENT_ID: "e2e-google-client",
   GOOGLE_CLIENT_SECRET: "e2e-google-secret",
+  DELHIVERY_TOKEN: "e2e-delhivery-token",
+  DELHIVERY_BASE_URL: "http://127.0.0.1:3198",
   GOOGLE_AUTH_URL: "http://127.0.0.1:3199/auth",
   GOOGLE_TOKEN_URL: "http://127.0.0.1:3199/token",
   NEXT_PUBLIC_SITE_URL: "http://localhost:3100",

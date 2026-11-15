@@ -585,6 +585,9 @@ const SettingsInput = z.object({
   orderFeedbackEnabled: z.boolean(), deliveryFeedbackEnabled: z.boolean(), adminAlertEmail: email,
   whatsappGroupUrl: z.union([z.literal(""), z.string().trim().max(200).regex(/^https:\/\/(chat\.whatsapp\.com\/[A-Za-z0-9]+|(www\.)?whatsapp\.com\/channel\/[A-Za-z0-9]+)\/?$/, "Paste the invite link from WhatsApp (it starts with https://chat.whatsapp.com/ or https://whatsapp.com/channel/)")]),
   supportHours: text(60), deliveryAreaName: text(40),
+  delhiveryPickupName: text(100), delhiveryPickupPin: z.union([z.literal(""), z.string().trim().regex(/^[1-9]\d{5}$/, "Enter the 6-digit pincode of your pickup address")]),
+  delhiveryPieceGrams: z.number().int().min(10, "Enter the weight of one piece in grams, like 250").max(5000),
+  delhiveryBox: z.string().trim().regex(/^\d{1,3}\s*[x×]\s*\d{1,3}\s*[x×]\s*\d{1,3}$/i, "Enter the box size as length x width x height in cm, like 30x25x5"),
   deliveryPincodes: text(4000).superRefine((t, ctx) => {
     const { bad } = parsePincodes(t);
     if (bad.length) ctx.addIssue({ code: "custom", message: `these aren't pincodes, ranges or prefixes: ${bad.slice(0, 5).join(", ")}` });
@@ -642,4 +645,58 @@ export async function setStaffActive(id: string, active: boolean): Promise<Resul
   await audit(a, active ? "enable" : "disable", "admin", id, `${active ? "Enabled" : "Disabled"} staff access`);
   revalidatePath("/admin/settings");
   return { ok: true };
+}
+
+/* ---------- Delhivery ---------- */
+export async function bookShipment(orderId: string, grams: number): Promise<Result & { awb?: string }> {
+  const a = await requireAdmin();
+  try {
+    if (!(grams >= 50 && grams <= 30000)) return { error: "Enter the parcel weight in grams, like 500." };
+    const { bookDelhivery } = await import("@/lib/shipping");
+    const r = await bookDelhivery(orderId, Math.round(grams), a.name);
+    await audit(a, "shipment", "order", orderId, `Booked Delhivery shipment ${r.awb}`, null, r);
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true, awb: r.awb };
+  } catch (e) { return fail(e); }
+}
+export async function cancelShipmentAction(orderId: string): Promise<Result> {
+  const a = await requireAdmin();
+  try {
+    const { cancelDelhivery } = await import("@/lib/shipping");
+    await cancelDelhivery(orderId, a.name);
+    await audit(a, "shipment", "order", orderId, "Cancelled Delhivery shipment");
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+export async function shippingLabel(orderId: string): Promise<Result & { url?: string }> {
+  await requireAdmin();
+  try {
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+    if (!o?.awb) return { error: "Book the shipment first." };
+    const { labelLink } = await import("@/lib/delhivery");
+    return { ok: true, url: await labelLink(o.awb) };
+  } catch (e) { return fail(e); }
+}
+export async function refreshTracking(): Promise<Result & { updated?: number }> {
+  await requireAdmin();
+  try {
+    const { syncDelhivery } = await import("@/lib/shipping");
+    const r = await syncDelhivery();
+    revalidatePath("/admin/orders");
+    return { ok: true, updated: r.updated };
+  } catch (e) { return fail(e); }
+}
+export async function bookPickup(input: { date: string; time: string; count: number }): Promise<Result & { pickupId?: string }> {
+  const a = await requireAdmin();
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^\d{2}:\d{2}$/.test(input.time)) return { error: "Choose a pickup date and time." };
+    if (!(input.count >= 1 && input.count <= 500)) return { error: "Enter how many parcels are ready, from 1 to 500." };
+    const s = await (await import("@/lib/settings")).getSettingsFresh();
+    if (!s.delhiveryPickupName.trim()) return { error: "Add your Delhivery pickup address name in Settings first." };
+    const { requestPickup } = await import("@/lib/delhivery");
+    const pickupId = await requestPickup(s.delhiveryPickupName.trim(), input.date, input.time, Math.round(input.count));
+    await audit(a, "pickup", "order", null, `Delhivery pickup ${pickupId} on ${input.date} ${input.time} for ${input.count} parcels`);
+    return { ok: true, pickupId };
+  } catch (e) { return fail(e); }
 }

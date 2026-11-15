@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { areaLabel, deliversTo, ncrPlace } from "@/lib/delivery-area";
 import { getSettings } from "@/lib/settings";
+import { estimateDelivery } from "@/lib/shipping";
 
 /**
  * Does the store deliver to this pincode, and which city/state is it? The delivery answer comes from the
@@ -17,8 +18,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ pin: strin
     const po = (await res.json())?.[0]?.PostOffice?.[0];
     if (po) { city = po.District; state = po.State; }
   } catch { /* lookup is a convenience */ }
+  // "Delivered by Tue, 18 Nov": our dispatch days plus Delhivery's transit estimate from the pickup pincode.
+  const eta = serviceable ? await estimateDelivery(s, pin).catch(() => null) : null;
   return NextResponse.json({
-    pincode: pin, serviceable, area: areaLabel(s),
+    pincode: pin, serviceable, area: areaLabel(s), eta,
     // "Noida" reads better than the district name "Gautam Buddha Nagar"; Delhi keeps its finer district ("South Delhi").
     place: (ncrPlace(pin) !== "Delhi" && ncrPlace(pin)) || city || ncrPlace(pin), city, state,
   }, { headers: { "Cache-Control": "public, max-age=300" } });

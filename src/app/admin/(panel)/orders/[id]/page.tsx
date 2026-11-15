@@ -7,6 +7,9 @@ import { and, desc, eq, ne, or } from "drizzle-orm";
 import { ArrowLeft, ExternalLink, FileText, MessageCircle, Phone } from "lucide-react";
 import { db, schema } from "@/db";
 import { OrderManager } from "@/components/admin/order-manager";
+import { DelhiveryPanel } from "@/components/admin/delhivery-panel";
+import { delhiveryConfigured } from "@/lib/delhivery";
+import { DELHIVERY, quoteShipment, shippingReady } from "@/lib/shipping";
 import { Panel, PayBadge, StatusBadge } from "@/components/admin/ui";
 import { formatDateTime, money, PAYMENT_LABEL } from "@/lib/format";
 import { buildOrderMessage, trackingLink, whatsappChatLink, type OrderEventName } from "@/lib/notifications";
@@ -55,6 +58,13 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3 [&>*]:min-w-0">
         <div className="space-y-5 xl:col-span-2">
+          {delhiveryConfigured() && !["pending_payment", "cancelled"].includes(o.status) && (!o.courier || o.courier === DELHIVERY) && (
+            <DelhiveryPanel
+              orderId={o.id} status={o.status} ready={shippingReady(s)}
+              booked={o.awb && o.courier === DELHIVERY ? { awb: o.awb, trackingUrl: o.trackingUrl, courierStatus: o.courierStatus, statusAt: o.courierStatusAt, etaAt: o.etaAt, cost: o.shippingCost } : null}
+              quote={!o.awb && shippingReady(s) && ["confirmed", "packed"].includes(o.status) ? await quoteShipment(o.id).catch(() => null) : null}
+            />
+          )}
           <OrderManager
             order={{ id: o.id, status: o.status, courier: o.courier, awb: o.awb, trackingUrl: o.trackingUrl, total: o.total, refundedTotal: o.refundedTotal, paymentStatus: o.paymentStatus, paymentMethod: o.paymentMethod }}
             nextStatuses={TRANSITIONS[o.status]}

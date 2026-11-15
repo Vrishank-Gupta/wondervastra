@@ -5,6 +5,8 @@ import { Download } from "lucide-react";
 import { db, schema } from "@/db";
 import { OrdersTable } from "@/components/admin/orders-table";
 import { Empty, PageHead } from "@/components/admin/ui";
+import { PickupRequest } from "@/components/admin/pickup-request";
+import { delhiveryConfigured } from "@/lib/delhivery";
 
 export const metadata: Metadata = { title: "Orders" };
 const TABS = [
@@ -35,6 +37,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
   return (
     <>
       <PageHead title="Orders" sub={`${rows.length} shown`} actions={<a className="btn btn-white btn-sm" href={`/api/admin/orders/export?${exportQ}`}><Download size={15} aria-hidden /> Export CSV</a>} />
+      {delhiveryConfigured() && <PickupRequest waiting={(await db.select({ n: sql<number>`count(*)` }).from(o).where(and(eq(o.courier, "Delhivery"), inArray(o.status, ["confirmed", "packed"]))))[0].n} />}
       <nav aria-label="Filter by status" className="scrollbar-none mb-3 flex gap-1.5 overflow-x-auto">
         {TABS.map((t) => <Link key={t.key} href={`/admin/orders?status=${t.key}`} aria-current={status === t.key ? "page" : undefined} className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium ${status === t.key ? "border-ink bg-ink text-white" : "border-line bg-white"}`}>{t.label}</Link>)}
       </nav>

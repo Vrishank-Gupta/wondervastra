@@ -1145,3 +1145,96 @@ test("thermal warmers: MRP per size, and Top / Bottom / Set where a set takes on
     await db.execute({ sql: "delete from products where id=?", args: [pid] });
   }
 });
+
+test("Delhivery: delivery date, book, label, pickup, tracking to delivered, customer sees it, cancel", async ({ page, request }) => {
+  let scan = { Status: "Manifested", StatusType: "UD", StatusLocation: "Delhi_Hub", Instructions: "" };
+  const seen: string[] = [];
+  const fake = createServer(async (req, res) => {
+    const u = new URL(req.url!, "http://127.0.0.1:3198");
+    const body = await new Promise<string>((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => r(b)); });
+    expect(req.headers.authorization).toBe("Token e2e-delhivery-token");
+    seen.push(u.pathname);
+    const json = (o: unknown) => res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(o));
+    if (u.pathname === "/api/dc/expected_tat") return json({ success: true, data: { tat: 2 } });
+    if (u.pathname === "/api/kinko/v1/invoice/charges/.json") return json([{ total_amount: 42.01 }]);
+    if (u.pathname === "/api/cmu/create.json") {
+      const data = JSON.parse(new URLSearchParams(body).get("data")!);
+      expect(data.pickup_location.name).toBe("WV Hauz Khas");
+      expect(data.shipments[0].pin).toBe("110016");
+      expect(data.shipments[0].payment_mode).toBe("COD");
+      return json({ success: true, packages: [{ waybill: `E2EAWB${seen.filter((p) => p === "/api/cmu/create.json").length}`, status: "Success" }] });
+    }
+    if (u.pathname === "/api/p/packing_slip") return json({ packages: [{ pdf_download_link: "https://example.com/label.pdf" }] });
+    if (u.pathname === "/api/p/edit") return json({ status: true });
+    if (u.pathname === "/fm/request/new/") return json({ pickup_id: 777 });
+    if (u.pathname === "/api/v1/packages/json/") {
+      return json({ ShipmentData: (u.searchParams.get("waybill") ?? "").split(",").map((awb) => ({ Shipment: { AWB: awb, Status: { ...scan, StatusDateTime: new Date().toISOString() }, ExpectedDeliveryDate: "2026-12-01T18:00:00" } })) });
+    }
+    res.writeHead(404).end();
+  });
+  await new Promise<void>((r) => fake.listen(3198, "127.0.0.1", () => r()));
+  await db.execute(`insert into settings (key, value, updated_at) values ('delhiveryPickupName', '"WV Hauz Khas"', 0), ('delhiveryPickupPin', '"110016"', 0) on conflict(key) do update set value=excluded.value`);
+  try {
+    // Customers see a delivery date for their pincode.
+    const pin = await request.get("/api/pincode/122002").then((r) => r.json());
+    expect(pin.serviceable).toBe(true);
+    expect(pin.eta).toBeGreaterThan(Date.now() + 2 * 86400_000);
+
+    const v = await variantOf("rupa-boys-thermal-top", 20);
+    const placed = await (await createOrder(request, { items: [{ variantId: v, qty: 2 }] }, "10.69.0.1")).json();
+    expect((await one("select eta_at from orders where id=?", [placed.id])).eta_at).toBeTruthy();
+
+    await adminLogin(page);
+    await page.goto(`/admin/orders/${placed.id}`);
+    const panel = page.getByTestId("delhivery");
+    await expect(panel).toContainText("Shipping costs you about ₹42.01");
+    await expect(panel).toContainText("about 2 days after pickup");
+    await expect(page.getByLabel("Parcel weight")).toHaveValue("500"); // 2 pieces × 250 g
+    await panel.getByRole("button", { name: "Book Delhivery shipment" }).click();
+    await expect(panel).toContainText("AWB E2EAWB1");
+    const booked = await one("select status, courier, awb, tracking_url, shipping_cost from orders where id=?", [placed.id]);
+    expect(booked).toMatchObject({ status: "packed", courier: "Delhivery", awb: "E2EAWB1", shipping_cost: 4201 });
+    expect(booked.tracking_url).toContain("delhivery.com/track-v2/package/E2EAWB1");
+    const popup = page.waitForEvent("popup");
+    await panel.getByRole("button", { name: "Print shipping label" }).click();
+    expect((await popup).url()).toContain("label.pdf");
+
+    // Pickup from the Orders page.
+    await page.goto("/admin/orders");
+    await expect(page.getByTestId("pickup")).toContainText("1 booked parcel is waiting for pickup");
+    await page.getByRole("button", { name: "Request a pickup" }).click();
+    await page.getByRole("button", { name: "Book pickup" }).click();
+    await expect(page.getByTestId("pickup")).toContainText("Pickup booked (request 777)");
+
+    // Tracking moves the order along and the customer sees it.
+    scan = { Status: "In Transit", StatusType: "UD", StatusLocation: "Gurgaon_Hub", Instructions: "Shipment in transit" };
+    await page.getByRole("button", { name: "Check tracking now" }).click();
+    await expect(page.getByText(/Tracking updated on 1 order/)).toBeVisible();
+    expect((await one("select status from orders where id=?", [placed.id])).status).toBe("shipped");
+    await page.goto(`/order/${placed.accessToken}`);
+    await expect(page.getByTestId("shipment")).toContainText("Arriving by Tuesday, 1 December");
+    await expect(page.getByTestId("shipment")).toContainText("In Transit at Gurgaon_Hub: Shipment in transit");
+
+    scan = { Status: "Dispatched", StatusType: "UD", StatusLocation: "Gurgaon_Hub", Instructions: "Out for delivery" };
+    await page.goto("/admin/orders");
+    await page.getByRole("button", { name: "Check tracking now" }).click();
+    await expect.poll(async () => (await one("select status from orders where id=?", [placed.id])).status).toBe("out_for_delivery");
+    scan = { Status: "Delivered", StatusType: "DL", StatusLocation: "Gurgaon", Instructions: "Delivered to consignee" };
+    await page.getByRole("button", { name: "Check tracking now" }).click();
+    await expect.poll(async () => (await one("select status, payment_status from orders where id=?", [placed.id]))).toMatchObject({ status: "delivered", payment_status: "paid" });
+
+    // A booked shipment can be cancelled before pickup.
+    const second = await (await createOrder(request, { items: [{ variantId: v, qty: 1 }] }, "10.69.0.2")).json();
+    await page.goto(`/admin/orders/${second.id}`);
+    await page.getByTestId("delhivery").getByRole("button", { name: "Book Delhivery shipment" }).click();
+    await expect(page.getByTestId("delhivery")).toContainText("AWB E2EAWB2");
+    await page.getByRole("button", { name: "Cancel shipment" }).click();
+    await page.getByRole("button", { name: "Yes, cancel it" }).click();
+    await expect(page.getByTestId("delhivery")).toContainText("Shipment cancelled");
+    expect((await one("select awb, courier from orders where id=?", [second.id]))).toMatchObject({ awb: null, courier: null });
+    expect(seen).toContain("/api/p/edit");
+  } finally {
+    fake.close();
+    await db.execute("delete from settings where key in ('delhiveryPickupName','delhiveryPickupPin')");
+  }
+});

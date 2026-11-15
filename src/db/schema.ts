@@ -296,6 +296,11 @@ export const orders = sqliteTable(
     courier: text("courier"),
     awb: text("awb"),
     trackingUrl: text("tracking_url"),
+    /** Latest courier scan ("In Transit at Delhi hub"), when it happened, the courier's expected delivery date, and what shipping cost us. */
+    courierStatus: text("courier_status"),
+    courierStatusAt: ts("courier_status_at"),
+    etaAt: ts("eta_at"),
+    shippingCost: integer("shipping_cost"),
     customerNote: text("customer_note"),
     adminNote: text("admin_note"),
     utmSource: text("utm_source"),
