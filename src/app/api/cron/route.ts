@@ -7,6 +7,10 @@ export async function GET(req: Request) {
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (new URL(req.url).searchParams.get("job") === "daily") {
+    const { sendDailySummary } = await import("@/lib/daily-summary");
+    return NextResponse.json(await sendDailySummary());
+  }
   const expiredOrders = await expireUnpaidOrders();
   const tracking = await syncDelhivery().catch((e) => ({ error: String(e?.message ?? e) }));
   // Visitor data is kept for 90 days.

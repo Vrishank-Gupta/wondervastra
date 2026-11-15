@@ -19,7 +19,7 @@ const KEEP_S = 30 * 60; // keep a stale copy this long, refreshing it in the bac
 const SIGNED_IN = /(?:^|;\s*)(vv_session|vv_admin)=/;
 // Pages that are the same for every signed-out shopper. Everything else (cart, checkout, account, admin,
 // orders, tracking, APIs) always renders fresh.
-const SHARED = /^\/(?:$|c\/|p\/|shop(?:\/|$)|brands(?:\/|$)|sale(?:\/|$)|info\/)/;
+const SHARED = /^\/(?:$|c\/|p\/|shop(?:\/|$)|family-pack$|brands(?:\/|$)|sale(?:\/|$)|info\/)/;
 // Ad and campaign tags don't change the page; drop them so every visitor from a campaign shares one copy.
 const NOISE = /^(utm_\w+|fbclid|gclid|igshid|ref|_gl)$/;
 
@@ -56,6 +56,7 @@ async function render(req: Request, env: Env, ctx: Ctx, key: Request, cache: Cac
 }
 
 const refreshing = new Set<string>();
+const DAILY = "30 3 * * *";
 
 export default {
   // One secure address for the shop: http:// → https://, and www.wondervastra.in → wondervastra.in, keeping the path.
@@ -86,9 +87,11 @@ export default {
     out.headers.delete("x-wv-at");
     return out;
   },
-  async scheduled(_event: unknown, env: Env, ctx: Ctx) {
+  async scheduled(event: { cron?: string }, env: Env, ctx: Ctx) {
     if (!env.CRON_SECRET) return;
     const url = new URL("/api/cron", env.NEXT_PUBLIC_SITE_URL || "https://wondervastra.in");
+    // 03:30 UTC is 9 am in India: the owner's morning summary email.
+    if (event.cron === DAILY) url.searchParams.set("job", "daily");
     ctx.waitUntil(handler.fetch(new Request(url, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }), env, ctx));
   },
 };

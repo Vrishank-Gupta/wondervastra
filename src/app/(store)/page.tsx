@@ -136,6 +136,16 @@ export default async function Home() {
           </div>
         </section>
       )}
+      <section aria-label="Family pack" className="container-x pt-8 sm:pt-12">
+        <Link href="/family-pack" className="group flex flex-wrap items-center justify-between gap-3 border border-ink bg-sand-soft px-4 py-4 sm:px-6 sm:py-5" data-testid="family-pack-cta">
+          <span>
+            <span className="eyebrow block text-madder">Whole family, one order</span>
+            <span className="font-display block text-2xl leading-tight sm:text-3xl">Build a family pack</span>
+            <span className="mt-1 block text-sm text-ink-soft">Pick a thermal and size for each person, kids and adults. More pieces, more extra off.</span>
+          </span>
+          <span className="btn btn-primary">Start <ArrowRight size={16} aria-hidden /></span>
+        </Link>
+      </section>
       {kidsItems.length > 0 && <ProductRail title="Kids' thermals" href="/c/kids-thermals" products={kidsItems} wished={wished} />}
       {mensItems.length > 0 && <ProductRail title="Men's thermals" href="/c/mens-thermals" products={mensItems} wished={wished} />}
 

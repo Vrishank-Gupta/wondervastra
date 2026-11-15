@@ -16,7 +16,7 @@ import { formatDate, money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { siteUrl, withBrand } from "@/lib/utils";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams?: Promise<{ size?: string; pick?: string }> };
 
 /** Rich previews are what make shared links convert on WhatsApp and Instagram. */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -36,8 +36,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ProductPage({ params }: Props) {
+export default async function ProductPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = (await searchParams) ?? {};
   const d = await getProductBySlug(slug);
   if (!d) notFound();
   const { product: p, images, variants, category, brand, reviews } = d;
@@ -102,6 +103,7 @@ export default async function ProductPage({ params }: Props) {
         wished={wished.includes(p.id)}
         settings={{ codEnabled: settings.codEnabled, onlinePayments: capabilities().onlinePayments, dispatchDays: settings.dispatchDays, deliveryDaysMin: settings.deliveryDaysMin, deliveryDaysMax: settings.deliveryDaysMax, returnWindowDays: settings.returnWindowDays, deliveryArea: areaLabel(settings), areaRestricted: Boolean(settings.deliveryPincodes.trim()) }}
         tiers={offerTiers(offers)}
+        initial={{ size: typeof sp.size === "string" ? sp.size : undefined, pick: typeof sp.pick === "string" ? sp.pick : undefined }}
       />
 
       {reviews.length > 0 && (

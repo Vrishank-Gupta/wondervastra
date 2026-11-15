@@ -27,6 +27,8 @@ type Props = {
   brand?: { name: string; slug: string; isHouse: boolean; logo?: string | null } | null;
   product: Product; images: { url: string; alt: string | null }[]; variants: Variant[];
   rating: { avg: number; count: number }; wished: boolean;
+  /** From the link (?size=…&pick=…), e.g. Google Shopping or a reorder: start with this size and piece chosen. */
+  initial?: { size?: string; pick?: string };
   settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number; deliveryArea: string; areaRestricted: boolean };
   /** Cart offers, cheapest threshold first: "₹1,000+ → 10% off". */
   tiers?: { minSubtotal: number; minPieces: number; label: string; reward: string }[];
@@ -87,7 +89,7 @@ export const SET = "Set (Top + Bottom)";
 const BOTTOM = /^(bottom|trousers?|lower)$/i;
 const TOP = /top$/i;
 
-export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [] }: Props) {
+export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [], initial }: Props) {
   const router = useRouter();
   const { add } = useCart();
   const sizes = useMemo(() => [...new Set(variants.map((v) => v.option1))], [variants]);
@@ -114,14 +116,15 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     return { ...t, id: `${t.id}+${b.id}`, option2: c, stock: Math.min(t.stock, b.stock), price: t.price + b.price, mrp: t.mrp + b.mrp, saleEndsAt: t.saleEndsAt ?? b.saleEndsAt, saleName: t.saleName ?? b.saleName };
   };
   const first = variants.find((v) => v.stock > 0) ?? variants[0];
-  const [color, setColor] = useState(hasSet ? colors[0].name : first?.option2 ?? "Default");
+  const startPick = initial?.pick && colors.some((c) => c.name === initial.pick) ? initial.pick : null;
+  const [color, setColor] = useState(startPick ?? (hasSet ? colors[0].name : first?.option2 ?? "Default"));
   /** Listings sold in twos start at two single pieces; a set is already two. */
   const qtyFor = (c: string) => (isSet(c) ? 1 : Math.max(1, p.minPieces ?? 1));
   // Clothing: the buyer must choose a size themselves; guessing one leads to wrong-size orders and returns.
   const needsSize = sizes.length > 1;
-  const [size, setSize] = useState(needsSize ? "" : first?.option1 ?? "Free size");
+  const [size, setSize] = useState(initial?.size && sizes.includes(initial.size) ? initial.size : needsSize ? "" : first?.option1 ?? "Free size");
   const [sizeError, setSizeError] = useState(false);
-  const [qty, setQty] = useState(() => qtyFor(hasSet ? colors[0].name : first?.option2 ?? "Default"));
+  const [qty, setQty] = useState(() => qtyFor(startPick ?? (hasSet ? colors[0].name : first?.option2 ?? "Default")));
   const [imgIdx, setImgIdx] = useState(0);
   const [heart, setHeart] = useState(wished);
   const [copied, setCopied] = useState(false);

@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: base, priority: 1, changeFrequency: "daily", lastModified: new Date(newest) },
     { url: `${base}/shop`, priority: 0.9, changeFrequency: "daily", lastModified: new Date(newest) },
     { url: `${base}/sale`, priority: 0.8, changeFrequency: "daily" },
+    { url: `${base}/family-pack`, priority: 0.7, changeFrequency: "weekly" },
     { url: `${base}/brands`, priority: 0.7, changeFrequency: "weekly" },
     ...cats.filter((c) => !c.comingSoon).flatMap((c) => {
       const inCat = cards.filter((p) => p.categoryId === c.id);

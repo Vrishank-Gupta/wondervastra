@@ -1,4 +1,5 @@
 "use client";
+import { SummaryNow } from "./summary-now";
 import { STATES } from "@/lib/states";
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
@@ -184,6 +185,7 @@ export function SettingsForm({ initial, isOwner, demand }: { initial: StoreSetti
           <Panel title="Messages and alerts">
             <div className="space-y-2">{toggle("orderFeedbackEnabled", "After an order, ask the customer how ordering went")}{toggle("deliveryFeedbackEnabled", "After delivery, ask for a rating and review")}</div>
             <div className="mt-4">{text("adminAlertEmail", "Email me when a new order comes in", "Your own email address. Leave empty for no emails.", "you@gmail.com")}</div>
+            <div className="mt-3">{toggle("dailySummary", "Also send me a summary every morning at 9 am: orders to pack, pickups, returns, stock running out, yesterday's visitors and sales, and the Delhivery wallet")}<SummaryNow /></div>
           </Panel>
 
           {!isOwner && <p className="text-sm text-ink-soft">Only the owner can change settings.</p>}

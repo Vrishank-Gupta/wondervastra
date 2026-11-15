@@ -9,11 +9,12 @@ import { CartDeliveryNote } from "@/components/store/delivery-check";
 import { CouponBox, PriceSummary } from "@/components/store/price-summary";
 import { useQuote } from "@/components/store/use-quote";
 import { money } from "@/lib/format";
+import { ShareCart, SharedCartArrival } from "@/components/store/share-cart";
 
 export default function CartPage() {
   const { items, ready, setQty, remove, coupon } = useCart();
   const { quote } = useQuote(items, { coupon, enabled: ready });
-  if (ready && !items.length) {
+  if (ready && !items.length && !(typeof window !== "undefined" && new URLSearchParams(location.search).has("items"))) {
     return (
       <div className="container-x flex flex-col items-center gap-3 py-20 text-center">
         <ShoppingBag size={48} aria-hidden />
@@ -27,6 +28,7 @@ export default function CartPage() {
       <h1 className="mb-5 text-4xl">Your cart</h1>
       <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="space-y-3">
+          <SharedCartArrival />
           {quote && <OfferProgress quote={quote} />}
           <CartDeliveryNote />
           {quote?.views.map((l) => (
@@ -56,6 +58,7 @@ export default function CartPage() {
               ? <p role="alert" data-testid="minimum-issue" className="rounded-sm bg-clay-soft p-3 text-sm font-medium">{quote.minimumIssue}</p>
               : <Link href="/checkout" className="btn btn-primary w-full text-lg">Proceed to checkout</Link>}
             <p className="text-center text-xs text-ink-soft">No account needed · Track your order anytime</p>
+            <div className="border-t border-line pt-3"><p className="mb-2 text-xs text-ink-soft">Someone else paying? Send them this cart.</p><ShareCart total={quote?.total ?? null} /></div>
           </div>
         </aside>
       </div>

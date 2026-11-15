@@ -34,6 +34,8 @@ export const DEFAULT_SETTINGS = {
   orderFeedbackEnabled: true,
   deliveryFeedbackEnabled: true,
   adminAlertEmail: "",
+  /** A 9 am email to adminAlertEmail: orders to pack, pickups, returns, stock, yesterday, Delhivery wallet. */
+  dailySummary: true,
   /** Delhivery: the pickup address name exactly as saved in Delhivery One, its pincode, and parcel defaults. */
   /** Seasonal look: light snowfall on the home banner and snowflakes in the top banner. */
   winterLook: true,

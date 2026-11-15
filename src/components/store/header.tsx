@@ -102,6 +102,7 @@ export function Header({ categories, announcements, loggedIn, winter = false }: 
             <Link href="/shop" className={navLink(pathname === "/shop")}>Shop all</Link>
             <Link href="/brands" className={navLink(pathname.startsWith("/brands"))}>Brands</Link>
             {categories.filter((c) => !c.comingSoon).slice(0, 2).map((c) => <Link key={c.slug} href={`/c/${c.slug}`} className={navLink(pathname === `/c/${c.slug}`)}>{c.name}</Link>)}
+            <Link href="/family-pack" className={navLink(pathname === "/family-pack")}>Family pack</Link>
             <Link href="/sale" className={`${navLink(pathname === "/sale")} text-madder`}>Sale</Link>
           </nav>
           <div className="ml-auto hidden w-full max-w-xs md:block lg:hidden xl:block xl:max-w-[16rem] 2xl:max-w-sm"><SearchBox /></div>
@@ -129,6 +130,7 @@ export function Header({ categories, announcements, loggedIn, winter = false }: 
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/shop">Shop all<ChevronRight size={18} aria-hidden /></Link>
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/brands">Shop by brand<ChevronRight size={18} aria-hidden /></Link>
               {categories.map((c) => <Link key={c.slug} className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href={`/c/${c.slug}`}><span>{c.name}{c.comingSoon && <span className="ml-2 bg-slate px-1.5 py-0.5 align-middle text-[11px] text-white">Soon</span>}</span><ChevronRight size={18} aria-hidden /></Link>)}
+              <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/family-pack">Family pack<ChevronRight size={18} aria-hidden /></Link>
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] text-madder uppercase" href="/sale">Sale & offers<ChevronRight size={18} aria-hidden /></Link>
               <div className="flex flex-col gap-1 bg-sand-soft px-4 py-4 text-sm">
                 <Link className="py-1.5" href="/track">Track order</Link>

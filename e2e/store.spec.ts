@@ -1499,3 +1499,95 @@ test("audit fixes: contact form emails support, checkout lists missing fields an
     await db.execute("delete from settings where key in ('supportEmail','businessAddress')");
   }
 });
+
+test("Google feed, family pack, share cart, reorder one size up, morning summary email", async ({ page, request, browser }) => {
+  const pid = "e2e-fam";
+  const cat = await one("select id from categories where slug='kids-thermals'");
+  const brand = await one("select id from brands where name='Dollar'");
+  const photo = await one("select url from product_images limit 1");
+  await db.execute({ sql: "insert into products (id, name, slug, category_id, brand_id, status, price, compare_at_price, option1_label, option2_label, min_pieces, created_at, updated_at) values (?,?,?,?,?,'active',23000,32500,'Size','Piece',2,0,0)", args: [pid, "Fam Kids' Thermal", "e2e-fam", cat.id as string, brand.id as string] });
+  await db.execute({ sql: "insert into product_images (id, product_id, url, alt, sort_order) values ('e2e-fam-img', ?, ?, 'Fam', 0)", args: [pid, photo.url as string] });
+  const v = [["e2e-f-t55", "2–3 Y (55 cm)", "Top"], ["e2e-f-b55", "2–3 Y (55 cm)", "Bottom"], ["e2e-f-t60", "4–5 Y (60 cm)", "Top"], ["e2e-f-b60", "4–5 Y (60 cm)", "Bottom"]] as const;
+  for (const [i, [id, s, piece]] of v.entries()) {
+    await db.execute({ sql: "insert into variants (id, product_id, option1, option2, price, mrp, stock, active, sort_order) values (?,?,?,?,25000,35500,9,1,?)", args: [id, pid, s, piece, i] });
+  }
+  try {
+    // 1. Google Shopping feed: kids' sets only (sold in 2s), MRP as price, our price as sale price, a link that opens on that size.
+    const xml = await (await request.get("/feeds/google.xml")).text();
+    expect(xml).toContain("<g:id>e2e-f-t55-e2e-f-b55</g:id>");
+    expect(xml).not.toContain("<g:id>e2e-f-t55</g:id>");
+    const item = xml.split("<item>").find((x) => x.includes("<g:id>e2e-f-t55-e2e-f-b55</g:id>"))!;
+    expect(item).toContain("<g:price>710.00 INR</g:price>");
+    expect(item).toContain("<g:sale_price>500.00 INR</g:sale_price>");
+    expect(item).toContain("<g:age_group>kids</g:age_group>");
+    expect(item).toContain("<g:price>0.00 INR</g:price></g:shipping>");
+    const link = item.match(/<g:link>([^<]+)<\/g:link>/)![1].replace(/&amp;/g, "&");
+    await page.goto(new URL(link).pathname + new URL(link).search);
+    await expect(page.getByTestId("price")).toHaveText("₹500");
+    await expect(page.locator("#size-picker").getByRole("button", { name: "2–3 Y (55 cm)" })).toHaveAttribute("aria-pressed", "true");
+
+    // 2. Family pack: an adult and a kid, sizes chosen, everything into the cart in one tap.
+    await page.goto("/family-pack");
+    const rowsEl = page.getByTestId("pack-row");
+    await expect(rowsEl).toHaveCount(2);
+    await page.getByTestId("pack-add").click();
+    await expect(page.getByRole("alert").filter({ hasText: "Choose a size for 2 people" })).toBeVisible();
+    const kid = rowsEl.nth(1);
+    await kid.getByLabel("Thermal").selectOption({ label: "Dollar Fam Kids' Thermal" });
+    await kid.getByLabel("Size").selectOption("4–5 Y (60 cm)");
+    const adult = rowsEl.nth(0);
+    const adultSize = adult.getByLabel("Size");
+    const firstSize = await adultSize.locator("option:not([disabled])").nth(1).getAttribute("value");
+    await adultSize.selectOption(firstSize!);
+    await expect(page.getByTestId("pack-total")).toBeVisible();
+    await page.getByTestId("pack-add").click();
+    await page.waitForURL("**/cart");
+    const cart = await page.evaluate(() => JSON.parse(localStorage.getItem("vv_cart") ?? "[]") as { variantId: string; qty: number }[]);
+    expect(cart.map((i) => i.variantId)).toEqual(expect.arrayContaining(["e2e-f-t60", "e2e-f-b60"]));
+    expect(cart.length).toBeGreaterThanOrEqual(3);
+
+    // 3. Share cart: the link fills an empty cart in another browser; a full cart is asked first.
+    await expect(page.getByTestId("share-cart").getByRole("link", { name: /WhatsApp/ })).toHaveAttribute("href", /wa\.me\/\?text=.*cart%3Fitems%3D/);
+    const shared = `/cart?items=${encodeURIComponent(cart.map((i) => `${i.variantId}:${i.qty}`).join(","))}`;
+    const other = await browser.newPage();
+    await other.goto(shared);
+    await expect(other.getByText("Fam Kids' Thermal").first()).toBeVisible();
+    expect(await other.evaluate(() => JSON.parse(localStorage.getItem("vv_cart") ?? "[]").length)).toBe(cart.length);
+    await other.evaluate(() => localStorage.setItem("vv_cart", JSON.stringify([{ variantId: "e2e-f-t55", qty: 2 }])));
+    await other.goto(shared);
+    await other.getByTestId("shared-cart").getByRole("button", { name: "Use the shared cart" }).click();
+    expect(await other.evaluate(() => JSON.parse(localStorage.getItem("vv_cart") ?? "[]").length)).toBe(cart.length);
+    await other.close();
+
+    // 4. Reorder: same pieces again, or one size up for kids.
+    const res = await createOrder(request, { items: [{ variantId: "e2e-f-t55", qty: 1 }, { variantId: "e2e-f-b55", qty: 1 }], ...buyer(41) }, "10.0.41.1");
+    expect(res.ok()).toBeTruthy();
+    const { id: orderId, accessToken } = await res.json();
+    await db.execute({ sql: "update orders set status='delivered', delivered_at=? where id=?", args: [Date.now(), orderId] });
+    await page.evaluate(() => localStorage.setItem("vv_cart", "[]"));
+    await page.goto(`/order/${accessToken}`);
+    await expect(page.getByTestId("reorder")).toContainText("Kids grow fast");
+    await page.getByTestId("reorder-up").click();
+    await page.waitForURL("**/cart");
+    const up = await page.evaluate(() => JSON.parse(localStorage.getItem("vv_cart") ?? "[]") as { variantId: string; qty: number }[]);
+    expect(up.map((i) => i.variantId).sort()).toEqual(["e2e-f-b60", "e2e-f-t60"]);
+
+    // 5. Morning summary: on by default; "Send now" emails the owner with what to pack.
+    await db.execute(`insert into settings (key, value, updated_at) values ('adminAlertEmail', '"owner@example.com"', 0) on conflict(key) do update set value=excluded.value`);
+    await db.execute({ sql: "update orders set status='confirmed', awb=null where id=?", args: [orderId] });
+    await adminLogin(page);
+    await page.goto("/admin/settings");
+    await page.getByRole("button", { name: "Send today's summary now" }).click();
+    await expect(page.getByText("Sent to owner@example.com")).toBeVisible();
+    const mail = await one("select subject, body, recipient from notifications where event='admin_daily_summary' order by created_at desc limit 1");
+    expect(mail.recipient).toBe("owner@example.com");
+    expect(String(mail.subject)).toMatch(/to pack/);
+    expect(String(mail.body)).toContain("Pack and ship today");
+    expect(String(mail.body)).toContain("Yesterday");
+  } finally {
+    await db.execute("delete from variants where product_id='e2e-fam'");
+    await db.execute("delete from product_images where product_id='e2e-fam'");
+    await db.execute("delete from products where id='e2e-fam'");
+    await db.execute("delete from settings where key='adminAlertEmail'");
+  }
+});
