@@ -35,6 +35,8 @@ export const DEFAULT_SETTINGS = {
   deliveryFeedbackEnabled: true,
   adminAlertEmail: "",
   /** Delhivery: the pickup address name exactly as saved in Delhivery One, its pincode, and parcel defaults. */
+  /** Seasonal look: light snowfall on the home banner and snowflakes in the top banner. */
+  winterLook: true,
   delhiveryPickupName: "",
   delhiveryPickupPin: "",
   delhiveryPieceGrams: 250,

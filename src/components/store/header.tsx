@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ChevronRight, Heart, Home, LayoutGrid, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { ChevronRight, Heart, Home, LayoutGrid, Menu, Search, ShoppingBag, User, X, Snowflake } from "lucide-react";
 import { money } from "@/lib/format";
 import { useCart } from "./cart-context";
 import { Logo } from "../brand-logo";
@@ -65,7 +65,7 @@ function SearchBox({ autoFocus, onDone }: { autoFocus?: boolean; onDone?: () => 
 
 type NavCat = { name: string; slug: string; comingSoon?: boolean };
 
-function AnnouncementBar({ items }: { items: string[] }) {
+function AnnouncementBar({ items, winter = false }: { items: string[]; winter?: boolean }) {
   if (!items.length) return null;
   const run = [...items, ...items, ...items];
   return (
@@ -74,7 +74,7 @@ function AnnouncementBar({ items }: { items: string[] }) {
       <div className="marquee flex w-max" aria-hidden>
         {[0, 1].map((half) => (
           <div key={half} className="flex shrink-0">
-            {run.map((t, i) => <span key={i} className="flex items-center gap-6 pr-6 text-[11px] font-bold tracking-[0.12em] whitespace-nowrap uppercase">{t}<span className="size-1 rounded-full bg-madder" /></span>)}
+            {run.map((t, i) => <span key={i} className="flex items-center gap-6 pr-6 text-[11px] font-bold tracking-[0.12em] whitespace-nowrap uppercase">{t}{winter ? <Snowflake size={12} strokeWidth={2} className="text-white/70" /> : <span className="size-1 rounded-full bg-madder" />}</span>)}
           </div>
         ))}
       </div>
@@ -82,7 +82,7 @@ function AnnouncementBar({ items }: { items: string[] }) {
   );
 }
 
-export function Header({ categories, announcements, loggedIn }: { categories: NavCat[]; announcements: string[]; loggedIn: boolean }) {
+export function Header({ categories, announcements, loggedIn, winter = false }: { categories: NavCat[]; announcements: string[]; loggedIn: boolean; winter?: boolean }) {
   const { count, ready, setDrawerOpen } = useCart();
   const [menu, setMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -93,7 +93,7 @@ export function Header({ categories, announcements, loggedIn }: { categories: Na
 
   return (
     <>
-      <AnnouncementBar items={announcements} />
+      <AnnouncementBar items={announcements} winter={winter} />
       <header className="sticky top-0 z-30 border-b border-line bg-white no-print">
         <div className="container-x flex items-center gap-3 py-3 lg:gap-8">
           <button aria-label="Open menu" className="-ml-2 grid size-11 place-items-center lg:hidden" onClick={() => setMenu(true)}><Menu size={24} /></button>

@@ -590,7 +590,7 @@ const SettingsInput = z.object({
   dispatchDays: days, deliveryDaysMin: days, deliveryDaysMax: days, returnWindowDays: days,
   orderFeedbackEnabled: z.boolean(), deliveryFeedbackEnabled: z.boolean(), adminAlertEmail: email,
   whatsappGroupUrl: z.union([z.literal(""), z.string().trim().max(200).regex(/^https:\/\/(chat\.whatsapp\.com\/[A-Za-z0-9]+|(www\.)?whatsapp\.com\/channel\/[A-Za-z0-9]+)\/?$/, "Paste the invite link from WhatsApp (it starts with https://chat.whatsapp.com/ or https://whatsapp.com/channel/)")]),
-  supportHours: text(60), deliveryAreaName: text(40),
+  supportHours: text(60), deliveryAreaName: text(40), winterLook: z.boolean(),
   delhiveryPickupName: text(100), delhiveryPickupPin: z.union([z.literal(""), z.string().trim().regex(/^[1-9]\d{5}$/, "Enter the 6-digit pincode of your pickup address")]),
   delhiveryPieceGrams: z.number().int().min(10, "Enter the weight of one piece in grams, like 250").max(5000),
   delhiveryBox: z.string().trim().regex(/^\d{1,3}\s*[x×]\s*\d{1,3}\s*[x×]\s*\d{1,3}$/i, "Enter the box size as length x width x height in cm, like 30x25x5"),

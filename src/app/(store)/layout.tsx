@@ -31,7 +31,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   return (
     <CartProvider>
       {previewMode() && <div className="bg-madder px-4 py-2 text-center text-xs font-bold tracking-[0.08em] text-white uppercase">{PREVIEW_MESSAGE}</div>}
-      <Header categories={nav} announcements={announcements} loggedIn={Boolean(customer)} />
+      <Header categories={nav} announcements={announcements} loggedIn={Boolean(customer)} winter={settings.winterLook} />
       <main>{children}</main>
       <Footer categories={nav} settings={settings} />
       <MobileTabBar loggedIn={Boolean(customer)} />

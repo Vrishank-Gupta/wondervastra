@@ -80,7 +80,7 @@ export default async function Home() {
     <>
       <JsonLd data={[organization(settings, partners.map((b) => b.name)), website(settings)]} />
       <h1 className="sr-only">WonderVastra: 100% original branded kids' and men's thermals at the lowest prices</h1>
-      <HeroCarousel slides={slides} />
+      <HeroCarousel slides={slides} winter={settings.winterLook} />
 
       {(offers.length > 0 || shownCoupons.length > 0) && (
         <section aria-label="Offers" className="border-b border-line">

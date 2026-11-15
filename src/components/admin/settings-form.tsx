@@ -158,6 +158,11 @@ export function SettingsForm({ initial, isOwner, demand }: { initial: StoreSetti
             {days("returnWindowDays", "Customers can return within", "Days after delivery. Put 0 if you don't take returns.")}
           </Panel>
 
+          <Panel title="Seasonal look">
+            {toggle("winterLook", "Winter look: light snowfall on the home banner, snowflakes in the top banner")}
+            <p className="mt-2 text-xs text-ink-soft">Turn it off when winter is over. It's light and switches itself off for visitors who prefer less motion.</p>
+          </Panel>
+
           <Panel title="Shop name and top banner">
             <div className="grid gap-4 sm:grid-cols-2">
               {text("storeName", "Shop name")}

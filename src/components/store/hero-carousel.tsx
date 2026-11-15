@@ -2,11 +2,12 @@
 import { getImageProps } from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Snowfall } from "./snowfall";
 
 export type Slide = { key: string; eyebrow: string; title: string; text: string; cta: string; href: string; wide: string; tall: string; alt: string };
 
 /** Swipeable banner slideshow. Advances every 6s, pauses on hover/touch and for reduced motion. */
-export function HeroCarousel({ slides }: { slides: Slide[] }) {
+export function HeroCarousel({ slides, winter = false }: { slides: Slide[]; winter?: boolean }) {
   const track = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -31,6 +32,7 @@ export function HeroCarousel({ slides }: { slides: Slide[] }) {
 
   return (
     <section aria-roledescription="carousel" aria-label="Featured" className="relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onTouchStart={() => setPaused(true)}>
+      {winter && <Snowfall />}
       <div ref={track} className="flex snap-x snap-mandatory overflow-x-auto scrollbar-none">
         {slides.map((s, i) => (
           <div key={s.key} className="relative w-full shrink-0 snap-start" role="group" aria-roledescription="slide" aria-label={`${i + 1} of ${slides.length}`}>
@@ -48,7 +50,7 @@ export function HeroCarousel({ slides }: { slides: Slide[] }) {
         ))}
       </div>
       {slides.length > 1 && (
-        <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1">
+        <div className="absolute inset-x-0 bottom-2 z-[2] flex justify-center gap-1">
           {slides.map((s, i) => (
             <button key={s.key} type="button" aria-label={`Show slide ${i + 1}`} aria-current={i === active} onClick={() => go(i)} className="group grid h-11 place-items-center px-1.5"><span className={`block h-1 transition-all ${i === active ? "w-8 bg-white" : "w-4 bg-white/45 group-hover:bg-white/80"}`} /></button>
           ))}
