@@ -59,7 +59,7 @@ export function presetFor(categoryName: string): CategoryPreset {
   if (n.includes("kid") || n.includes("baby") || n.includes("child")) {
     return {
       kind: "kids", sizes: "kids",
-      audiences: [{ tag: "baby", label: "Baby (0–2 yrs)", sizes: "baby" }, { tag: "boys", label: "Boys", sizes: "kids" }, { tag: "girls", label: "Girls", sizes: "kids" }],
+      audiences: [{ tag: "boys", label: "Boys", sizes: "kids" }, { tag: "girls", label: "Girls", sizes: "kids" }],
       names: thermal ? ["Thermal Set", "Thermal Top", "Thermal Bottom", "Thermal Top Full Sleeve", "Thermal Bodysuit"] : ["Vest", "Set", "Top"],
       material: thermal ? "Soft cotton blend, brushed inside for warmth" : "Soft cotton", care: THERMAL_CARE, hsn: "6111", tags: thermal ? ["kids", "winter"] : ["kids"],
     };

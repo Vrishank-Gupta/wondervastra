@@ -88,7 +88,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
   const audiences = preset.audiences ?? [];
   const chosenAudience = audiences.filter((a) => tags.includes(a.tag));
   // Size chips on offer: the set(s) that fit this category and audience, plus anything already chosen.
-  const sizeSets: SizeSet[] = chosenAudience.length ? uniq(chosenAudience.map((a) => a.sizes)) as SizeSet[] : preset.audiences ? ["baby", "kids"] : [preset.sizes];
+  const sizeSets: SizeSet[] = chosenAudience.length ? uniq(chosenAudience.map((a) => a.sizes)) as SizeSet[] : preset.audiences ? ["kids"] : [preset.sizes];
   const sizeChoices = uniq([...sizeSets.flatMap((s) => [...SIZE_SETS[s]]), ...sizes]).filter((s) => s !== FREE);
   const colourChoices = [...COLOURS, ...colours.filter((c) => !COLOURS.some((k) => k.name === c.name))];
 
