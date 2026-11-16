@@ -86,8 +86,7 @@ function NotifyForm({ product, variant, soon = false, inStock = [], otherColors 
 /** A listing sold as separate Top and Bottom pieces also offers both together. A set has no stock of its own: it takes one of each piece. */
 export const SET = "Set (Top + Bottom)";
 /** Piece names that are a lower half; any name ending in "top" is an upper half ("Top", "V-neck top"). */
-const BOTTOM = /^(bottom|trousers?|lower)$/i;
-const TOP = /top$/i;
+import { isBottom, isTop, setName } from "@/lib/sets";
 
 export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [], initial }: Props) {
   const router = useRouter();
@@ -98,15 +97,15 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
     const m = new Map<string, string | null>();
     variants.forEach((v) => { if (v.option2 !== "Default") m.set(v.option2, v.colorHex); });
     const list = [...m].map(([name, hex]) => ({ name, hex }));
-    const bottom = list.find((c) => BOTTOM.test(c.name))?.name;
+    const bottom = list.find((c) => isBottom(c.name))?.name;
     const sets = new Map<string, [string, string]>();
-    if (bottom) for (const c of list) if (TOP.test(c.name)) sets.set(`Set (${c.name} + ${bottom})`, [c.name, bottom]);
+    if (bottom) for (const c of list) if (isTop(c.name)) sets.set(setName(c.name, bottom), [c.name, bottom]);
     return { colors: [...[...sets.keys()].map((name) => ({ name, hex: null })), ...list], sets };
   }, [variants]);
   const isSet = (c: string) => sets.has(c);
   const hasSet = sets.size > 0;
   // Text choices (Top / Bottom / Set) are shown as buttons, real colours as swatches.
-  const asText = colors.length > 0 && colors.every((c) => !c.hex);
+  const asText = colors.length > 0 && colors.every((c) => !c.hex || isTop(c.name) || isBottom(c.name));
   /** The variant for a size and choice; for a set, a combined view of its top and bottom. */
   const pick = (s: string, c: string): Variant | null => {
     const parts = sets.get(c);
@@ -220,7 +219,7 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
                 const any = sizes.some((s) => (pick(s, c.name)?.stock ?? 0) > 0);
                 if (asText) return (
                   <button key={c.name} type="button" aria-pressed={c.name === color} onClick={() => pickColor(c.name)}
-                    className={`min-h-11 border px-3.5 py-2 text-sm font-semibold ${c.name === color ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${any ? "" : "text-ink/40 line-through"}`}>{c.name}</button>
+                    className={`min-h-11 border px-3.5 py-2 text-sm font-semibold ${c.name === color ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"} ${any ? "" : "text-ink/40 line-through"}`}><span className="inline-flex items-center gap-2">{(c.hex ?? (sets.get(c.name) ? colors.find((x) => x.name === sets.get(c.name)![0])?.hex : null)) && <span aria-hidden className="size-3 shrink-0 rounded-full border border-current/30" style={{ background: c.hex ?? colors.find((x) => x.name === sets.get(c.name)![0])?.hex ?? undefined }} />}{c.name}</span></button>
                 );
                 return (
                   <button key={c.name} type="button" aria-pressed={c.name === color} aria-label={`${c.name}${any ? "" : ", sold out"}`} title={c.name} onClick={() => pickColor(c.name)}

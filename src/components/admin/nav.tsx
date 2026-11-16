@@ -18,7 +18,7 @@ const LINKS = [
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/reviews", label: "Reviews & feedback", icon: MessageSquareHeart, badge: "reviews" },
   { href: "/admin/notifications", label: "Notifications", icon: Bell, badge: "notifs" },
-  { href: "/admin/audit", label: "Audit log", icon: History },
+  { href: "/admin/audit", label: "Change history", icon: History },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 type Badges = Record<string, number>;

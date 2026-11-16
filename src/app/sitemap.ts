@@ -1,3 +1,4 @@
+import { GUIDES } from "@/lib/guides";
 import type { MetadataRoute } from "next";
 import { getActiveBrands, getActiveCategories, getAllCards } from "@/lib/catalog";
 import { abs } from "@/lib/seo";
@@ -27,6 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     ...brands.map((b) => ({ url: `${base}/brands/${b.slug}`, priority: 0.7, changeFrequency: "weekly" as const })),
     ...cards.map((p) => ({ url: `${base}/p/${p.slug}`, priority: 0.8, changeFrequency: "weekly" as const, lastModified: new Date(p.updatedAt), images: p.images.slice(0, 5).map((i) => abs(i.url)) })),
+    { url: `${base}/guides`, priority: 0.7, changeFrequency: "weekly" as const },
+    ...GUIDES.map((g) => ({ url: `${base}/guides/${g.slug}`, priority: 0.7, changeFrequency: "weekly" as const })),
     ...["about", "contact", "faq", "shipping-policy", "returns-policy", "privacy-policy", "terms"].map((s) => ({ url: `${base}/info/${s}`, priority: 0.3, changeFrequency: "monthly" as const })),
   ];
 }

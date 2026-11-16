@@ -1,4 +1,4 @@
-import { cheapestSet } from "./sets";
+import { cheapestSet, isBottom, isTop, splitPiece } from "./sets";
 import { sizeKey } from "./utils";
 import { cache } from "react";
 import { memo } from "./memo";
@@ -97,7 +97,9 @@ export const getAllCards = cache((): Promise<ProductCard[]> => memo("cards", asy
     const r = ratings.find((x) => x.id === p.id);
     const colors = new Map<string, string | null>();
     // Only real colours get dots on the card; text options such as Top / Bottom don't.
-    vs.forEach((v) => { if (v.option2 !== "Default" && v.colorHex) colors.set(v.option2, v.colorHex); });
+    // A piece named with its colour ("Top (Black)") shows one dot for that colour, not one per piece.
+    vs.forEach((v) => { if (v.option2 !== "Default" && v.colorHex) { const pc = splitPiece(v.option2); colors.set(isTop(v.option2) || isBottom(v.option2) ? pc.colour ?? "" : v.option2, v.colorHex); } });
+    colors.delete("");
     return [{
       id: p.id, name: p.name, slug: p.slug, shortDescription: p.shortDescription,
       categoryId: p.categoryId, categoryName: cat.name, categorySlug: cat.slug,

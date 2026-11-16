@@ -5,9 +5,8 @@
  */
 import { getAllCards, getProductBySlug } from "./catalog";
 import { sizeKey, withBrand } from "./utils";
+import { isBottom, isTop, setName } from "./sets";
 
-const BOTTOM = /^(bottom|trousers?|lower)$/i;
-const TOP = /top$/i;
 
 export type Choice = {
   /** "Top", "Bottom" or "Set (Top + Bottom)", as on the product page. */
@@ -39,8 +38,8 @@ export async function getBuyables(): Promise<Buyable[]> {
     const { product: p, variants, images, brand } = d;
     const sizes = [...new Set(variants.map((v) => v.option1))];
     const kinds = [...new Set(variants.map((v) => v.option2))];
-    const bottom = kinds.find((k) => BOTTOM.test(k));
-    const tops = kinds.filter((k) => TOP.test(k));
+    const bottom = kinds.find((k) => isBottom(k));
+    const tops = kinds.filter((k) => isTop(k));
     const choices: Choice[] = [];
     for (const v of variants) {
       choices.push({ pick: v.option2, isSet: false, size: v.option1, variantIds: [v.id], pieces: 1, price: v.price, mrp: v.mrp, stock: v.stock, sku: v.sku });
@@ -50,7 +49,7 @@ export async function getBuyables(): Promise<Buyable[]> {
         for (const s of sizes) {
           const a = variants.find((v) => v.option1 === s && v.option2 === t), b = variants.find((v) => v.option1 === s && v.option2 === bottom);
           if (!a || !b) continue;
-          choices.push({ pick: `Set (${t} + ${bottom})`, isSet: true, size: s, variantIds: [a.id, b.id], pieces: 2, price: a.price + b.price, mrp: a.mrp + b.mrp, stock: Math.min(a.stock, b.stock), sku: a.sku && b.sku ? `${a.sku}+${b.sku}` : null });
+          choices.push({ pick: setName(t, bottom), isSet: true, size: s, variantIds: [a.id, b.id], pieces: 2, price: a.price + b.price, mrp: a.mrp + b.mrp, stock: Math.min(a.stock, b.stock), sku: a.sku && b.sku ? `${a.sku}+${b.sku}` : null });
         }
       }
     }

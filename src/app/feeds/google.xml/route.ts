@@ -20,7 +20,8 @@ export async function GET() {
     if (!b.images.length) continue; // Google rejects products without a photo
     for (const c of b.choices) {
       if (b.minPieces > 1 && c.pieces < b.minPieces) continue;
-      const what = c.isSet ? `Set (${c.pick.replace(/^Set \((.*)\)$/, "$1")})` : c.pick;
+      const what = c.pick;
+      const colour = c.pick.match(/\(([^()]+)\)\s*$/)?.[1];
       const title = `${b.fullName} ${what}, ${sizeKey(c.size)}`.slice(0, 150);
       const link = `${site}/p/${b.slug}?${new URLSearchParams({ size: c.size, pick: c.pick })}`;
       const desc = `${b.description || b.fullName}${c.isSet ? " This set has one top and one bottom in the same size." : ""} Free delivery in Delhi NCR. Returnable within ${s.returnWindowDays} days of delivery.`;
@@ -44,7 +45,7 @@ ${c.sku ? `<g:mpn>${esc(c.sku)}</g:mpn>` : ""}
 <g:product_type>${esc(b.categoryName)}</g:product_type>
 <g:age_group>${b.kids ? "kids" : "adult"}</g:age_group>
 <g:gender>${b.kids ? "unisex" : "male"}</g:gender>
-<g:size>${esc(sizeKey(c.size))}</g:size>
+${colour && !/\+/.test(colour) ? `<g:color>${esc(colour)}</g:color>\n` : ""}<g:size>${esc(sizeKey(c.size))}</g:size>
 <g:size_system>IN</g:size_system>
 ${c.isSet ? "<g:is_bundle>yes</g:is_bundle>" : ""}
 <g:shipping><g:country>IN</g:country><g:service>Free delivery</g:service><g:price>0.00 INR</g:price></g:shipping>

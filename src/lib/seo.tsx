@@ -48,11 +48,10 @@ export function organization(s: StoreSettings, brandNames: string[] = []) {
     slogan: "Crafted with trust",
     description: seoDescription(brandNames, s),
     email: s.supportEmail || undefined,
-    telephone: s.whatsappNumber || undefined,
     areaServed: served(s),
     currenciesAccepted: "INR",
     sameAs: [s.instagramUrl, s.facebookUrl].filter(Boolean),
-    contactPoint: s.supportEmail || s.whatsappNumber ? [{ "@type": "ContactPoint", contactType: "customer support", email: s.supportEmail || undefined, telephone: s.whatsappNumber || undefined, areaServed: "IN", availableLanguage: ["English", "Hindi"] }] : undefined,
+    contactPoint: s.supportEmail ? [{ "@type": "ContactPoint", contactType: "customer support", email: s.supportEmail, url: `${siteUrl()}/info/contact`, areaServed: "IN", availableLanguage: ["English", "Hindi"] }] : undefined,
     hasMerchantReturnPolicy: returnPolicy(s),
   };
 }

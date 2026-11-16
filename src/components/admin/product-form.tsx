@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Camera, Check, ChevronDown, Circle, Loader2, Plu
 import { saveProduct } from "@/app/admin/actions";
 import { COLOURS, SIZE_SETS, TYPICAL_HEIGHTS, autoShortDescription, colourHex, presetFor, type SizeSet } from "@/lib/listing-presets";
 import { Panel } from "./ui";
+import { isBottom, isTop, setName, splitPiece } from "@/lib/sets";
 
 type Variant = { id?: string; sku: string; option1: string; option2: string; colorHex: string; price: string; mrp?: string; minPrice?: string; stock: string; active: boolean };
 export type ProductFormData = {
@@ -116,6 +117,38 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
   const toggleColour = (c: { name: string; hex: string }) => setColours((xs) => (xs.some((x) => x.name === c.name) ? xs.filter((x) => x.name !== c.name) : [...xs, c]));
   function addCustomSize() { const s = customSize.trim(); if (s && !sizes.includes(s)) setSizes([...sizes, s]); setCustomSize(""); }
   function addCustomColour() { const c = customColour.trim(); if (c && !colours.some((x) => x.name.toLowerCase() === c.toLowerCase())) setColours([...colours, { name: c, hex: colourHex(c) }]); setCustomColour(""); }
+  // Thermals sell pieces (Top / Bottom), each in the colour in stock: "Top (Black)". Renaming a piece or
+  // changing its colour keeps its stock, prices, SKU and identity, so nothing is lost or duplicated.
+  const pieceMode = colours.some((c) => isTop(c.name) || isBottom(c.name)) || /piece/i.test(f.option2Label);
+  const compose = (base: string, colour: string | null) => (colour?.trim() ? `${base.trim()} (${colour.trim()})` : base.trim());
+  const colourNames = uniq([...COLOURS.map((k) => k.name), ...colours.map((c) => splitPiece(c.name).colour ?? "").filter(Boolean)]);
+  function renameOption(from: string, to: { name: string; hex: string }) {
+    if (!to.name.trim()) return;
+    if (to.name !== from && colours.some((c) => c.name === to.name)) { setMsg({ ok: false, text: `There's already a piece called “${to.name}”.` }); return; }
+    setColours((xs) => xs.map((x) => (x.name === from ? to : x)));
+    if (to.name === from) return;
+    const move = <T,>(rec: Record<string, T>) => Object.fromEntries(Object.entries(rec).map(([k, v]) => { const [sz, c] = k.split("|"); return [c === from ? key(sz, to.name) : k, v]; }));
+    setStock(move); setMeta(move);
+  }
+  const setPieceColour = (name: string, colour: string) => {
+    const base = splitPiece(name).base;
+    renameOption(name, { name: compose(base, colour || null), hex: colour ? COLOURS.find((k) => k.name.toLowerCase() === colour.toLowerCase())?.hex ?? colourHex(colour) : "" });
+  };
+  const addPiece = (base: string) => {
+    const colour = colours.map((c) => splitPiece(c.name).colour).find(Boolean) ?? null;
+    let name = compose(base, colour); let n = 2;
+    while (colours.some((c) => c.name === name)) name = compose(`${base} ${n++}`, colour);
+    setColours((xs) => [...xs, { name, hex: colour ? colours.find((c) => splitPiece(c.name).colour === colour)?.hex ?? colourHex(colour) : "" }]);
+  };
+  const setPrice = (sz: string, c: string, field: "price" | "mrp", v: string) =>
+    setMeta((x) => ({ ...x, [key(sz, c)]: { ...(x[key(sz, c)] ?? { sku: "", price: "", mrp: "", minPrice: "" }), [field]: v } }));
+  const fillDown = (c: string, field: "price" | "mrp") => {
+    const v = meta[key(S[0], c)]?.[field] ?? "";
+    setMeta((x) => ({ ...x, ...Object.fromEntries(S.map((sz) => [key(sz, c), { ...(x[key(sz, c)] ?? { sku: "", price: "", mrp: "", minPrice: "" }), [field]: v }])) }));
+  };
+  const copyPrices = (from: string) => setMeta((x) => ({ ...x, ...Object.fromEntries(C.filter((c) => c !== from).flatMap((c) => S.map((sz) => [key(sz, c), { ...(x[key(sz, c)] ?? { sku: "", price: "", mrp: "", minPrice: "" }), price: x[key(sz, from)]?.price ?? "", mrp: x[key(sz, from)]?.mrp ?? "" }]))) }));
+  const bottomPiece = colours.find((c) => isBottom(c.name))?.name;
+  const customerSees = pieceMode ? [...(bottomPiece ? colours.filter((c) => isTop(c.name)).map((t) => setName(t.name, bottomPiece)) : []), ...colours.map((c) => c.name)] : [];
   function applyFillAll() { if (fillAll.trim() === "") return; setStock((st) => ({ ...st, ...Object.fromEntries(C.flatMap((c) => S.map((s) => [key(s, c), fillAll]))) })); }
 
   async function upload(files: FileList | File[]) {
@@ -156,7 +189,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
     }));
     const r = await saveProduct({
       id: f.id, name: f.name, slug: f.slug || undefined,
-      shortDescription: f.shortDescription || autoShortDescription({ brand: brandName, name: f.name, colours: C, sizes: S, material: f.material }) || null,
+      shortDescription: f.shortDescription || autoShortDescription({ brand: brandName, name: f.name, colours: pieceMode ? [] : C, sizes: S, material: f.material }) || null,
       description: f.description || null, categoryId: f.categoryId, brandId: f.brandId || null, status: status ?? f.status,
       price: paise(f.price), compareAtPrice: f.compareAtPrice ? paise(f.compareAtPrice) : null, tags: tagList(f.tags), featured: f.featured,
       material: f.material || null, care: f.care || null, sizeGuide: f.sizeGuide || null, sizeChart: (f.sizeChart ?? []).map((t) => ({ title: t.title.trim(), columns: t.columns.map((c) => c.trim()), rows: t.rows.filter((r) => r.some((c) => c.trim())).map((r) => r.map((c) => c.trim())) })).filter((t) => t.rows.length), option1Label: f.option1Label, option2Label: f.option2Label,
@@ -262,7 +295,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
           {f.deliveryMode === "flat" && <div className="mt-2"><label className="label" htmlFor="dc">Delivery charge ₹</label><input id="dc" className="input" type="number" inputMode="numeric" min="0" step="1" required value={f.deliveryCharge} onChange={(e) => set("deliveryCharge", e.target.value)} /></div>}
         </Step>
 
-        <Step n={4} title="Sizes & colours" hint="Tap everything you have. Leave colours empty if there's only one.">
+        <Step n={4} title={pieceMode ? "Sizes & pieces" : "Sizes & colours"} hint={pieceMode ? "Tap the sizes you have, then list the pieces with the colour in stock." : "Tap everything you have. Leave colours empty if there's only one."}>
           <fieldset>
             <legend className="label">{f.option1Label}s</legend>
             <div className="flex flex-wrap gap-2">
@@ -289,41 +322,134 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
               {sizes.some((s) => !heightOf(s) && TYPICAL_HEIGHTS[s]) && <button type="button" className="mt-2 text-sm font-medium underline" onClick={() => setHeights((h) => ({ ...h, ...Object.fromEntries(sizes.filter((s) => !heightOf(s) && TYPICAL_HEIGHTS[s]).map((s) => [s, TYPICAL_HEIGHTS[s]])) }))}>Fill typical heights for the empty ones</button>}
             </fieldset>
           )}
+          {pieceMode ? (
+            <fieldset className="mt-4" data-testid="piece-editor">
+              <legend className="label">Pieces you sell, and the colour in stock</legend>
+              <p className="mb-2 text-xs text-ink-soft">Name each piece and pick its colour. Customers see the piece with its colour, like “Top (Black)”, and a set of top + bottom is offered automatically. Changing a colour keeps the stock and prices.</p>
+              <div className="space-y-2">
+                {colours.map((c, i) => { const sp = splitPiece(c.name); return (
+                  <div key={c.name} className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-sm border border-line p-2.5 sm:flex sm:flex-wrap sm:items-center">
+                    <label className="block sm:contents"><span className="mb-0.5 block text-xs text-ink-soft sm:hidden">Piece</span>
+                    <input aria-label={`Piece ${i + 1} name`} className="input w-full py-2 sm:w-44" defaultValue={sp.base} placeholder="Top"
+                      onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== sp.base) renameOption(c.name, { name: compose(e.target.value, sp.colour), hex: c.hex }); }} />
+                    </label>
+                    <button type="button" className="row-span-2 grid size-10 place-items-center self-start text-ink-soft hover:text-clay sm:order-last sm:ml-auto sm:size-9" aria-label={`Remove ${c.name}`} onClick={() => setColours((xs) => xs.filter((x) => x.name !== c.name))}><Trash2 size={16} /></button>
+                    <span className="hidden text-sm text-ink-soft sm:inline">in</span>
+                    <label className="flex items-end gap-2 sm:contents"><span className="w-full sm:contents"><span className="mb-0.5 block text-xs text-ink-soft sm:hidden">Colour in stock</span>
+                    <input aria-label={`Colour of ${sp.base}`} list="piece-colours" className="input w-full py-2 sm:w-40" defaultValue={sp.colour ?? ""} placeholder="No colour"
+                      onBlur={(e) => { if ((e.target.value.trim() || null) !== sp.colour) setPieceColour(c.name, e.target.value.trim()); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
+                    </span>{c.hex && <span aria-hidden className="mb-2.5 size-5 shrink-0 rounded-full border border-black/15 sm:mb-0" style={{ background: c.hex }} />}</label>
+                  </div>
+                ); })}
+                <datalist id="piece-colours">{colourNames.map((n) => <option key={n} value={n} />)}</datalist>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {!colours.some((c) => isTop(c.name)) && <button type="button" className="btn btn-white btn-sm" onClick={() => addPiece("Top")}><Plus size={14} aria-hidden /> Top</button>}
+                {!bottomPiece && <button type="button" className="btn btn-white btn-sm" onClick={() => addPiece("Bottom")}><Plus size={14} aria-hidden /> Bottom</button>}
+                <button type="button" className="btn btn-white btn-sm" onClick={() => addPiece("Top, V-neck")}><Plus size={14} aria-hidden /> Another top style</button>
+              </div>
+              {customerSees.length > 0 && <p className="mt-3 rounded-sm bg-sand-soft p-2.5 text-sm" data-testid="customer-sees"><b>Customers will see:</b> {customerSees.join(" · ")}</p>}
+            </fieldset>
+          ) : (
           <fieldset className="mt-4">
-            <legend className="label">{f.option2Label}s</legend>
-            <div className="flex flex-wrap gap-2">
-              {colourChoices.map((c) => <Chip key={c.name} swatch={c.hex} on={colours.some((x) => x.name === c.name)} onClick={() => toggleColour(c)}>{c.name}</Chip>)}
-              <span className="inline-flex items-center gap-1">
-                <input aria-label="Other colour" className="input min-h-10 w-32 py-1.5 text-sm" placeholder="Other colour" value={customColour} onChange={(e) => setCustomColour(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomColour(); } }} />
-                <button type="button" aria-label="Add colour" className="grid size-10 place-items-center rounded-full border border-line hover:border-ink" onClick={addCustomColour}><Plus size={16} /></button>
-              </span>
-            </div>
-          </fieldset>
+              <legend className="label">{f.option2Label}s</legend>
+              <div className="flex flex-wrap gap-2">
+                {colourChoices.map((c) => <Chip key={c.name} swatch={c.hex} on={colours.some((x) => x.name === c.name)} onClick={() => toggleColour(c)}>{c.name}</Chip>)}
+                <span className="inline-flex items-center gap-1">
+                  <input aria-label="Other colour" className="input min-h-10 w-32 py-1.5 text-sm" placeholder="Other colour" value={customColour} onChange={(e) => setCustomColour(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomColour(); } }} />
+                  <button type="button" aria-label="Add colour" className="grid size-10 place-items-center rounded-full border border-line hover:border-ink" onClick={addCustomColour}><Plus size={16} /></button>
+                </span>
+              </div>
+            </fieldset>
+          )}
         </Step>
 
-        <Step n={5} title={`Stock: ${totalStock} pieces`} hint="How many pieces of each you have right now. 0 shows as sold out.">
+        {S[0] !== FREE && (
+          <Step n={5} title="Price and MRP for each size" hint={`Leave a box empty to use the main price (₹${f.price || "…"}) and MRP (₹${f.compareAtPrice || "…"}).`}>
+            {/* Phones: one card per size. */}
+            <div className="space-y-2 sm:hidden" data-testid="size-prices-mobile">
+              <div className="flex flex-wrap gap-1.5 text-xs">{C.flatMap((c) => (["price", "mrp"] as const).map((fld) => <button key={c + fld} type="button" className="rounded-full border border-line px-2.5 py-1.5 font-medium" onClick={() => fillDown(c, fld)}>{C.length > 1 ? `${splitPiece(c).base} ` : ""}{fld === "price" ? "price" : "MRP"}: same as {S[0]} for all</button>))}</div>
+              {S.map((sz) => (
+                <div key={sz} className="rounded-sm border border-line p-2.5">
+                  <p className="text-sm font-semibold">{sz}</p>
+                  {C.map((c) => (
+                    <div key={c} className="mt-2 grid grid-cols-2 gap-2">
+                      {c !== PLAIN && <span className="col-span-2 -mb-1 text-xs font-medium text-ink-soft">{c}</span>}
+                      {(["price", "mrp"] as const).map((fld) => (
+                        <label key={fld} className="block"><span className="block text-[11px] text-ink-soft">{fld === "price" ? "Price ₹" : "MRP ₹"}</span>
+                          <input className="input w-full px-2 py-2 text-center" type="number" inputMode="decimal" min="1" step="0.01" placeholder={fld === "price" ? f.price || "–" : f.compareAtPrice || "–"} value={meta[key(sz, c)]?.[fld] ?? ""} onChange={(e) => setPrice(sz, c, fld, e.target.value)} /></label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto sm:block" data-testid="size-prices">
+              <table className="text-sm [&_td]:p-1 [&_th]:p-1 [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-soft">
+                <thead>
+                  <tr><th />{C.map((c) => <th key={c} colSpan={2} className="border-b border-line text-center whitespace-nowrap">{c === PLAIN ? "All pieces" : c}</th>)}</tr>
+                  <tr><th className="text-left">Size</th>{C.flatMap((c) => (["price", "mrp"] as const).map((fld) => <th key={c + fld} className="text-center">{fld === "price" ? "Price ₹" : "MRP ₹"}<button type="button" className="ml-1 text-[11px] font-semibold text-ink underline" onClick={() => fillDown(c, fld)} title={`Copy the first size's ${fld === "price" ? "price" : "MRP"} to every size`}>fill ↓</button></th>))}</tr>
+                </thead>
+                <tbody>
+                  {S.map((sz) => (
+                    <tr key={sz}>
+                      <th scope="row" className="pr-2 text-left whitespace-nowrap">{sz}</th>
+                      {C.flatMap((c) => (["price", "mrp"] as const).map((fld) => (
+                        <td key={c + fld}><input aria-label={`${fld === "price" ? "Price" : "MRP"} for ${c === PLAIN ? "" : `${c} `}${sz}`} className="input w-20 px-2 py-1.5 text-center" type="number" inputMode="decimal" min="1" step="0.01"
+                          placeholder={fld === "price" ? f.price || "–" : f.compareAtPrice || "–"} value={meta[key(sz, c)]?.[fld] ?? ""} onChange={(e) => setPrice(sz, c, fld, e.target.value)} /></td>
+                      )))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {C.length > 1 && C[0] !== PLAIN && <button type="button" className="mt-2 text-sm font-medium underline" onClick={() => copyPrices(C[0])}>Use {C[0]}&apos;s prices for every piece</button>}
+          </Step>
+        )}
+
+        <Step n={S[0] !== FREE ? 6 : 5} title={`Stock: ${totalStock} pieces`} hint="How many pieces of each you have right now. 0 shows as sold out.">
           <div className="mb-3 flex flex-wrap items-end gap-2">
             <div><label className="label text-xs" htmlFor="fill">Same for all</label><input id="fill" className="input w-24 py-1.5" type="number" inputMode="numeric" min="0" value={fillAll} onChange={(e) => setFillAll(e.target.value)} /></div>
             <button type="button" className="btn btn-white btn-sm" onClick={applyFillAll}>Fill all</button>
           </div>
+          {C.length <= 3 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm [&_td]:p-1 [&_th]:p-1 [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-soft">
+                <thead><tr><th className="text-left">{S[0] === FREE ? "" : f.option1Label}</th>{C.map((c) => <th key={c} className="text-center">{c === PLAIN ? "Pieces" : <span className="inline-flex items-center gap-1">{colours.find((x) => x.name === c)?.hex && <span className="size-3 rounded-full border border-black/15" style={{ background: colours.find((x) => x.name === c)?.hex }} aria-hidden />}{c}</span>}</th>)}</tr></thead>
+                <tbody>
+                  {S.map((sz) => (
+                    <tr key={sz}>
+                      <th scope="row" className="pr-2 text-left">{sz === FREE ? "" : sz}</th>
+                      {C.map((c) => (
+                        <td key={c} className="text-center"><input aria-label={`Stock for ${[c !== PLAIN && c, sz !== FREE && sz].filter(Boolean).join(" ") || "this item"}`} className="input w-20 px-2 py-2 text-center" type="number" inputMode="numeric" min="0"
+                          value={stock[key(sz, c)] ?? ""} placeholder="0" onChange={(e) => setStock((st) => ({ ...st, [key(sz, c)]: e.target.value }))} /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
-            <table className="text-sm [&_td]:p-1 [&_th]:p-1 [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-soft">
-              <thead><tr><th className="text-left">{C[0] === PLAIN ? "" : f.option2Label}</th>{S.map((s) => <th key={s} className="text-center whitespace-nowrap">{s === FREE ? "Pieces" : s}</th>)}</tr></thead>
-              <tbody>
-                {C.map((c) => (
-                  <tr key={c}>
-                    <th scope="row" className="pr-2 text-left whitespace-nowrap">
-                      {c !== PLAIN && <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded-full border border-black/15" style={{ background: colours.find((x) => x.name === c)?.hex }} aria-hidden />{c}</span>}
-                    </th>
-                    {S.map((s) => (
-                      <td key={s}><input aria-label={`Stock for ${[c !== PLAIN && c, s !== FREE && s].filter(Boolean).join(" ") || "this item"}`} className="input w-16 px-2 py-1.5 text-center" type="number" inputMode="numeric" min="0"
-                        value={stock[key(s, c)] ?? ""} placeholder="0" onChange={(e) => setStock((st) => ({ ...st, [key(s, c)]: e.target.value }))} /></td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              <table className="text-sm [&_td]:p-1 [&_th]:p-1 [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-soft">
+                <thead><tr><th className="text-left">{C[0] === PLAIN ? "" : f.option2Label}</th>{S.map((s) => <th key={s} className="text-center whitespace-nowrap">{s === FREE ? "Pieces" : s}</th>)}</tr></thead>
+                <tbody>
+                  {C.map((c) => (
+                    <tr key={c}>
+                      <th scope="row" className="pr-2 text-left whitespace-nowrap">
+                        {c !== PLAIN && <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded-full border border-black/15" style={{ background: colours.find((x) => x.name === c)?.hex }} aria-hidden />{c}</span>}
+                      </th>
+                      {S.map((s) => (
+                        <td key={s}><input aria-label={`Stock for ${[c !== PLAIN && c, s !== FREE && s].filter(Boolean).join(" ") || "this item"}`} className="input w-16 px-2 py-1.5 text-center" type="number" inputMode="numeric" min="0"
+                          value={stock[key(s, c)] ?? ""} placeholder="0" onChange={(e) => setStock((st) => ({ ...st, [key(s, c)]: e.target.value }))} /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Step>
 
         <details className="group rounded-sm border border-line bg-white">
@@ -332,7 +458,7 @@ export function ProductForm({ initial, categories, brands }: { initial: ProductF
             <ChevronDown size={18} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden />
           </summary>
           <div className="space-y-4 border-t border-line p-4">
-            <div><label className="label" htmlFor="short">Short description <span className="font-normal text-ink-soft">(written for you if left blank)</span></label><input id="short" className="input" maxLength={200} value={f.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder={autoShortDescription({ brand: brandName, name: f.name, colours: C, sizes: S, material: f.material })} /></div>
+            <div><label className="label" htmlFor="short">Short description <span className="font-normal text-ink-soft">(written for you if left blank)</span></label><input id="short" className="input" maxLength={200} value={f.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder={autoShortDescription({ brand: brandName, name: f.name, colours: pieceMode ? [] : C, sizes: S, material: f.material })} /></div>
             <div><label className="label" htmlFor="desc">Full description</label><textarea id="desc" className="input" rows={4} value={f.description} onChange={(e) => set("description", e.target.value)} /></div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className="label" htmlFor="mat">Material</label><input id="mat" className="input" value={f.material} onChange={(e) => set("material", e.target.value)} /></div>

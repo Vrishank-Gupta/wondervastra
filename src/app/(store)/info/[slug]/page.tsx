@@ -11,7 +11,17 @@ const channels = () => (capabilities().whatsapp ? "email and WhatsApp" : "email"
 
 type Page = { title: string; body: (s: StoreSettings) => React.ReactNode };
 
-const contactLine = (s: StoreSettings) => s.supportEmail || s.whatsappNumber ? `at ${[s.supportEmail, s.whatsappNumber].filter(Boolean).join(" or ")}` : "through our contact page";
+const DESCRIPTIONS: Record<string, string> = {
+  about: "WonderVastra sells 100% original Amul, Dollar and Lux thermal wear for kids and men, delivered free across Delhi NCR.",
+  contact: "Contact WonderVastra by email or the contact form. Questions about sizes, orders, delivery or returns.",
+  faq: "Answers about sizes, delivery across Delhi NCR, free delivery, payments, returns and tracking at WonderVastra.",
+  "shipping-policy": "Free delivery on every order across Delhi NCR, usually in 3–5 days, with live tracking.",
+  "returns-policy": "Return unused thermals within 3 days of delivery. Free pickup once approved, refund to your original payment method.",
+  "privacy-policy": "How WonderVastra collects, uses and protects your personal information.",
+  terms: "Terms of use for shopping at WonderVastra.",
+};
+
+const contactLine = (s: StoreSettings) => s.supportEmail ? `at ${s.supportEmail}` : "through our contact page";
 
 /** One source for the FAQ page and its FAQPage search data, so both always say the same thing. */
 function faqItems(s: StoreSettings): { q: string; a: string }[] {
@@ -84,7 +94,7 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const p = PAGES[slug];
-  return p ? { title: p.title, alternates: { canonical: `/info/${slug}` } } : {};
+  return p ? { title: p.title, description: DESCRIPTIONS[slug], alternates: { canonical: `/info/${slug}` } } : {};
 }
 export default async function InfoPage({ params }: Props) {
   const { slug } = await params;

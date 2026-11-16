@@ -19,7 +19,7 @@ const KEEP_S = 30 * 60; // keep a stale copy this long, refreshing it in the bac
 const SIGNED_IN = /(?:^|;\s*)(vv_session|vv_admin)=/;
 // Pages that are the same for every signed-out shopper. Everything else (cart, checkout, account, admin,
 // orders, tracking, APIs) always renders fresh.
-const SHARED = /^\/(?:$|c\/|p\/|shop(?:\/|$)|family-pack$|brands(?:\/|$)|sale(?:\/|$)|info\/)/;
+const SHARED = /^\/(?:$|c\/|p\/|shop(?:\/|$)|family-pack$|guides(?:\/|$)|brands(?:\/|$)|sale(?:\/|$)|info\/)/;
 // Ad and campaign tags don't change the page; drop them so every visitor from a campaign shares one copy.
 const NOISE = /^(utm_\w+|fbclid|gclid|igshid|ref|_gl)$/;
 

@@ -1,6 +1,21 @@
 /** Listings sold as a top and a bottom: the price of the set, so cards, titles and the product page all agree. */
-const BOTTOM = /^(bottom|trousers?|lower)$/i;
-const TOP = /top$/i;
+/** "Top (Black)" → { base: "Top", colour: "Black" }. Pieces can carry the colour in stock in brackets. */
+export function splitPiece(name: string): { base: string; colour: string | null } {
+  const m = name.match(/^(.*?)[\s,]*\(([^()]+)\)\s*$/);
+  return m ? { base: m[1].trim(), colour: m[2].trim() } : { base: name.trim(), colour: null };
+}
+/** A trouser: "Bottom", "Trouser", "Lower", with or without a colour. */
+export const isBottom = (name: string) => /^(bottom|trousers?|lower)$/i.test(splitPiece(name).base);
+/** A top: "Top", "Round neck top", "Top, Round neck", with or without a colour. */
+export const isTop = (name: string) => /\btop\b/i.test(splitPiece(name).base);
+/** "Set (Top + Bottom)", plus the colour when both pieces share one: "Set (Top + Bottom) (Black)". */
+export function setName(top: string, bottom: string) {
+  const t = splitPiece(top), b = splitPiece(bottom);
+  const colour = t.colour && t.colour === b.colour ? t.colour : null;
+  return `Set (${colour ? t.base : top} + ${colour ? b.base : bottom})${colour ? ` (${colour})` : ""}`;
+}
+const BOTTOM = { test: isBottom };
+const TOP = { test: isTop };
 type V = { option1: string; option2: string; price: number; mrp: number; stock: number };
 
 /** The cheapest in-stock set (any top + the bottom, same size), or the cheapest set at all when none is in stock. */

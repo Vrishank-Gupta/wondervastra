@@ -52,9 +52,8 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         <div className="col-span-2 md:col-span-1">
           <p aria-label="WonderVastra"><Logo onDark size="lg" /></p>
           <p className="mt-3 max-w-xs text-sm text-white/70">{settings.tagline}</p>
-          {(settings.whatsappNumber || settings.supportEmail) && (
+          {settings.supportEmail && (
             <ul className="mt-5 space-y-0 text-sm md:space-y-2" aria-label="Customer support">
-              {settings.whatsappNumber && <li><a className={`${a} inline-flex items-center gap-2`} href={waLink(settings.whatsappNumber, "Hi WonderVastra, I have a question.")} target="_blank" rel="noreferrer"><MessageCircle size={16} aria-hidden /> WhatsApp {settings.whatsappNumber}</a></li>}
               {settings.supportEmail && <li><a className={`${a} inline-flex items-center gap-2`} href={`mailto:${settings.supportEmail}`}><Mail size={16} aria-hidden /> {settings.supportEmail}</a></li>}
               {settings.supportHours && <li className="inline-flex items-center gap-2 text-white/55"><Clock size={16} aria-hidden /> {settings.supportHours}</li>}
             </ul>
@@ -78,6 +77,7 @@ export function Footer({ categories, settings }: { categories: { name: string; s
           <ul className="space-y-0 text-sm md:space-y-2.5">
             <li><Link className={a} href="/track">Track your order</Link></li>
             <li><Link className={a} href="/info/faq">FAQs</Link></li>
+            <li><Link className={a} href="/guides">Size & buying guides</Link></li>
             <li><Link className={a} href="/info/shipping-policy">Shipping</Link></li>
             <li><Link className={a} href="/info/returns-policy">Returns & refunds</Link></li>
             <li><Link className={a} href="/info/contact">Contact us</Link></li>

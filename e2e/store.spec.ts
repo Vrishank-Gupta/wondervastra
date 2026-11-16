@@ -1577,6 +1577,8 @@ test("Google feed, family pack, share cart, reorder one size up, morning summary
     await db.execute({ sql: "update orders set status='confirmed', awb=null where id=?", args: [orderId] });
     await adminLogin(page);
     await page.goto("/admin/settings");
+    // The dev server sometimes compiles Settings mid-login on a long run; sign in again if it bounced.
+    if (await page.getByRole("heading", { name: "Seller login" }).isVisible().catch(() => false)) { await adminLogin(page); await page.goto("/admin/settings"); }
     await page.getByRole("button", { name: "Send today's summary now" }).click();
     await expect(page.getByText("Sent to owner@example.com")).toBeVisible();
     const mail = await one("select subject, body, recipient from notifications where event='admin_daily_summary' order by created_at desc limit 1");
@@ -1591,3 +1593,81 @@ test("Google feed, family pack, share cart, reorder one size up, morning summary
     await db.execute("delete from settings where key='adminAlertEmail'");
   }
 });
+
+test("guides and llms.txt: size by age from brand charts, FAQ data for AI and Google, email-only contact", async ({ page, request }) => {
+  const llms = await (await request.get("/llms.txt")).text();
+  expect(llms).toContain("## Buying guides");
+  expect(llms).toContain("/guides/kids-thermal-size-chart");
+  expect(llms).not.toMatch(/WhatsApp \d/);
+  await page.goto("/guides");
+  await page.getByRole("link", { name: /Kids' thermal size chart by age/ }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Kids' thermal size chart by age");
+  await expect(page.getByRole("heading", { name: "Quick answer: size by age" })).toBeVisible();
+  const ld = await page.locator('script[type="application/ld+json"]').allTextContents();
+  expect(ld.join(" ")).toContain('"FAQPage"');
+  expect(ld.join(" ")).toContain('"Article"');
+  for (const slug of ["mens-thermal-size-guide", "amul-vs-dollar-vs-lux-thermals", "thermal-wear-for-delhi-winter"]) {
+    expect((await request.get(`/guides/${slug}`)).status()).toBe(200);
+  }
+  expect(await (await request.get("/sitemap.xml")).text()).toContain("/guides/amul-vs-dollar-vs-lux-thermals");
+});
+
+test("pieces with colours: text buttons and sets on the store; phone editor keeps prices, stock and variants; change history says what changed", async ({ page }) => {
+  const pid = "e2e-col";
+  const cat = await one("select id from categories where slug='mens-thermals'");
+  const photo = await one("select url from product_images limit 1");
+  await db.execute({ sql: "insert into products (id, name, slug, category_id, status, price, compare_at_price, option1_label, option2_label, created_at, updated_at) values (?,?,?,?,'active',38500,44800,'Size','Piece',0,0)", args: [pid, "Col Men's Thermal", "e2e-col", cat.id as string] });
+  await db.execute({ sql: "insert into product_images (id, product_id, url, alt, sort_order) values ('e2e-col-img', ?, ?, 'Col', 0)", args: [pid, photo.url as string] });
+  const v = [["e2e-c-tm", "M (85 cm)", "Top (Black)", 38500, 46200], ["e2e-c-tl", "L (90 cm)", "Top (Black)", 39500, 47600], ["e2e-c-bm", "M (85 cm)", "Bottom (Black)", 38500, 46200], ["e2e-c-bl", "L (90 cm)", "Bottom (Black)", 39500, 47600]] as const;
+  for (const [i, [id, s, piece, price, mrp]] of v.entries()) {
+    await db.execute({ sql: "insert into variants (id, product_id, option1, option2, color_hex, price, mrp, stock, active, sort_order) values (?,?,?,?,'#1F1E1D',?,?,4,1,?)", args: [id, pid, s, piece, price, mrp, i] });
+  }
+  try {
+    // Store: pieces are text buttons (not colour circles) and the set is back, with the colour.
+    await page.goto("/p/e2e-col");
+    await expect(page.getByRole("button", { name: "Set (Top + Bottom) (Black)" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Top (Black)", exact: true })).toBeVisible();
+    await page.locator("#size-picker").getByRole("button", { name: "L (90 cm)" }).click();
+    await expect(page.locator("#size-picker").getByRole("button", { name: "L (90 cm)" })).toHaveAttribute("aria-pressed", "true");
+
+    // Admin on a phone: change the colour from Black to Navy for both pieces.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await adminLogin(page);
+    await page.goto(`/admin/products/${pid}`);
+    await expect(page.getByTestId("customer-sees")).toContainText("Set (Top + Bottom) (Black) · Top (Black) · Bottom (Black)");
+    for (const piece of ["Top", "Bottom"]) {
+      const colour = page.getByLabel(`Colour of ${piece}`);
+      await colour.fill("Navy");
+      await colour.press("Enter");
+    }
+    await expect(page.getByTestId("customer-sees")).toContainText("Set (Top + Bottom) (Navy)");
+    // Per-size prices kept through the rename, and editable on a phone.
+    const mobile = page.getByTestId("size-prices-mobile");
+    await expect(mobile.getByText("L (90 cm)")).toBeVisible();
+    await expect(mobile.locator("input").nth(4)).toHaveValue("395");
+    await mobile.locator("input").nth(4).fill("410");
+    await page.getByRole("button", { name: "Save changes" }).first().click();
+    await expect.poll(async () => (await rows_(pid)).filter((r) => r.active && r.option2 === "Top (Navy)").length, { timeout: 15000 }).toBe(2);
+    const rows = await rows_(pid);
+    expect(rows.filter((r) => r.active).map((r) => `${r.id}|${r.option2}|${r.price}|${r.stock}`).sort()).toEqual([
+      "e2e-c-bl|Bottom (Navy)|39500|4", "e2e-c-bm|Bottom (Navy)|38500|4", "e2e-c-tl|Top (Navy)|41000|4", "e2e-c-tm|Top (Navy)|38500|4",
+    ]);
+    expect(rows.length).toBe(4); // no leftover copies
+
+    // Change history: plain words.
+    await page.goto(`/admin/audit?entity=product&id=${pid}`);
+    const entry = page.getByTestId("audit-list").locator("li").first();
+    await expect(entry).toContainText("Pieces renamed");
+    await expect(entry).toContainText("Top (Black)");
+    await expect(entry).toContainText("Top (Navy)");
+    await expect(entry).toContainText("Top (Navy) · L (90 cm)");
+    await expect(entry).toContainText("₹410");
+  } finally {
+    await db.execute("delete from variants where product_id='e2e-col'");
+    await db.execute("delete from product_images where product_id='e2e-col'");
+    await db.execute("delete from products where id='e2e-col'");
+  }
+});
+async function rows_(pid: string) {
+  return (await rows("select id, option2, price, stock, active from variants where product_id=?", [pid])) as { id: string; option2: string; price: number; stock: number; active: number }[];
+}

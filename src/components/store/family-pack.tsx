@@ -14,7 +14,7 @@ type P = { id: string; slug: string; name: string; kids: boolean; image: string 
 type Row = { key: number; kid: boolean; name: string; productId: string; pick: string; size: string };
 
 let rowSeq = 0;
-const shortPick = (p: string) => p.replace(/^Set \((.*)\)$/, "Set: $1");
+const shortPick = (p: string) => p.replace(/^Set \((.*?)\)/, "Set: $1");
 
 /** One row per family member: who, which thermal, set or piece, and size. Everything goes to the cart together. */
 export function FamilyPack({ products, tiers }: { products: P[]; tiers: { pieces: number; reward: string }[] }) {
