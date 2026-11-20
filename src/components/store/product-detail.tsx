@@ -32,6 +32,8 @@ type Props = {
   settings: { codEnabled: boolean; onlinePayments: boolean; dispatchDays: number; deliveryDaysMin: number; deliveryDaysMax: number; returnWindowDays: number; deliveryArea: string; areaRestricted: boolean };
   /** Cart offers, cheapest threshold first: "₹1,000+ → 10% off". */
   tiers?: { minSubtotal: number; minPieces: number; label: string; reward: string }[];
+  /** A running campaign (lib/promo.ts): shown as a sale box under the price. */
+  promo?: { name: string; endsAt: number; ends: string } | null;
 };
 
 function Accordion({ title, children, open = false }: { title: string; children: React.ReactNode; open?: boolean }) {
@@ -88,7 +90,7 @@ export const SET = "Set (Top + Bottom)";
 /** Piece names that are a lower half; any name ending in "top" is an upper half ("Top", "V-neck top"). */
 import { isBottom, isTop, setName } from "@/lib/sets";
 
-export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [], initial }: Props) {
+export function ProductDetail({ brand, product: p, images, variants, rating, wished, settings, tiers = [], initial, promo }: Props) {
   const router = useRouter();
   const { add } = useCart();
   const sizes = useMemo(() => [...new Set(variants.map((v) => v.option1))], [variants]);
@@ -189,8 +191,21 @@ export function ProductDetail({ brand, product: p, images, variants, rating, wis
           {mrp > price && <><span className="text-ink-soft">MRP <s>{money(mrp)}</s></span><span className="font-bold text-madder">{pct}% off</span></>}
         </div>
         <p className="text-xs text-ink-soft">Inclusive of all taxes</p>
+        {promo && !p.comingSoon && (() => {
+          const best = tiers.filter((t) => t.minPieces > 0).sort((x, y) => y.minPieces - x.minPieces)[0];
+          const first = tiers.filter((t) => t.minPieces > 0).sort((x, y) => x.minPieces - y.minPieces)[0];
+          return (
+            <a href="/sale" className="mt-3 block border-2 border-[#E3202A] bg-gradient-to-r from-[#FFF3B0] to-[#FFC83A] p-3 text-[#4A1420]" data-testid="promo-box">
+              <span className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-2 font-display text-xl uppercase leading-none"><span className="wv-flash size-2.5 rounded-full bg-[#E3202A]" aria-hidden />{promo.name} is on</span>
+                <span className="bg-[#E3202A] px-2 py-1 text-xs font-bold text-white uppercase">Ends in <Countdown endsAt={promo.endsAt} compact /></span>
+              </span>
+              {best && first && <span className="mt-1.5 block text-sm font-semibold">Pick any {first.minPieces}+ pieces for {first.reward.replace(/ off.*$/, "")} extra off, up to {best.reward.replace(/ off.*$/, "")} with {best.minPieces}. Mix sizes for the whole family. Applied in your cart.</span>}
+            </a>
+          );
+        })()}
         {brand && !brand.isHouse && (
-          <p className="mt-2 inline-flex items-center gap-1.5 bg-pine-soft px-2.5 py-1 text-xs font-bold text-pine"><ShieldCheck size={14} aria-hidden /> 100% original {brand.name} product, at our lowest price</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 bg-pine-soft px-2.5 py-1 text-xs font-bold text-pine"><ShieldCheck size={14} aria-hidden /> 100% original {brand.name} product, bought direct from {brand.name}</p>
         )}
 
         {(p.minPieces ?? 1) > 1 && (

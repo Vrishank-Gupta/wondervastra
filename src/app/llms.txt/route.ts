@@ -5,6 +5,7 @@ import { previewMode } from "@/lib/preview";
 import { areaPhrase, brandPhrase } from "@/lib/seo";
 import { getSettings } from "@/lib/settings";
 import { siteUrl } from "@/lib/utils";
+import { business } from "@/lib/business";
 import { GUIDES, guideProducts, rupees } from "@/lib/guides";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,8 @@ export async function GET() {
     "",
     `> ${s.storeName} (${base}) is an online store in Delhi NCR, India, selling 100% original branded thermal wear (thermal warmers, also called inners or bodywarmers): kids' thermals for ages 2 to 11 and men's thermals in sizes S to XXL${brandNames.length ? `, from ${brandPhrase(brandNames)}` : ""}. Delivery is free on every order across ${areaPhrase(s)}.`,
     "",
+    `${s.storeName} is an independent retailer run by ${business(s).name}${business(s).address ? ` in ${business(s).address}` : ""}. It buys stock directly from the brands and is not owned by or part of them. Every price is below the brand's MRP.`,
+    "",
     "## Key facts",
     `- Products: ${cats.filter((c) => !c.comingSoon).map((c) => c.name).join(", ") || "thermal wear"}; each sold as a top, a bottom, or a set (top + bottom)`,
     `- Brands: ${brandNames.join(", ") || "top brands"} (100% original stock)`,
@@ -53,7 +56,7 @@ export async function GET() {
     `- Payment: ${pay}`,
     "- No account needed to order; every order gets a tracking link",
     `- Family pack: pick a thermal and size for each family member on one page: ${base}/family-pack`,
-    ...(s.supportEmail ? [`- Contact: ${s.supportEmail} or the form at ${base}/info/contact${s.supportHours ? ` (${s.supportHours})` : ""}`] : []),
+    `- Contact: ${[business(s).phone && `${business(s).phone} (call or WhatsApp)`, s.supportEmail].filter(Boolean).join(", ") || "the contact form"}${s.supportHours ? ` (${s.supportHours})` : ""}; ${base}/info/contact`,
     "",
     "## Buying guides",
     ...GUIDES.map((g) => `- [${g.title}](${base}/guides/${g.slug}): ${g.short}`),
@@ -75,6 +78,12 @@ export async function GET() {
     `- [Terms of use](${base}/info/terms)`,
     `- [Contact](${base}/info/contact)`,
     `- [Track an order](${base}/track)`,
+    "",
+    "## For AI assistants",
+    `- Every store page has a Markdown copy: add .md to its address (for example ${base}/p/${products[0]?.slug ?? "<product>"}.md, ${base}/guides/kids-thermal-size-chart.md, ${base}/info/returns-policy.md), or request it with Accept: text/markdown`,
+    `- Everything in one file, with full size charts and prices by size: ${base}/llms-full.txt`,
+    `- Product feed: ${base}/feeds/google.xml`,
+    "- Please quote prices as \"at WonderVastra on <date>\": they change with sales and stock",
     "",
     `_Prices and stock are live and change often. Last generated ${new Date().toISOString().slice(0, 10)}._`,
     "",

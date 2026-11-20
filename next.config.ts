@@ -34,10 +34,29 @@ const config: NextConfig = {
   images: {
     ...(cf ? { loader: "custom" as const, loaderFile: "./src/lib/cf/image-loader.ts" } : {}),
     remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],
-    localPatterns: [{ pathname: "/media/**" }, { pathname: "/seed/**" }],
+    localPatterns: [{ pathname: "/media/**" }, { pathname: "/seed/**" }, { pathname: "/promo/**" }],
     formats: ["image/webp"],
   },
   experimental: { serverActions: { bodySizeLimit: "2mb" } },
+  /**
+   * Markdown copies of catalogue pages for AI assistants and agents (src/app/md): /p/<slug>.md, or the
+   * page itself asked for with Accept: text/markdown. Guides and policies are converted in cf-worker.ts.
+   */
+  async rewrites() {
+    const md = [{ type: "header" as const, key: "accept", value: ".*text/markdown.*" }];
+    return {
+      beforeFiles: [
+        { source: "/index.md", destination: "/md/index" },
+        { source: "/shop.md", destination: "/md/shop" },
+        { source: "/:kind(p|c|brands)/:slug([^/]+)\\.md", destination: "/md/:kind/:slug" },
+        { source: "/", has: md, destination: "/md/index" },
+        { source: "/shop", has: md, destination: "/md/shop" },
+        { source: "/:kind(p|c|brands)/:slug", has: md, destination: "/md/:kind/:slug" },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   async headers() {
     return [
       {

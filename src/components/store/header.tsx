@@ -65,16 +65,16 @@ function SearchBox({ autoFocus, onDone }: { autoFocus?: boolean; onDone?: () => 
 
 type NavCat = { name: string; slug: string; comingSoon?: boolean };
 
-function AnnouncementBar({ items, winter = false }: { items: string[]; winter?: boolean }) {
+function AnnouncementBar({ items, winter = false, sale = false }: { items: string[]; winter?: boolean; sale?: boolean }) {
   if (!items.length) return null;
   const run = [...items, ...items, ...items];
   return (
-    <div className="overflow-hidden bg-ink py-2 text-white no-print" role="region" aria-label="Offers">
+    <div className={`overflow-hidden py-2 text-white no-print ${sale ? "bg-[#E3202A]" : "bg-ink"}`} role="region" aria-label="Offers">
       <ul className="sr-only">{items.map((t) => <li key={t}>{t}</li>)}</ul>
       <div className="marquee flex w-max" aria-hidden>
         {[0, 1].map((half) => (
           <div key={half} className="flex shrink-0">
-            {run.map((t, i) => <span key={i} className="flex items-center gap-6 pr-6 text-[11px] font-bold tracking-[0.12em] whitespace-nowrap uppercase">{t}{winter ? <Snowflake size={12} strokeWidth={2} className="text-white/70" /> : <span className="size-1 rounded-full bg-madder" />}</span>)}
+            {run.map((t, i) => <span key={i} className="flex items-center gap-6 pr-6 text-[11px] font-bold tracking-[0.12em] whitespace-nowrap uppercase">{t}{sale ? <span className="size-1.5 rounded-full bg-[#FFC83A]" /> : winter ? <Snowflake size={12} strokeWidth={2} className="text-white/70" /> : <span className="size-1 rounded-full bg-madder" />}</span>)}
           </div>
         ))}
       </div>
@@ -82,7 +82,7 @@ function AnnouncementBar({ items, winter = false }: { items: string[]; winter?: 
   );
 }
 
-export function Header({ categories, announcements, loggedIn, winter = false }: { categories: NavCat[]; announcements: string[]; loggedIn: boolean; winter?: boolean }) {
+export function Header({ categories, announcements, loggedIn, winter = false, sale, ribbon }: { categories: NavCat[]; announcements: string[]; loggedIn: boolean; winter?: boolean; /** Name of a running campaign: the menu's Sale link becomes a red button. */ sale?: string; /** Campaign band kept in view under the sticky header. */ ribbon?: React.ReactNode }) {
   const { count, ready, setDrawerOpen } = useCart();
   const [menu, setMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -93,17 +93,19 @@ export function Header({ categories, announcements, loggedIn, winter = false }: 
 
   return (
     <>
-      <AnnouncementBar items={announcements} winter={winter} />
+      <AnnouncementBar items={announcements} winter={winter} sale={Boolean(sale)} />
       <header className="sticky top-0 z-30 border-b border-line bg-white no-print">
         <div className="container-x flex items-center gap-3 py-3 lg:gap-8">
           <button aria-label="Open menu" className="-ml-2 grid size-11 place-items-center lg:hidden" onClick={() => setMenu(true)}><Menu size={24} /></button>
           <Link href="/" aria-label="WonderVastra home" className="shrink-0"><Logo className="max-[380px]:[&_svg]:h-7 max-[380px]:[&>span:last-child]:text-[1.05rem]" /></Link>
-          <nav aria-label="Categories" className="hidden min-w-0 flex-1 items-center gap-5 overflow-x-auto lg:flex scrollbar-none">
+          <nav aria-label="Categories" className={`hidden min-w-0 flex-1 items-center overflow-x-auto py-1 lg:flex scrollbar-none ${sale ? "gap-4" : "gap-5"}`}>
             <Link href="/shop" className={navLink(pathname === "/shop")}>Shop all</Link>
             <Link href="/brands" className={navLink(pathname.startsWith("/brands"))}>Brands</Link>
             {categories.filter((c) => !c.comingSoon).slice(0, 2).map((c) => <Link key={c.slug} href={`/c/${c.slug}`} className={navLink(pathname === `/c/${c.slug}`)}>{c.name}</Link>)}
             <Link href="/family-pack" className={navLink(pathname === "/family-pack")}>Family pack</Link>
-            <Link href="/sale" className={`${navLink(pathname === "/sale")} text-madder`}>Sale</Link>
+            {sale
+              ? <Link href="/sale" className="shrink-0 whitespace-nowrap bg-[#E3202A] px-2.5 py-1.5 text-[12px] font-bold tracking-[0.08em] text-white uppercase hover:bg-[#4A1420]" title={sale}>Sale</Link>
+              : <Link href="/sale" className={`${navLink(pathname === "/sale")} text-madder`}>Sale</Link>}
           </nav>
           <div className="ml-auto hidden w-full max-w-xs md:block lg:hidden xl:block xl:max-w-[16rem] 2xl:max-w-sm"><SearchBox /></div>
           <div className="ml-auto flex items-center md:ml-0 lg:ml-auto xl:ml-0">
@@ -116,6 +118,7 @@ export function Header({ categories, announcements, loggedIn, winter = false }: 
           </div>
         </div>
         {searchOpen && <div className="container-x pb-3 md:hidden lg:block xl:hidden"><SearchBox autoFocus onDone={() => setSearchOpen(false)} /></div>}
+        {ribbon}
       </header>
 
       {menu && (
@@ -131,7 +134,7 @@ export function Header({ categories, announcements, loggedIn, winter = false }: 
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/brands">Shop by brand<ChevronRight size={18} aria-hidden /></Link>
               {categories.map((c) => <Link key={c.slug} className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href={`/c/${c.slug}`}><span>{c.name}{c.comingSoon && <span className="ml-2 bg-slate px-1.5 py-0.5 align-middle text-[11px] text-white">Soon</span>}</span><ChevronRight size={18} aria-hidden /></Link>)}
               <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] uppercase" href="/family-pack">Family pack<ChevronRight size={18} aria-hidden /></Link>
-              <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] text-madder uppercase" href="/sale">Sale & offers<ChevronRight size={18} aria-hidden /></Link>
+              <Link className="flex items-center justify-between border-b border-line px-4 py-4 text-sm font-bold tracking-[0.06em] text-madder uppercase" href="/sale">{sale ? `${sale} sale` : "Sale & offers"}<ChevronRight size={18} aria-hidden /></Link>
               <div className="flex flex-col gap-1 bg-sand-soft px-4 py-4 text-sm">
                 <Link className="py-1.5" href="/track">Track order</Link>
                 <Link className="py-1.5" href={loggedIn ? "/account" : "/login"}>{loggedIn ? "My account" : "Log in"}</Link>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export function Countdown({ endsAt, compact = false, dark = false }: { endsAt: number; compact?: boolean; dark?: boolean }) {
+export function Countdown({ endsAt, compact = false, dark = false, big = false }: { endsAt: number; compact?: boolean; dark?: boolean; /** Large red sale-style blocks. */ big?: boolean }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     setNow(Date.now());
@@ -19,6 +19,16 @@ export function Countdown({ endsAt, compact = false, dark = false }: { endsAt: n
   const label = `${d ? `${d} days ` : ""}${h} hours ${m} minutes left`;
   if (compact) return <span className="font-bold tabular-nums" aria-label={label}>{d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}</span>;
   const parts = [...(d > 0 ? [["days", d]] : []), ["hrs", h], ["min", m], ["sec", s]] as [string, number][];
+  if (big) return (
+    <div className="flex gap-2" role="timer" aria-label={label}>
+      {parts.map(([k, v]) => (
+        <div key={k} className="w-[4.2rem] bg-[#E3202A] py-2 text-center text-white shadow-[4px_4px_0_#4A1420] sm:w-20">
+          <div className={`font-display text-4xl leading-none tabular-nums sm:text-5xl ${k === "sec" ? "wv-tick" : ""}`} key={k === "sec" ? v : undefined}>{pad(v)}</div>
+          <div className="mt-1 text-[11px] font-extrabold tracking-[0.14em] uppercase">{k}</div>
+        </div>
+      ))}
+    </div>
+  );
   return (
     <div className="flex gap-1.5" role="timer" aria-label={label}>
       {parts.map(([k, v]) => (

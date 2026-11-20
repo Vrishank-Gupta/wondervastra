@@ -37,6 +37,7 @@ export function ProductCard({ p, priority = false, wished = false }: { p: Card; 
           {hoverImg && <Image src={hoverImg.url} alt="" fill sizes="25vw" className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100" />}
         </Link>
         {badge && <span className={`sticker pointer-events-none absolute top-2 left-2 ${badge.cls}`}>{badge.text}</span>}
+        {p.inStock && p.discountPct > 0 && <span className="promo-only sticker pointer-events-none absolute bottom-2 left-2 bg-[#FFC83A] text-[#4A1420]">Sale</span>}
         <button type="button" onClick={toggleWish} aria-label={heart ? `Remove ${p.name} from wishlist` : `Add ${p.name} to wishlist`} aria-pressed={heart} className="absolute top-1 right-1 grid size-11 place-items-center">
           <span className="grid size-8 place-items-center rounded-full bg-white/90"><Heart size={16} className={heart ? "fill-madder text-madder" : ""} aria-hidden /></span>
         </button>

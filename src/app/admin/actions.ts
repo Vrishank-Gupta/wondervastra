@@ -584,7 +584,7 @@ const email = z.union([z.literal(""), z.string().trim().email("Enter a valid ema
 /** Every setting has a type and a sensible range, so a typo can't break checkout (e.g. a negative COD fee). */
 const SettingsInput = z.object({
   storeName: text(60).min(2), tagline: text(200), announcement: text(160), supportEmail: email, whatsappNumber: text(20).regex(/^[+\d\s-]*$/, "Digits only"),
-  instagramUrl: url, facebookUrl: url, legalName: text(120), businessAddress: text(400), businessState: text(60),
+  instagramUrl: url, facebookUrl: url, legalName: text(120), grievanceOfficer: text(80), businessAddress: text(400), businessState: text(60),
   gstin: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, "That doesn't look like a GSTIN (15 characters)")]),
   shippingCombine: z.enum(["highest", "sum"]), defaultDeliveryCharge: money, codEnabled: z.boolean(), codFee: money, codMaxOrder: money,
   dispatchDays: days, deliveryDaysMin: days, deliveryDaysMax: days, returnWindowDays: days,

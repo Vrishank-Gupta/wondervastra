@@ -16,7 +16,7 @@ export function generateStaticParams() { return GUIDES.map((g) => ({ slug: g.slu
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const g = find((await params).slug);
   if (!g) return { title: "Not found" };
-  return { title: g.title, description: g.short, alternates: { canonical: `/guides/${g.slug}` }, openGraph: { title: g.title, description: g.short, type: "article", url: `/guides/${g.slug}` } };
+  return { title: g.title, description: g.short, alternates: { canonical: `/guides/${g.slug}`, types: { "text/markdown": `/guides/${g.slug}.md` } }, openGraph: { title: g.title, description: g.short, type: "article", url: `/guides/${g.slug}` } };
 }
 
 function Table({ t, highlight }: { t: SizeTable; highlight?: (row: string[]) => boolean }) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BadgeCheck, Clock, CreditCard, Mail, MessageCircle, RotateCcw, Truck, Users } from "lucide-react";
+import { BadgeCheck, Clock, CreditCard, Mail, MapPin, MessageCircle, Phone, RotateCcw, Truck, Users } from "lucide-react";
+import { business } from "@/lib/business";
 import type { StoreSettings } from "@/lib/settings";
 import { capabilities, paymentLine } from "@/lib/capabilities";
 import { areaLabel } from "@/lib/delivery-area";
@@ -26,7 +27,7 @@ export function TrustStrip({ settings }: { settings: StoreSettings }) {
     areaLabel(settings) === "India"
       ? { icon: Truck, title: "Free delivery", text: `Delivered in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` }
       : { icon: Truck, title: `Delivering in ${areaLabel(settings)}`, text: `Arrives in ${settings.deliveryDaysMin}–${settings.deliveryDaysMax} days` },
-    { icon: BadgeCheck, title: "100% original brands", text: "At the lowest prices" },
+    { icon: BadgeCheck, title: "100% original brands", text: "Bought direct from the brands" },
     { icon: RotateCcw, title: `${settings.returnWindowDays}-day returns`, text: "On eligible items" },
   ];
   return (
@@ -46,18 +47,19 @@ export function TrustStrip({ settings }: { settings: StoreSettings }) {
 export function Footer({ categories, settings }: { categories: { name: string; slug: string; comingSoon?: boolean }[]; settings: StoreSettings }) {
   const h = "mb-4 text-xs font-bold tracking-[0.14em] text-white uppercase";
   const a = "inline-flex min-h-11 items-center text-white/70 transition-colors hover:text-white md:min-h-0";
+  const b = business(settings);
   return (
     <footer className="mt-14 bg-wine text-white no-print">
       <div className="container-x grid grid-cols-2 gap-x-6 gap-y-10 py-12 md:grid-cols-[2fr_1fr_1fr_1fr]">
         <div className="col-span-2 md:col-span-1">
           <p aria-label="WonderVastra"><Logo onDark size="lg" /></p>
           <p className="mt-3 max-w-xs text-sm text-white/70">{settings.tagline}</p>
-          {settings.supportEmail && (
-            <ul className="mt-5 space-y-0 text-sm md:space-y-2" aria-label="Customer support">
-              {settings.supportEmail && <li><a className={`${a} inline-flex items-center gap-2`} href={`mailto:${settings.supportEmail}`}><Mail size={16} aria-hidden /> {settings.supportEmail}</a></li>}
-              {settings.supportHours && <li className="inline-flex items-center gap-2 text-white/55"><Clock size={16} aria-hidden /> {settings.supportHours}</li>}
-            </ul>
-          )}
+          <ul className="mt-5 space-y-0 text-sm md:space-y-2" aria-label="Customer support">
+            {b.phone && <li><a className={`${a} inline-flex items-center gap-2`} href={`tel:${b.tel}`}><Phone size={16} aria-hidden /> {b.phone}</a></li>}
+            {b.email && <li><a className={`${a} inline-flex items-center gap-2`} href={`mailto:${b.email}`}><Mail size={16} aria-hidden /> {b.email}</a></li>}
+            {b.hours && <li className="inline-flex items-center gap-2 text-white/55"><Clock size={16} aria-hidden /> {b.hours}</li>}
+            {b.address && <li className="flex items-start gap-2 text-white/55"><MapPin size={16} aria-hidden className="mt-0.5 shrink-0" /> <span>{b.address}, India</span></li>}
+          </ul>
           <div className="mt-5 flex flex-wrap gap-2">
             {settings.whatsappGroupUrl && <a className="btn btn-sm border-[#25D366] bg-[#25D366] text-ink hover:bg-white" href={settings.whatsappGroupUrl} target="_blank" rel="noreferrer"><Users size={15} aria-hidden /> Join our WhatsApp group</a>}
             {settings.instagramUrl && <a className="btn btn-sm border-white/40 text-white hover:bg-white hover:text-ink" href={settings.instagramUrl} target="_blank" rel="noreferrer">Instagram</a>}
@@ -86,14 +88,14 @@ export function Footer({ categories, settings }: { categories: { name: string; s
         <div>
           <h2 className={h} style={{ fontStretch: "100%" }}>About</h2>
           <ul className="space-y-0 text-sm md:space-y-2.5">
-            <li><Link className={a} href="/info/about">Our story</Link></li>
+            <li><Link className={a} href="/info/about">About us</Link></li>
             <li><Link className={a} href="/info/privacy-policy">Privacy policy</Link></li>
             <li><Link className={a} href="/info/terms">Terms of use</Link></li>
           </ul>
         </div>
       </div>
       <div className="border-t border-white/15">
-        <p className="container-x py-5 text-xs text-white/50">© {new Date().getFullYear()} {settings.legalName || settings.storeName}.{capabilities().razorpay ? " Payments secured by Razorpay." : ""}</p>
+        <p className="container-x py-5 text-xs text-white/50">© {new Date().getFullYear()} {b.name}{b.tradingAs ? ` (${b.tradingAs})` : ""}.{b.gstin ? ` GSTIN ${b.gstin}.` : ""}{capabilities().razorpay ? " Payments secured by Razorpay." : ""}</p>
       </div>
     </footer>
   );

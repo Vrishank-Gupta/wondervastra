@@ -1,5 +1,8 @@
 import { cheapestSet } from "@/lib/sets";
-import { abs, breadcrumbs, JsonLd, returnPolicy, shippingDetails } from "@/lib/seo";
+import { abs, breadcrumbs, faqPage, JsonLd, returnPolicy, shippingDetails } from "@/lib/seo";
+import { guideProducts } from "@/lib/guides";
+import { metaDescription, productFaq } from "@/lib/product-facts";
+import { activePromo } from "@/lib/promo";
 import { capabilities } from "@/lib/capabilities";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -28,9 +31,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const price = set ? set.price : variants.length ? Math.min(...variants.map((v) => v.price)) : p.price;
   const fullName = withBrand(p.name, brand?.name);
   const title = p.seoTitle || `${fullName} · ${set ? `Set ${money(price)}` : money(price)}`;
-  const description = p.seoDescription || p.shortDescription || `Shop ${fullName} at WonderVastra.`;
+  // The admin's own text wins; otherwise a description written from the listing's live prices, sizes and fabric.
+  const facts = p.seoDescription ? null : (await guideProducts(p.slug))[0];
+  const description = p.seoDescription || (facts ? metaDescription(facts, await getSettings()) : p.shortDescription) || `Shop ${fullName} at WonderVastra.`;
   return {
-    title, description, alternates: { canonical: `/p/${p.slug}` },
+    title, description, alternates: { canonical: `/p/${p.slug}`, types: { "text/markdown": `/p/${p.slug}.md` } },
     openGraph: { title, description, type: "website", url: `/p/${p.slug}`, images: images[0] ? [{ url: `/api/og/${p.id}`, width: 1200, height: 630, alt: p.name }] : undefined },
     twitter: { card: "summary_large_image", title, description },
   };
@@ -42,7 +47,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const d = await getProductBySlug(slug);
   if (!d) notFound();
   const { product: p, images, variants, category, brand, reviews } = d;
-  const [settings, cards, wished, offers] = await Promise.all([getSettings(), getAllCards(), wishedIds(), getLiveOffers()]);
+  const [settings, cards, wished, offers, [facts]] = await Promise.all([getSettings(), getAllCards(), wishedIds(), getLiveOffers(), guideProducts(p.slug)]);
+  const faq = facts ? productFaq(facts, settings, { returnable: p.returnable }) : [];
   const related = cards.filter((c) => c.categoryId === p.categoryId && c.id !== p.id && c.inStock).slice(0, 4);
   const sameBrand = brand ? cards.filter((c) => c.brandId === brand.id && c.id !== p.id && c.categoryId !== p.categoryId && c.inStock).slice(0, 4) : [];
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
@@ -65,7 +71,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
   };
   const jsonLd = [{
     "@context": "https://schema.org", "@type": "Product", "@id": `${url}#product`, name: fullName, url,
-    description: p.shortDescription ?? p.description ?? undefined,
+    description: [p.shortDescription, p.description?.replace(/\n+/g, " ").replace(/\s*•\s*/g, "; ")].filter(Boolean).join(" ") || undefined,
+    ...(facts?.features.length ? { additionalProperty: facts.features.map((f) => ({ "@type": "PropertyValue", name: "Feature", value: f })) } : {}),
     image: images.map((i) => abs(i.url)),
     sku: variants[0]?.sku ?? p.id, mpn: p.id,
     brand: { "@type": "Brand", name: brand?.name ?? "WonderVastra" },
@@ -81,7 +88,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
       aggregateRating: { "@type": "AggregateRating", ratingValue: avg.toFixed(1), reviewCount: reviews.length },
       review: reviews.slice(0, 5).map((r) => ({ "@type": "Review", author: { "@type": "Person", name: r.name }, reviewRating: { "@type": "Rating", ratingValue: r.rating }, reviewBody: r.body ?? undefined })),
     } : {}),
-  }, breadcrumbs([{ name: "Home", path: "/" }, ...(category ? [{ name: category.name, path: `/c/${category.slug}` }] : [{ name: "Shop", path: "/shop" }]), { name: fullName, path: `/p/${p.slug}` }])];
+  }, ...(faq.length ? [faqPage(faq)] : []), breadcrumbs([{ name: "Home", path: "/" }, ...(category ? [{ name: category.name, path: `/c/${category.slug}` }] : [{ name: "Shop", path: "/shop" }]), { name: fullName, path: `/p/${p.slug}` }])];
 
   return (
     <div className="container-x py-4 sm:py-6">
@@ -103,6 +110,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
         wished={wished.includes(p.id)}
         settings={{ codEnabled: settings.codEnabled, onlinePayments: capabilities().onlinePayments, dispatchDays: settings.dispatchDays, deliveryDaysMin: settings.deliveryDaysMin, deliveryDaysMax: settings.deliveryDaysMax, returnWindowDays: settings.returnWindowDays, deliveryArea: areaLabel(settings), areaRestricted: Boolean(settings.deliveryPincodes.trim()) }}
         tiers={offerTiers(offers)}
+        promo={(() => { const x = activePromo(); return x ? { name: x.name, endsAt: x.endsAt, ends: x.ends } : null; })()}
         initial={{ size: typeof sp.size === "string" ? sp.size : undefined, pick: typeof sp.pick === "string" ? sp.pick : undefined }}
       />
 
@@ -120,6 +128,20 @@ export default async function ProductPage({ params, searchParams }: Props) {
                 {r.body && <p className="mt-1 text-sm text-ink-soft">{r.body}</p>}
                 <p className="mt-2 text-xs text-ink-soft">Verified purchase · {formatDate(r.createdAt)}</p>
               </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {faq.length > 0 && (
+        <section id="questions" className="mt-12 scroll-mt-24" aria-labelledby="questions-h">
+          <h2 id="questions-h" className="text-3xl">Questions about this product</h2>
+          <div className="mt-4 grid gap-x-8 gap-y-5 md:grid-cols-2">
+            {faq.map((x) => (
+              <div key={x.q}>
+                <h3 className="font-semibold">{x.q}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-ink-soft">{x.a}</p>
+              </div>
             ))}
           </div>
         </section>

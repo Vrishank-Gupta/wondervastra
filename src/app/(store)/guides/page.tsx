@@ -7,7 +7,7 @@ import { breadcrumbs, JsonLd } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Thermal wear buying guides",
   description: "Size charts by age, men's sizes, Amul vs Dollar vs Lux compared, and how to choose thermals for Delhi winters.",
-  alternates: { canonical: "/guides" },
+  alternates: { canonical: "/guides", types: { "text/markdown": "/guides.md" } },
 };
 
 export default function GuidesPage() {

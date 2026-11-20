@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { activePromo } from "@/lib/promo";
+import { PromoHero } from "@/components/store/promo-hero";
 import { Tag } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -6,10 +8,19 @@ import { Countdown } from "@/components/store/countdown";
 import { filtersFromParams, Listing } from "@/components/store/listing";
 import { CopyCode } from "@/components/store/copy-code";
 import { getAllCards, getLiveOffers, getLiveSales, salesWithItems } from "@/lib/catalog";
-import { isLive, isOpenEnded, saleLabel } from "@/lib/pricing";
+import { isLive, isOpenEnded, offerTiers, saleLabel } from "@/lib/pricing";
 import { money } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Winter Sale", description: "Winter Sale on every listing: original branded thermals below MRP, extra savings when you pick more pieces, and free delivery at WonderVastra.", alternates: { canonical: "/sale" } };
+export async function generateMetadata(): Promise<Metadata> {
+  const name = activePromo()?.name ?? "Winter Sale";
+  const promo = activePromo();
+  return {
+    title: name,
+    description: `${name} on every listing: original branded thermals below MRP, extra savings when you pick more pieces, and free delivery across Delhi NCR at WonderVastra.${promo ? ` ${promo.ends}.` : ""}`,
+    alternates: { canonical: "/sale", types: { "text/markdown": "/sale.md" } },
+    ...(promo ? { openGraph: { images: [{ url: promo.poster, width: 1080, height: 1350, alt: promo.alt }] } } : {}),
+  };
+}
 
 export default async function SalePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [cards, allSales, offers, coupons] = await Promise.all([
@@ -21,17 +32,23 @@ export default async function SalePage({ searchParams }: { searchParams: Promise
   const shown = coupons.filter((c) => isLive(c, now) && (c.usageLimit == null || c.usedCount < c.usageLimit) && c.description);
   const onOffer = cards.filter((c) => c.discountPct > 0);
   const maxOff = Math.max(0, ...cards.map((c) => c.discountPct));
+  const promo = activePromo(now);
   return (
     <>
+      {promo && <PromoHero promo={promo} cards={cards} extra={offerTiers(offers).at(-1)?.reward.replace(/ off.*$/, "") ?? null} heading="h1" />}
       <div className="bg-madder text-white">
         <div className="container-x py-8 sm:py-12">
-          <h1 className="text-6xl sm:text-8xl">Winter Sale</h1>
-          <p className="mt-2 max-w-2xl text-white/90">On every listing: {maxOff > 0 ? <>up to <b>{maxOff}% below MRP</b>, </> : null}with extra savings when you pick more pieces. Free delivery on every order.</p>
+          {promo
+            ? <p className="max-w-2xl text-white/90">On every listing: {maxOff > 0 ? <>up to <b>{maxOff}% below MRP</b>, </> : null}with extra savings when you pick more pieces. Free delivery on every order.</p>
+            : <>
+              <h1 className="text-6xl sm:text-8xl">Winter Sale</h1>
+              <p className="mt-2 max-w-2xl text-white/90">On every listing: {maxOff > 0 ? <>up to <b>{maxOff}% below MRP</b>, </> : null}with extra savings when you pick more pieces. Free delivery on every order.</p>
+            </>}
           <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {sales.map((s) => (
               <div key={s.id} className="flex bg-white text-ink flex-col gap-2 p-4">
                 <p className="font-display text-2xl">{s.name}</p>
-                <p className="text-sm text-ink-soft">{saleLabel(s).replace("Lowest prices", "Lowest prices on")} selected styles</p>
+                <p className="text-sm text-ink-soft">{saleLabel(s).replace("Special prices", "Special prices on")} selected styles</p>
                 {!isOpenEnded(s.endsAt) && <Countdown endsAt={s.endsAt} />}
               </div>
             ))}

@@ -6,6 +6,7 @@
 import type { StoreSettings } from "./settings";
 import { siteUrl, withBrand } from "./utils";
 import { areaLabel, parsePincodes, splitArea } from "./delivery-area";
+import { business, postalAddress } from "./business";
 
 export function JsonLd({ data }: { data: object | object[] }) {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
@@ -27,7 +28,7 @@ export function areaPhrase(s: Pick<StoreSettings, "deliveryAreaName" | "delivery
   return towns.length ? `${a} (${brandPhrase(towns)})` : a;
 }
 export function seoDescription(brandNames: string[], s: Pick<StoreSettings, "deliveryAreaName" | "deliveryPincodes">) {
-  return `WonderVastra is an online store for 100% original branded thermal wear at the lowest prices: kids' thermals for ages 2 to 11 and men's thermals, from ${brandPhrase(brandNames)}. Delivering across ${areaPhrase(s)}.`;
+  return `WonderVastra is an online store for 100% original branded thermal wear, sold below MRP: kids' thermals for ages 2 to 11 and men's thermals, from ${brandPhrase(brandNames)}. Delivering across ${areaPhrase(s)}.`;
 }
 /** Where we deliver, as schema.org understands it. */
 function served(s: StoreSettings) {
@@ -36,6 +37,7 @@ function served(s: StoreSettings) {
 }
 
 export function organization(s: StoreSettings, brandNames: string[] = []) {
+  const b = business(s);
   return {
     "@context": "https://schema.org",
     "@type": "OnlineStore",
@@ -48,10 +50,14 @@ export function organization(s: StoreSettings, brandNames: string[] = []) {
     slogan: "Crafted with trust",
     description: seoDescription(brandNames, s),
     email: s.supportEmail || undefined,
+    telephone: b.tel || undefined,
+    address: postalAddress(s),
+    taxID: b.gstin || undefined,
+    knowsAbout: ["Thermal wear", "Kids' thermals", "Men's thermals", "Thermal size charts", ...brandNames.map((n) => `${n} thermals`)],
     areaServed: served(s),
     currenciesAccepted: "INR",
     sameAs: [s.instagramUrl, s.facebookUrl].filter(Boolean),
-    contactPoint: s.supportEmail ? [{ "@type": "ContactPoint", contactType: "customer support", email: s.supportEmail, url: `${siteUrl()}/info/contact`, areaServed: "IN", availableLanguage: ["English", "Hindi"] }] : undefined,
+    contactPoint: s.supportEmail || b.tel ? [{ "@type": "ContactPoint", contactType: "customer support", email: s.supportEmail || undefined, telephone: b.tel || undefined, url: `${siteUrl()}/info/contact`, areaServed: "IN", availableLanguage: ["English", "Hindi"] }] : undefined,
     hasMerchantReturnPolicy: returnPolicy(s),
   };
 }

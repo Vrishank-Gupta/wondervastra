@@ -6,7 +6,7 @@ import { getActiveBrands } from "@/lib/catalog";
 
 export async function generateMetadata(): Promise<Metadata> {
   const names = (await getActiveBrands()).filter((b) => !b.isHouse).map((b) => b.name);
-  return { title: "Shop by brand", description: `Thermals from the brands you already trust (${brandPhrase(names)}), 100% original at the lowest prices.`, alternates: { canonical: "/brands" } };
+  return { title: "Shop by brand", description: `Thermals from the brands you already trust (${brandPhrase(names)}), 100% original, below MRP.`, alternates: { canonical: "/brands" } };
 }
 
 export default async function Brands() {
@@ -19,7 +19,7 @@ export default async function Brands() {
         <div className="container-x py-7 sm:py-10">
           <nav aria-label="Breadcrumb" className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-soft uppercase"><Link href="/" className="hover:underline">Home</Link> / Brands</nav>
           <h1 className="text-5xl sm:text-7xl">Shop by brand</h1>
-          <p className="mt-2 text-ink-soft">100% original stock at the lowest prices, from {partners.length} {partners.length === 1 ? "brand" : "brands"} you know{house.length > 0 && ", plus our own label"}.</p>
+          <p className="mt-2 text-ink-soft">100% original stock, bought direct and sold below MRP, from {partners.length} {partners.length === 1 ? "brand" : "brands"} you know{house.length > 0 && ", plus our own label"}.</p>
         </div>
       </div>
       <div className="container-x py-8">

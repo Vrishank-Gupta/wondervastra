@@ -34,7 +34,7 @@ const wordmark = (dark: boolean, size: number) => `<div style="display:flex;alig
 type Post = { file: string; dark: boolean; eyebrow: string; title: string; body: string; foot?: string };
 const POSTS: Post[] = [
   {
-    file: "01-now-open", dark: true, eyebrow: "Now open", title: "Original thermals.<br>Lowest prices.",
+    file: "01-now-open", dark: true, eyebrow: "Now open", title: "Original thermals.<br>Below MRP.",
     body: `<p style="font-size:44px;line-height:1.35;margin:0">Warm layers for babies, boys, girls and men, from brands you already trust. 100% original.</p>`,
     foot: "Shop at wondervastra.in",
   },

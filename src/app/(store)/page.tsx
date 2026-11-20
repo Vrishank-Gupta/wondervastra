@@ -10,6 +10,8 @@ import { Countdown } from "@/components/store/countdown";
 import { CopyCode } from "@/components/store/copy-code";
 import { TrustStrip } from "@/components/store/footer";
 import { HeroCarousel, type Slide } from "@/components/store/hero-carousel";
+import { PromoHero } from "@/components/store/promo-hero";
+import { activePromo } from "@/lib/promo";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductRail, SectionTitle } from "@/components/store/product-rail";
 import { wishedIds } from "@/components/store/listing";
@@ -20,7 +22,7 @@ import { money } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { AUDIENCES, bannerSrc } from "@/lib/home-banners";
 
-export const metadata: Metadata = { alternates: { canonical: "/" } };
+export const metadata: Metadata = { alternates: { canonical: "/", types: { "text/markdown": "/llms.txt" } } };
 
 export default async function Home() {
   const [settings, categories, brands, cards, sales, offers, wished, topReviews, coupons] = await Promise.all([
@@ -48,9 +50,11 @@ export default async function Home() {
   const daysLeft = sale ? Math.max(1, Math.ceil((sale.endsAt - now) / 86_400_000)) : 0;
 
   const saleScope = sale ? (sale.scope === "all" ? "everything" : sale.scope === "category" ? categories.filter((c) => sale.targetIds.includes(c.id)).map((c) => c.name.toLowerCase()).join(" and ") || "selected styles" : sale.scope === "brand" ? brands.filter((b) => sale.targetIds.includes(b.id)).map((b) => b.name).join(" and ") || "selected brands" : "selected styles") : "";
+  // While a dated campaign runs (lib/promo.ts), its banner replaces the slideshow.
+  const promo = activePromo(now);
   const slides: Slide[] = [
     ...(categories.some((c) => c.slug === "kids-thermals" && !c.comingSoon) ? [{ key: "kids", eyebrow: "Ages 2 to 11 · Amul, Dollar", title: "Kids' thermals",
-      text: "Soft, warm layers for little ones. 100% original brands at the lowest prices.", cta: "Shop kids'", href: "/c/kids-thermals",
+      text: "Soft, warm layers for little ones. 100% original brands, below MRP.", cta: "Shop kids'", href: "/c/kids-thermals",
       ...bannerSrc("kids"), alt: "Boy in a Dollar Ultra charcoal thermal top and trouser" }] : []),
     ...(sale ? [{
       key: "sale", eyebrow: isOpenEnded(sale.endsAt) ? "On now" : `Ends in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`, title: sale.name,
@@ -79,8 +83,8 @@ export default async function Home() {
   return (
     <>
       <JsonLd data={[organization(settings, partners.map((b) => b.name)), website(settings)]} />
-      <h1 className="sr-only">WonderVastra: 100% original branded kids' and men's thermals at the lowest prices</h1>
-      <HeroCarousel slides={slides} winter={settings.winterLook} />
+      <h1 className="sr-only">WonderVastra: 100% original branded kids' and men's thermals, below MRP</h1>
+      {promo ? <PromoHero promo={promo} cards={cards} extra={offerTiers(offers).at(-1)?.reward.replace(/ off.*$/, "") ?? null} /> : <HeroCarousel slides={slides} winter={settings.winterLook} />}
 
       {(offers.length > 0 || shownCoupons.length > 0) && (
         <section aria-label="Offers" className="border-b border-line">
@@ -154,12 +158,12 @@ export default async function Home() {
       <section aria-label="Our promise" className="mt-12 bg-ink text-white sm:mt-16">
         <div className="container-x grid gap-6 py-8 sm:py-10 lg:grid-cols-[1.1fr_2fr] lg:items-center lg:gap-10">
           <p className="font-display text-[2.6rem] leading-[0.92] uppercase sm:text-6xl">
-            100% original.<br /><span className="text-madder">Lowest prices.</span>
+            100% original.<br /><span className="text-madder">Below MRP.</span>
           </p>
           <ul className="grid gap-5 sm:grid-cols-3">
             {[
               { icon: BadgeCheck, title: "Only the real thing", text: "Genuine stock from the brands you already trust. No copies, ever." },
-              { icon: IndianRupee, title: "Lowest prices", text: "Always below MRP, with extra savings on bigger carts and packs." },
+              { icon: IndianRupee, title: "Below MRP", text: "Always below MRP, with extra savings on bigger carts and packs." },
               { icon: Tags, title: "Big brands, one cart", text: `${partners.slice(0, 3).map((b) => b.name).join(", ") || "Top brands"}${partners.length > 3 ? " and more" : ""}, delivered together.` },
             ].map((i) => (
               <li key={i.title} className="flex gap-3">

@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { createClient } from "@libsql/client";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import sharp from "sharp";
+import { activePromo } from "../src/lib/promo";
 
 const db = createClient({ url: "file:./data/e2e.db" });
 // The app writes to the same file (visitor beacons etc.): wait for a lock instead of failing.
@@ -391,7 +392,7 @@ test("seller adds a category and listing with a real photo upload; jewellery wor
   expect(skus.map((r) => r.sku)).toEqual(["WV-KUNDANJH-GOL", "WV-KUNDANJH-SIL"]);
 
   await page.goto("/p/kundan-jhumka-earrings");
-  await expect(page.getByRole("heading", { name: "Kundan Jhumka Earrings" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kundan Jhumka Earrings", exact: true })).toBeVisible();
   await expect(page.getByText("Free delivery", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/9 pieces available/)).toBeVisible();
   await expect(page.getByText(/Limit 2 per order/)).toBeVisible();
@@ -1075,7 +1076,7 @@ test("thermal warmers: MRP per size, and Top / Bottom / Set where a set takes on
     await expect(page.locator("#size-picker").getByRole("button", { name: "4–5 Y (60 cm)" })).toHaveClass(/line-through/);
     await page.locator("#size-picker").getByRole("button", { name: "2–3 Y (55 cm)" }).click();
     await expect(page.getByTestId("price")).toHaveText("₹500");
-    await expect(page.getByText("MRP ₹710")).toBeVisible();
+    await expect(page.getByText("MRP ₹710", { exact: true })).toBeVisible();
     await expect(page.getByText("Only 2 sets left")).toBeVisible();
     await page.getByRole("button", { name: "Add to cart" }).first().click();
     const cart = await page.evaluate(() => JSON.parse(localStorage.getItem("vv_cart") ?? "[]"));
@@ -1131,8 +1132,11 @@ test("thermal warmers: MRP per size, and Top / Bottom / Set where a set takes on
     await page.goto("/p/e2e-warmer");
     await expect(page.getByTestId("combo")).toContainText("Sold in 2s");
     await expect(page.getByTestId("combo")).toContainText("Cart over ₹1,500? Single pieces are fine too.");
-    await page.evaluate(() => localStorage.setItem("vv_cart", JSON.stringify([{ variantId: "e2e-w-t55", qty: 1 }])));
+    // Put the item in once the cart page has loaded its own (empty) cart, so a page still starting up can't save over it.
     await page.goto("/cart");
+    await expect(page.getByRole("heading", { name: "Your cart is empty" })).toBeVisible();
+    await page.evaluate(() => localStorage.setItem("vv_cart", JSON.stringify([{ variantId: "e2e-w-t55", qty: 1 }])));
+    await page.reload();
     await expect(page.getByTestId("minimum-issue")).toContainText("add 1 more");
     await expect(page.getByRole("link", { name: "Proceed to checkout" })).toHaveCount(0);
 
@@ -1671,3 +1675,117 @@ test("pieces with colours: text buttons and sets on the store; phone editor keep
 async function rows_(pid: string) {
   return (await rows("select id, option2, price, stock, active from variants where product_id=?", [pid])) as { id: string; option2: string; price: number; stock: number; active: number }[];
 }
+
+test("AI-readable pages: Markdown copies, llms-full.txt, product questions, business details, no unprovable price claims", async ({ page, request }) => {
+  const md = async (path: string, accept?: string) => {
+    const r = await request.get(path, accept ? { headers: { accept } } : undefined);
+    return { status: r.status(), type: r.headers()["content-type"] ?? "", link: r.headers()["link"] ?? "", body: await r.text() };
+  };
+  // Product, category, brand and shop pages as Markdown, by ".md" or by asking for text/markdown.
+  const prod = await md("/p/rupa-boys-thermal-top.md");
+  expect(prod.status).toBe(200);
+  expect(prod.type).toContain("text/markdown");
+  expect(prod.link).toContain('/p/rupa-boys-thermal-top>; rel="canonical"');
+  expect(prod.body).toMatch(/^# Rupa Boys' Thermal Top\n\n> Buy Rupa Boys' Thermal Top online/);
+  expect(prod.body).toContain("## Prices by size");
+  expect(prod.body).toContain("### Is this Rupa Boys' Thermal Top original?");
+  expect(prod.body).not.toMatch(/<[a-z]+[ >]/i);
+  expect((await md("/p/rupa-boys-thermal-top", "text/markdown")).body).toBe(prod.body);
+  expect((await md("/c/kids-thermals.md")).body).toContain("## Products");
+  expect((await md("/brands/rupa.md")).body).toContain("Are these genuine Rupa products?");
+  expect((await md("/shop.md")).status).toBe(200);
+  expect((await md("/p/no-such-thing.md")).status).toBe(404);
+  // A browser still gets the normal page.
+  expect((await request.get("/p/rupa-boys-thermal-top")).headers()["content-type"]).toContain("text/html");
+
+  const full = await md("/llms-full.txt");
+  expect(full.body).toContain("# Products in full");
+  expect(full.body).toContain("## Rupa Boys' Thermal Top");
+  expect((await md("/llms.txt")).body).toContain("/llms-full.txt");
+
+  // The product page: a fact-built description, a Markdown alternate, visible questions with matching FAQ data.
+  await page.goto("/p/rupa-boys-thermal-top");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /^Buy Rupa Boys' Thermal Top online: .*free delivery across Delhi NCR/);
+  await expect(page.locator('link[rel="alternate"][type="text/markdown"]')).toHaveAttribute("href", /\/p\/rupa-boys-thermal-top\.md$/);
+  await expect(page.getByRole("heading", { name: "Questions about this product" })).toBeVisible();
+  const ld = await page.locator('script[type="application/ld+json"]').allTextContents();
+  const types = ld.flatMap((t) => [JSON.parse(t)].flat()).map((x: { "@type": string }) => x["@type"]);
+  expect(types).toEqual(expect.arrayContaining(["Product", "FAQPage", "BreadcrumbList"]));
+
+  // Category pages: intro, questions, and the product list for search engines.
+  await page.goto("/c/kids-thermals");
+  await expect(page.getByRole("heading", { name: "Kids' Thermals: common questions" })).toBeVisible();
+  const catLd = (await page.locator('script[type="application/ld+json"]').allTextContents()).flatMap((t) => [JSON.parse(t)].flat());
+  expect(catLd.map((x: { "@type": string }) => x["@type"])).toEqual(expect.arrayContaining(["CollectionPage", "ItemList", "FAQPage"]));
+
+  // Who runs the store: shown on Contact with only the city, never the street address.
+  // The dev server may be writing visitor stats at the same moment; retry a busy database.
+  const write = async (sql: string) => { for (let i = 0; ; i++) { try { return await db.execute(sql); } catch (e) { if (i > 20 || !String(e).includes("locked")) throw e; await new Promise((r) => setTimeout(r, 150)); } } };
+  await write("insert or replace into settings (key, value, updated_at) values ('businessAddress', '\"9 Test Lane, Sarita Vihar, New Delhi 110076\"', 0), ('whatsappNumber', '\"9876543210\"', 0), ('grievanceOfficer', '\"Test Officer\"', 0)");
+  try {
+    await page.goto("/info/contact");
+    await expect(page.getByText("Based in")).toBeVisible();
+    await expect(page.locator("main")).toContainText("Delhi");
+    await expect(page.locator("main")).toContainText("+91 98765 43210");
+    await expect(page.locator("main")).toContainText("Test Officer");
+    expect(await page.content()).not.toContain("Test Lane");
+    await page.goto("/info/terms");
+    await expect(page.getByRole("heading", { name: "Complaints and grievances" })).toBeVisible();
+    await expect(page.locator("main")).toContainText("grievance officer, Test Officer");
+  } finally {
+    await write("delete from settings where key in ('businessAddress', 'whatsappNumber', 'grievanceOfficer')");
+  }
+
+  // Merchant Center: no unprovable "lowest price" claims anywhere a shopper or crawler looks.
+  for (const path of ["/", "/shop", "/c/kids-thermals", "/brands/rupa", "/p/rupa-boys-thermal-top", "/info/about", "/info/faq", "/llms.txt"]) {
+    expect(await (await request.get(path)).text(), path).not.toMatch(/lowest prices/i);
+  }
+});
+
+test("dated sale campaign: banner, sticky countdown, stickers and product box while it runs; nothing after it ends", async ({ page }) => {
+  const promo = activePromo();
+  await page.goto("/");
+  if (!promo) {
+    // Outside the campaign's dates the store looks normal.
+    await expect(page.getByText("Hurry! Sale ends in")).toHaveCount(0);
+    await expect(page.locator("main")).not.toHaveAttribute("data-promo", "on");
+    return;
+  }
+  // Home: the campaign banner replaces the slideshow, with a live countdown and real prices.
+  await expect(page.getByRole("heading", { name: promo.name.replace(" ", "") }).or(page.getByRole("heading", { name: promo.name })).first()).toBeVisible();
+  await expect(page.getByText("Hurry! Sale ends in")).toBeVisible();
+  const timer = page.getByRole("timer").first();
+  const t1 = await timer.innerText();
+  await expect.poll(() => timer.innerText(), { timeout: 4000 }).not.toBe(t1);
+  await expect(page.getByText(/sets from/i).first()).toBeVisible();
+  // The top strip and the sticky ribbon announce it; the menu's Sale link is a button.
+  await expect(page.getByRole("region", { name: "Offers" }).getByRole("listitem").first()).toHaveText(promo.strip);
+  await expect(page.getByRole("link", { name: `${promo.name} sale is live. Shop the sale` })).toBeVisible();
+  // Still in view after scrolling (it lives in the sticky header).
+  await page.mouse.wheel(0, 2500);
+  await page.waitForTimeout(300);
+  await expect(page.getByRole("link", { name: `${promo.name} sale is live. Shop the sale` })).toBeInViewport();
+
+  // Listings: discounted, in-stock cards carry the sale sticker.
+  await page.goto("/c/kids-thermals");
+  await expect(page.locator("main")).toHaveAttribute("data-promo", "on");
+  await expect(page.locator(".promo-only").first()).toBeVisible();
+
+  // Product page: the sale box with its own countdown, above the fold.
+  await page.goto("/p/rupa-boys-thermal-top");
+  await expect(page.getByTestId("promo-box")).toContainText(`${promo.name} is on`);
+  await expect(page.getByTestId("promo-box")).toContainText("Ends in");
+
+  // /sale: the campaign is the page's heading, with the poster as the share image.
+  await page.goto("/sale");
+  await expect(page.locator("h1")).toContainText(promo.name.split(" ")[0]);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(promo.poster.replace(/[.]/g, "\\.")));
+  await expect(page).toHaveTitle(new RegExp(promo.name));
+
+  // No page scrolls sideways on a small phone.
+  await page.setViewportSize({ width: 360, height: 800 });
+  for (const path of ["/", "/sale", "/c/kids-thermals", "/p/rupa-boys-thermal-top", "/info/contact"]) {
+    await page.goto(path);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(360);
+  }
+});

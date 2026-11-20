@@ -172,13 +172,14 @@ export function SettingsForm({ initial, isOwner, demand }: { initial: StoreSetti
             </div>
           </Panel>
 
-          <Panel title="Business details (for GST bills)">
-            <p className="mb-3 text-sm text-ink-soft">Printed on invoices. Fill these when your GST registration is ready; leave empty until then.</p>
+          <Panel title="Business details (shown on your website and bills)">
+            <p className="mb-3 text-sm text-ink-soft">Your business name, phone and email are shown on your Contact, About and Terms pages and in the footer; the website shows only your city, not the full address. Everything is printed on invoices. Google checks these before it shows your products, so fill your name and address now, even before GST registration. Leave GSTIN empty until you have one.</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              {text("legalName", "Registered business name", "As on your GST certificate.")}
+              {text("legalName", "Business name", "Your registered or trading name, e.g. as on your GST certificate or bank account.")}
+              {text("grievanceOfficer", "Person who handles complaints", "Full name. Indian e-commerce rules ask shops to name one person customers can complain to.")}
               {text("gstin", "GSTIN (if registered)", "15 characters, e.g. 07ABCDE1234F1Z5.")}
               <Field id="bstate" label="State you're registered in" hint="Decides CGST + SGST or IGST on each bill."><select id="bstate" className="input w-full min-w-0 truncate" value={s.businessState} onChange={(e) => up("businessState", e.target.value)}><option value="">Choose state</option>{STATES.map((x) => <option key={x}>{x}</option>)}</select></Field>
-              <Field id="ba" label="Business address" wide><textarea id="ba" className="input" rows={2} value={s.businessAddress} onChange={(e) => up("businessAddress", e.target.value)} /></Field>
+              <Field id="ba" label="Business address" hint="Full address with pincode. Printed on invoices and courier labels; the website only shows your city (Delhi)." wide><textarea id="ba" className="input" rows={2} value={s.businessAddress} onChange={(e) => up("businessAddress", e.target.value)} /></Field>
             </div>
           </Panel>
 

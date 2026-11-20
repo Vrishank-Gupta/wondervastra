@@ -10,8 +10,8 @@ import { money } from "./format";
 export type SizeTable = { title: string; columns: string[]; rows: string[][] };
 export type GuideProduct = Buyable & { material: string | null; care: string | null; chart: SizeTable[]; features: string[]; setFrom: number | null; pieceFrom: number | null };
 
-export async function guideProducts(): Promise<GuideProduct[]> {
-  const items = await getBuyables();
+export async function guideProducts(slug?: string): Promise<GuideProduct[]> {
+  const items = await getBuyables(slug);
   const out: GuideProduct[] = [];
   for (const b of items) {
     const d = await getProductBySlug(b.slug);

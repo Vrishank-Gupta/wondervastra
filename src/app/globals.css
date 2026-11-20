@@ -91,3 +91,27 @@ body { background: var(--color-ivory); color: var(--color-ink); font-family: var
   nav[aria-label="Breadcrumb"] a { padding-block: 15px; margin-block: -15px; }
   select { min-height: 44px; }
 }
+
+/* Campaign-only touches (lib/promo.ts): hidden unless the store layout marks <main data-promo="on">. */
+.promo-only { display: none !important; }
+[data-promo="on"] .promo-only { display: inline-flex !important; }
+
+/* Sale urgency (campaign banner, ribbon and tape bands). All of it stops for reduced motion. */
+@keyframes wv-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes wv-wiggle { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(1.5deg) scale(1.05); } }
+@keyframes wv-wiggle-r { 0%, 100% { transform: rotate(2.5deg); } 50% { transform: rotate(-1.5deg) scale(1.05); } }
+@keyframes wv-spin { 0%, 100% { transform: rotate(-14deg) scale(1); } 50% { transform: rotate(8deg) scale(1.08); } }
+@keyframes wv-ring { 0% { box-shadow: 0 0 0 0 rgba(227, 32, 42, 0.7); } 100% { box-shadow: 0 0 0 16px rgba(227, 32, 42, 0); } }
+@keyframes wv-tick { from { transform: translateY(-30%); opacity: 0.3; } to { transform: none; opacity: 1; } }
+@keyframes wv-burst { 0%, 100% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(12deg) scale(1.08); } }
+.wv-flash { animation: wv-flash 1s steps(2, jump-none) infinite; }
+.wv-wiggle { animation: wv-wiggle 1.6s ease-in-out infinite; }
+.wv-wiggle-r { animation: wv-wiggle-r 1.6s ease-in-out infinite 0.3s; }
+.wv-spin { animation: wv-spin 2.4s ease-in-out infinite; }
+.wv-ring { animation: wv-ring 1.4s ease-out infinite; }
+.wv-tick { animation: wv-tick 0.25s ease-out; }
+.wv-burst { animation: wv-burst 2s ease-in-out infinite; clip-path: polygon(50% 0%, 61% 13%, 77% 6%, 79% 22%, 95% 25%, 88% 40%, 100% 50%, 88% 60%, 95% 75%, 79% 78%, 77% 94%, 61% 87%, 50% 100%, 39% 87%, 23% 94%, 21% 78%, 5% 75%, 12% 60%, 0% 50%, 12% 40%, 5% 25%, 21% 22%, 23% 6%, 39% 13%); }
+.marquee-fast { animation: marquee 18s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .wv-flash, .wv-wiggle, .wv-wiggle-r, .wv-spin, .wv-ring, .wv-tick, .wv-burst, .marquee-fast { animation: none; }
+}

@@ -7,7 +7,7 @@ import { FamilyPack } from "@/components/store/family-pack";
 export const metadata: Metadata = {
   title: "Family pack: thermals for everyone in one go",
   description: "Pick a thermal for each person in your family, kids and adults, and add them all to your cart together. Extra savings on 3, 4, 5 and 7 pieces.",
-  alternates: { canonical: "/family-pack" },
+  alternates: { canonical: "/family-pack", types: { "text/markdown": "/family-pack.md" } },
 };
 
 export default async function FamilyPackPage() {

@@ -1,4 +1,7 @@
-import { brandPhrase, breadcrumbs, itemList, JsonLd } from "@/lib/seo";
+import { abs, brandPhrase, breadcrumbs, faqPage, itemList, JsonLd } from "@/lib/seo";
+import { guideProducts } from "@/lib/guides";
+import { collectionFacts } from "@/lib/product-facts";
+import { CollectionFaq } from "@/components/store/collection-faq";
 import { areaLabel } from "@/lib/delivery-area";
 import { getSettings } from "@/lib/settings";
 import { money } from "@/lib/format";
@@ -21,12 +24,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const items = cards.filter((c) => c.categoryId === cat.id && c.inStock);
   const brands = [...new Set(items.map((c) => c.brandName).filter(Boolean))] as string[];
   const from = items.length ? Math.min(...items.map((c) => c.price)) : 0;
-  const description = `Buy ${cat.name.toLowerCase()} online in ${area}${brands.length ? ` from ${brandPhrase(brands)}` : ""}. 100% original${from ? `, from ${money(from)}` : ""}, at the lowest prices with delivery across ${area}.${cat.tagline ? ` ${cat.tagline}.` : ""}`;
+  const description = `Buy ${cat.name.toLowerCase()} online in ${area}${brands.length ? ` from ${brandPhrase(brands)}` : ""}. 100% original${from ? `, from ${money(from)}` : ""}, below MRP, with free delivery across ${area}.${cat.tagline ? ` ${cat.tagline}.` : ""}`;
   // Baby/Boys/Girls shortcuts are real landing pages; other filter combinations aren't indexed.
   const indexable = Object.keys(sp).every((k) => k === "collection");
   return {
     title: `${cat.name} online${sp.collection ? ` · ${String(sp.collection).replace(/^./, (c) => c.toUpperCase())}` : ""}`, description,
-    alternates: { canonical: sp.collection && indexable ? `/c/${cat.slug}?collection=${sp.collection}` : `/c/${cat.slug}` },
+    alternates: { canonical: sp.collection && indexable ? `/c/${cat.slug}?collection=${sp.collection}` : `/c/${cat.slug}`, types: { "text/markdown": `/c/${cat.slug}.md` } },
     ...(indexable ? {} : { robots: { index: false, follow: true } }),
     openGraph: { images: cat.image ? [cat.image] : undefined },
   };
@@ -34,10 +37,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function CategoryPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const [cats, cards] = await Promise.all([getActiveCategories(), getAllCards()]);
+  const [cats, cards, settings, products] = await Promise.all([getActiveCategories(), getAllCards(), getSettings(), guideProducts()]);
   const cat = cats.find((c) => c.slug === slug);
   if (!cat) notFound();
   const inCat = cards.filter((c) => c.categoryId === cat.id);
+  const about = collectionFacts(cat.name, products.filter((p) => p.categorySlug === cat.slug), settings);
   const sp = await searchParams;
   const filters = filtersFromParams(sp);
   // "Baby / Boys / Girls" style shortcuts appear when listings in this category carry those tags.
@@ -45,12 +49,18 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const chip = (on: boolean) => `shrink-0 border px-4 py-2 text-xs font-bold tracking-[0.06em] uppercase transition-colors ${on ? "border-ink bg-ink text-white" : "border-[#cfcfcf] hover:border-ink"}`;
   return (
     <>
-      <JsonLd data={[breadcrumbs([{ name: "Home", path: "/" }, { name: cat.name, path: `/c/${cat.slug}` }]), itemList(cat.name, inCat.filter((c) => c.inStock))]} />
+      <JsonLd data={[
+        breadcrumbs([{ name: "Home", path: "/" }, { name: cat.name, path: `/c/${cat.slug}` }]),
+        { "@context": "https://schema.org", "@type": "CollectionPage", name: cat.name, url: abs(`/c/${cat.slug}`), description: cat.description || about.intro || undefined, isPartOf: { "@id": abs("/#website") } },
+        itemList(cat.name, inCat.filter((c) => c.inStock)),
+        ...(about.faq.length ? [faqPage(about.faq)] : []),
+      ]} />
       <div className="bg-sand-soft">
         <div className="container-x py-7 sm:py-10">
           <nav aria-label="Breadcrumb" className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-soft uppercase"><Link href="/" className="hover:underline">Home</Link> / <Link href="/shop" className="hover:underline">Shop</Link> / {cat.name}</nav>
           <h1 className="text-5xl sm:text-7xl">{cat.name}</h1>
           {cat.tagline && <p className="mt-2 text-ink-soft">{cat.tagline} · {inCat.length} {inCat.length === 1 ? "style" : "styles"}</p>}
+          {(cat.description || about.intro) && <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-soft">{cat.description || about.intro}</p>}
         </div>
       </div>
       {cat.comingSoon && (
@@ -71,6 +81,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         )}
         <Listing cards={inCat} filters={filters} />
       </div>
+      <CollectionFaq title={`${cat.name}: common questions`} faq={about.faq} />
     </>
   );
 }

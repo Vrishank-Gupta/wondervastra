@@ -82,9 +82,9 @@ export type Quote = {
 export const NO_END = Date.UTC(2100, 0, 1);
 export const isOpenEnded = (endsAt: number | null | undefined) => endsAt != null && endsAt >= NO_END;
 
-/** "20% off", "₹50 off" or "Lowest prices" for a sale. */
+/** "20% off", "₹50 off" or "Special prices" for a sale. */
 export function saleLabel(s: Pick<SaleRule, "type" | "value">) {
-  return s.type === "min_price" ? "Lowest prices" : s.type === "percent" ? `${s.value}% off` : `${rupees(s.value)} off`;
+  return s.type === "min_price" ? "Special prices" : s.type === "percent" ? `${s.value}% off` : `${rupees(s.value)} off`;
 }
 export function rewardLabel(o: Pick<OfferRule, "type" | "value" | "maxDiscount">) {
   if (o.type === "free_shipping") return "Free delivery";

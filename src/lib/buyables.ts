@@ -29,8 +29,9 @@ export type Buyable = {
   choices: Choice[];
 };
 
-export async function getBuyables(): Promise<Buyable[]> {
-  const cards = (await getAllCards()).filter((c) => !c.comingSoon);
+/** Every live listing, or just the one with `slug` (one product page shouldn't load the whole catalogue). */
+export async function getBuyables(slug?: string): Promise<Buyable[]> {
+  const cards = (await getAllCards()).filter((c) => !c.comingSoon && (!slug || c.slug === slug));
   const out: Buyable[] = [];
   for (const c of cards) {
     const d = await getProductBySlug(c.slug);

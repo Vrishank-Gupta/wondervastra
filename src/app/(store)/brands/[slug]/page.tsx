@@ -1,4 +1,7 @@
-import { breadcrumbs, itemList, JsonLd } from "@/lib/seo";
+import { abs, breadcrumbs, faqPage, itemList, JsonLd } from "@/lib/seo";
+import { guideProducts } from "@/lib/guides";
+import { collectionFacts } from "@/lib/product-facts";
+import { CollectionFaq } from "@/components/store/collection-faq";
 import { areaLabel } from "@/lib/delivery-area";
 import { getSettings } from "@/lib/settings";
 import type { Metadata } from "next";
@@ -17,8 +20,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!b) return {};
   return {
     title: `${b.name} thermals online`,
-    description: `Buy 100% original ${b.name} thermals online at the lowest prices${b.tagline ? `: ${b.tagline.toLowerCase()}` : ""}. Delivered across ${areaLabel(s)} by WonderVastra.`,
-    alternates: { canonical: `/brands/${b.slug}` },
+    description: `Buy 100% original ${b.name} thermals online, below MRP${b.tagline ? `: ${b.tagline.toLowerCase()}` : ""}. Delivered across ${areaLabel(s)} by WonderVastra.`,
+    alternates: { canonical: `/brands/${b.slug}`, types: { "text/markdown": `/brands/${b.slug}.md` } },
     ...(Object.keys(sp).length ? { robots: { index: false, follow: true } } : {}),
     openGraph: { images: b.image ? [b.image] : undefined },
   };
@@ -26,17 +29,23 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function BrandPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const [brands, cards] = await Promise.all([getActiveBrands(), getAllCards()]);
+  const [brands, cards, settings, products] = await Promise.all([getActiveBrands(), getAllCards(), getSettings(), guideProducts()]);
   const brand = brands.find((b) => b.slug === slug);
   if (!brand) notFound();
   const mine = cards.filter((c) => c.brandId === brand.id);
+  const about = collectionFacts(brand.name, products.filter((p) => p.brand === brand.name), settings, { brand: brand.isHouse ? undefined : brand.name });
   const cats = [...new Map(mine.map((c) => [c.categorySlug, c.categoryName])).entries()];
   const sp = await searchParams;
   const filters = { ...filtersFromParams(sp), brand: undefined, category: typeof sp.category === "string" ? sp.category : undefined };
   const dark = brand.isHouse;
   return (
     <>
-      <JsonLd data={[breadcrumbs([{ name: "Home", path: "/" }, { name: "Brands", path: "/brands" }, { name: brand.name, path: `/brands/${brand.slug}` }]), itemList(`${brand.name} thermals`, cards.filter((c) => c.brandId === brand.id && c.inStock))]} />
+      <JsonLd data={[
+        breadcrumbs([{ name: "Home", path: "/" }, { name: "Brands", path: "/brands" }, { name: brand.name, path: `/brands/${brand.slug}` }]),
+        { "@context": "https://schema.org", "@type": "CollectionPage", name: `${brand.name} thermals`, url: abs(`/brands/${brand.slug}`), description: about.intro || undefined, about: { "@type": "Brand", name: brand.name }, isPartOf: { "@id": abs("/#website") } },
+        itemList(`${brand.name} thermals`, cards.filter((c) => c.brandId === brand.id && c.inStock)),
+        ...(about.faq.length ? [faqPage(about.faq)] : []),
+      ]} />
       <div className={`relative overflow-hidden ${dark ? "bg-ink text-white" : "bg-sand-soft"}`}>
         {brand.image && <Image src={brand.image} alt="" fill priority sizes="100vw" className="object-cover opacity-35" />}
         <div className="container-x relative flex flex-wrap items-center gap-x-8 gap-y-4 py-7 sm:py-10">
@@ -49,7 +58,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
             </nav>
             <h1 className="text-5xl sm:text-7xl">{brand.name}</h1>
             <p className={`mt-2 ${dark ? "text-white/80" : "text-ink-soft"}`}>
-              {brand.tagline ? `${brand.tagline} · ` : ""}{mine.length} {mine.length === 1 ? "style" : "styles"}{dark ? "" : " · 100% original, lowest prices"}
+              {brand.tagline ? `${brand.tagline} · ` : ""}{mine.length} {mine.length === 1 ? "style" : "styles"}{dark ? "" : " · 100% original, below MRP"}
             </p>
           </div>
         </div>
@@ -65,6 +74,8 @@ export default async function BrandPage({ params, searchParams }: Props) {
         )}
         <Listing cards={mine} filters={filters} />
       </div>
+      {about.intro && <p className="container-x mb-8 max-w-3xl text-sm leading-relaxed text-ink-soft">{about.intro}</p>}
+      <CollectionFaq title={`${brand.name}: common questions`} faq={about.faq} />
     </>
   );
 }

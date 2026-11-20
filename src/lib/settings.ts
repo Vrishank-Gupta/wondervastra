@@ -5,7 +5,7 @@ import { clearMemo, memo } from "./memo";
 
 export const DEFAULT_SETTINGS = {
   storeName: "WonderVastra",
-  tagline: "100% original brands at the lowest prices. Thermals for kids (ages 2–11) and men.",
+  tagline: "100% original brands, always below MRP. Thermals for kids (ages 2–11) and men.",
   announcement: "",
   supportEmail: "",
   whatsappNumber: "",
@@ -18,6 +18,8 @@ export const DEFAULT_SETTINGS = {
   instagramUrl: "",
   facebookUrl: "",
   legalName: "",
+  /** The named person customers can complain to (Consumer Protection (E-Commerce) Rules, 2020). */
+  grievanceOfficer: "",
   businessAddress: "",
   /** State the business is registered in; decides CGST+SGST vs IGST on invoices. */
   businessState: "",
@@ -52,6 +54,8 @@ export const getSettings = cache(async (): Promise<StoreSettings> => {
   const rows = await memo("settings", () => db.select().from(schema.settings));
   const out: Record<string, unknown> = { ...DEFAULT_SETTINGS };
   for (const r of rows) out[r.key] = r.value;
+  // The first tagline promised "the lowest prices", a claim Google Merchant Center can't verify and flags as misrepresentation.
+  if (typeof out.tagline === "string") out.tagline = out.tagline.replace(/\s*at the lowest prices/i, ", always below MRP");
   return out as StoreSettings;
 });
 /** Always reads the database: for the admin settings page, right after a save. */
